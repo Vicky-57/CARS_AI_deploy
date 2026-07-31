@@ -1,0 +1,75 @@
+# ─── Environment ──────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ─── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+venv/
+.venv/
+env/
+.Python
+pip-log.txt
+
+# ─── Whisper / AI model cache ─────────────────────────────────────────────────
+*.pt
+*.bin
+*.onnx
+models/
+~/.cache/huggingface/
+
+# ─── Audio & media uploads ────────────────────────────────────────────────────
+*.mp3
+*.mp4
+*.wav
+*.m4a
+*.ogg
+*.flac
+*.webm
+
+# ─── Generated PDFs & documents ───────────────────────────────────────────────
+*.pdf
+# (keep template PDFs in other docs/ — un-ignore if needed)
+# !other docs/
+
+# ─── Node / Frontend ──────────────────────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/coverage/
+*.local
+
+# ─── IDEs ─────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.sw?
+
+# ─── OS files ─────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ─── Supabase local dev ───────────────────────────────────────────────────────
+.supabase/
+
+# ─── Misc ─────────────────────────────────────────────────────────────────────
+*.bak
+*.tmp

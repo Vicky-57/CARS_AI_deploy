@@ -1,0 +1,406 @@
+AI OPERATIONS SYSTEM
+Detailed Study & Development Plan
+Client
+CAR-AGENTS
+Prepared by
+McKH Technologies
+Timeline
+4 Weeks
+Document Version
+v2.0 — Detailed Plan
+1. Executive Summary
+CAR-AGENTS is a founder-led automotive brokerage that depends on fast lead response, disciplined follow-up, organized document handling, and consistent customer communication. This document provides the detailed study and development plan for the AI Operations System — including task-level breakdowns showing exactly which n8n node, API, or service powers each piece of work, along with realistic time estimates.
+1.1 Expected Business Impact
+Area
+Current State
+After System
+Lead Capture
+Manual, often missed
+Near 100% automated logging
+First Response Time
+Hours or next day
+30–60% faster turnaround
+Follow-up Discipline
+Relies on memory
+70–85% fewer missed follow-ups
+Daily Admin
+1–2 hrs of manual effort
+Automated digest saves 1–2 hrs/day
+Communication History
+Scattered across apps
+One unified CRM timeline
+Document Handling
+Inconsistent folder naming
+Structured Drive with CRM links
+Meeting Actions
+Notes lost or forgotten
+Auto-extracted tasks via voice AI
+2. Recommended Tech Stack & Integration Method
+Every tool below is connected to n8n through either a native node or a direct API call. This table shows exactly how each piece talks to the others.
+Tool
+Connects via
+Integration Detail
+HubSpot Free CRM
+n8n HubSpot node (OAuth 2.0 / Private App)
+Native n8n node — create/update contacts, deals, tasks, notes. Real-time webhook triggers are limited on Free tier, so changes are detected via scheduled polling (every 5 min) instead of instant push triggers.
+Gmail
+n8n Gmail node (OAuth 2.0)
+Native n8n node — trigger on new email, send email, label/archive. Used for inbound lead capture and outbound logging.
+Google Drive
+n8n Google Drive node (OAuth 2.0)
+Native n8n node — create folders, upload files, move/rename. Used to build and maintain the client/deal folder structure automatically.
+WhatsApp Business
+n8n WhatsApp Business Cloud API node / webhook
+Official Meta Cloud API via n8n's WhatsApp node — inbound messages arrive via webhook, outbound replies sent via API call. Requires Meta Business verification before webhook goes live.
+Claude API
+n8n HTTP Request node (Anthropic API)
+No native n8n node — calls Anthropic's /v1/messages endpoint directly via HTTP Request node. Used for summarization, classification, drafting, and the daily brief.
+Whisper / Transcription
+n8n HTTP Request node (OpenAI Whisper API)
+Voice notes forwarded via webhook, sent to Whisper API for transcription, text returned to n8n for further processing by Claude.
+Google Sheets (optional)
+n8n Google Sheets node (OAuth 2.0)
+Used only if lightweight reporting beyond HubSpot's dashboard is needed.
+2.1 Important Technical Notes
+HubSpot Free fully supports n8n's native HubSpot node for creating/updating contacts, deals, tasks, and notes — zero issues for this use case
+All standard read/write operations work on the Free tier with no restrictions
+Real-time webhook triggers (e.g. "the moment a deal moves to Won, do X") require HubSpot Professional/Enterprise
+Workaround: n8n Schedule Trigger polls HubSpot every 5 minutes instead of instant push — not a dealbreaker for a 1-person operation
+HubSpot requires OAuth 2.0 or Private App tokens for all API access as of 2026 — old-style API keys no longer work
+This is a one-time setup detail during Week 1, not an ongoing limitation
+WhatsApp connects via n8n's WhatsApp Business Cloud API node — inbound via webhook, outbound via API call
+Requires Meta Business verification to be completed before the webhook can go live
+Claude has no native n8n node — it is called directly via the HTTP Request node against the Anthropic API
+3. Sprint Breakdown — Week by Week
+WEEK 1  — Discovery, Process Mapping & CRM Setup
+3.1 Goal
+Understand exactly how CAR-AGENTS operates today. Define the lead lifecycle, deal pipeline stages, and data structure. Set up HubSpot as the central operating hub and Google Drive as the document backbone.
+3.2 Task Breakdown
+Task
+n8n / API / Service Used
+Estimated Time
+Kickoff meeting — capture full current workflow
+Manual / Zoom or in-person
+3–4 hours
+Map current lead sources (WhatsApp, email, referral, walk-in)
+Manual review of client data
+2–3 hours
+Define lead qualification criteria and scoring logic
+Manual — business logic definition
+2 hours
+Define deal pipeline stages
+HubSpot — Deal Pipeline settings
+2–3 hours
+Start WhatsApp Business verification process
+Meta Business Manager / Cloud API onboarding
+1–2 hours (review takes 1–2 weeks)
+Set up HubSpot Private App / OAuth 2.0 credentials
+HubSpot — Private App settings (required for n8n)
+1 hour
+Configure HubSpot account — contacts, companies, deals, tasks
+HubSpot Admin + n8n HubSpot node (test connection)
+4–6 hours
+Create custom HubSpot properties (lead source, vehicle type)
+HubSpot — Properties settings
+3–4 hours
+Set up Google Drive folder structure
+Google Drive + n8n Google Drive node
+2–3 hours
+Define document naming conventions
+Manual — documented standard
+1–2 hours
+Provision n8n instance (VPS, domain, SSL)
+n8n self-hosted — VPS (Hetzner/DigitalOcean)
+1–2 days
+Draft implementation spec for Weeks 2–4
+Manual — Google Doc
+4–5 hours
+Confirm automation approval rules
+Manual — policy decision with owner
+1–2 hours
+3.3 Week 1 Deliverables
+Deliverable
+Format
+Notes
+CRM Architecture Document
+PDF / Google Doc
+Full field mapping, pipeline stages, property list
+HubSpot Live Configuration
+HubSpot + Private App
+Working CRM with OAuth 2.0 credentials ready for n8n
+Google Drive Folder Structure
+Google Drive
+Standardized folders with naming convention guide
+n8n Instance
+Self-hosted VPS
+Live and ready for Week 2 workflow building
+WhatsApp Verification
+Meta Business Manager
+Submitted and in review — required before Week 2 WhatsApp build
+Implementation Specification
+Google Doc
+Blueprint for Weeks 2–4 development
+WEEK 2  — Communication Integration
+3.4 Goal
+Connect Gmail and WhatsApp to HubSpot via n8n so that every inbound and outbound message is automatically captured in the CRM timeline. Build the task-trigger logic so that conversations generate follow-up tasks without manual entry.
+3.5 Task Breakdown
+Task
+n8n / API / Service Used
+Estimated Time
+Connect Gmail via OAuth 2.0
+n8n Gmail node
+3–4 hours
+Build inbound email capture workflow
+n8n Gmail Trigger node → HubSpot node
+4–6 hours
+Build outbound email logging workflow
+n8n Gmail node → HubSpot Engagements API
+3–4 hours
+Confirm WhatsApp webhook is live (post-verification)
+Meta Cloud API + n8n Webhook node
+1–2 hours
+Build WhatsApp inbound message capture
+n8n WhatsApp node (webhook) → HubSpot node
+4–6 hours
+Map messages to correct HubSpot contact/deal
+n8n Function node + HubSpot Search API
+4–5 hours
+Build activity logging rules (calls, notes, emails)
+n8n HubSpot node — Engagements API
+3–4 hours
+Build task-trigger rules from inbound messages
+n8n IF/Switch node → HubSpot Tasks API
+4–5 hours
+Build HubSpot change-detection (polling, since no live webhook)
+n8n Schedule Trigger (every 5 min) → HubSpot node
+2–3 hours
+Build draft reply generation flow
+n8n HTTP Request node → Claude API
+3–5 hours
+Test end-to-end email and WhatsApp flow with dummy data
+n8n manual execution + HubSpot sandbox records
+3–4 hours
+3.6 Week 2 Deliverables
+Deliverable
+Format
+Notes
+Email Capture Workflow
+n8n workflow
+Inbound lead emails logged to HubSpot automatically
+WhatsApp Capture Workflow
+n8n workflow
+Inbound WhatsApp messages logged via Meta Cloud API
+HubSpot Polling Workflow
+n8n Schedule Trigger
+5-minute polling replaces unavailable real-time webhooks
+Task Trigger Logic
+n8n workflow
+New message → task created in HubSpot
+Draft Reply Generator
+n8n + Claude API
+AI drafts reply for owner review and approval
+Unified Activity Timeline
+HubSpot CRM
+All communications visible in one place per contact
+WEEK 3  — AI Intelligence Layer
+3.7 Goal
+Add the Claude-powered intelligence layer that transforms raw data into structured, useful outputs — lead summaries, conversation summaries, reply drafts, voice transcription, action-item extraction, and the daily executive brief.
+3.8 Task Breakdown
+Task
+n8n / API / Service Used
+Estimated Time
+Build AI lead summarization workflow
+n8n HTTP Request → Claude API → HubSpot Notes API
+4–6 hours
+Build conversation summarization workflow
+n8n HTTP Request → Claude API
+4–5 hours
+Build reply draft generation with tone matching
+n8n HTTP Request → Claude API (custom prompt)
+3–5 hours
+Set up Whisper transcription service
+n8n HTTP Request → OpenAI Whisper API
+3–4 hours
+Build voice-to-action workflow
+n8n: Webhook → Whisper API → Claude API → HubSpot Tasks API
+5–7 hours
+Build action-item extraction from transcripts
+n8n HTTP Request → Claude API (structured JSON output)
+3–5 hours
+Build stale deal detection
+n8n Schedule Trigger → HubSpot Deals API (filter by last activity)
+3–4 hours
+Build overdue task detection and escalation
+n8n Schedule Trigger → HubSpot Tasks API
+2–3 hours
+Build daily executive brief automation
+n8n Schedule Trigger → HubSpot API + Claude API → Gmail/WhatsApp send
+5–7 hours
+Test all AI workflows with real sample data
+n8n manual execution with client-provided samples
+4–6 hours
+Tune Claude prompts based on output quality
+Claude API — prompt iteration
+3–4 hours
+3.9 Week 3 Deliverables
+Deliverable
+Format
+Notes
+AI Lead Summary
+n8n + Claude + HubSpot
+Auto-summary on every new inbound lead
+AI Conversation Summary
+n8n + Claude
+Thread summarized and logged as HubSpot note
+Reply Draft Output
+Claude API → owner inbox
+Draft reply for approval before sending
+Voice-to-Task Workflow
+n8n + Whisper + Claude
+Voice note → transcript → summary → tasks
+Daily Executive Brief
+n8n + Claude → Gmail/WhatsApp
+Morning digest of leads, tasks, risks, priorities
+Silent Deal Alerts
+n8n + HubSpot Deals API
+Flags deals with no activity beyond threshold
+WEEK 4  — Testing, Hardening, UAT & Handover
+3.10 Goal
+Stabilize all workflows, run full functional and user acceptance testing with real business scenarios, harden error handling and retries, document the operating SOPs, train the owner, and deliver a production-ready system.
+3.11 Task Breakdown
+Task
+n8n / API / Service Used
+Estimated Time
+Smoke testing — all workflows run without crash
+n8n — manual execution of every workflow
+1 day
+API integration testing
+HubSpot, Claude, Gmail, WhatsApp, Drive, Whisper APIs
+1–2 days
+Functional testing — end-to-end per workflow
+n8n test executions against test matrix
+2 days
+UAT Session 1 — owner tests with live data
+Live walkthrough in HubSpot + WhatsApp
+Half day
+Bug fixing and iteration from UAT Session 1
+n8n workflow edits
+1–2 days
+UAT Session 2 — validate fixes and edge cases
+Live walkthrough
+Half day
+Error handling — retries, fallback logic, failure alerts
+n8n Error Trigger node + retry settings
+1–2 days
+Webhook monitoring — confirm reliable triggers
+n8n execution logs (Gmail, WhatsApp webhooks)
+Half day
+Write operating SOPs
+Manual — Google Doc
+1 day
+Owner training session
+Live walkthrough (recorded)
+2–3 hours
+Final handover — credentials, workflow map
+Manual — secure document handoff
+Half day
+1-week post-launch monitoring
+n8n execution logs + manual check-ins
+Ongoing
+3.12 Week 4 Deliverables
+Deliverable
+Format
+Notes
+Tested Production Workflows
+n8n + HubSpot + all tools
+All workflows live, tested, and stable
+UAT Report
+Document
+Pass/fail for each test scenario
+Operating SOPs
+PDF / Google Doc
+Step-by-step guides for owner
+Owner Training Recording
+Video
+Walkthrough session recorded for reference
+Handover Documentation
+Document
+All credentials, workflow map, API details
+Post-Launch Support Period
+1 week
+Bug fixes only; monitored by McKH Tech
+4. Time Risk Register
+This section identifies every component known to take meaningful time, with a single realistic estimate for planning purposes.
+Item
+Estimated Time
+Why It Can Take This Long
+WhatsApp Business verification
+1–2 weeks
+Meta manually reviews business documents via the Cloud API onboarding flow; can require resubmission if details don't match exactly
+HubSpot OAuth / Private App setup
+1 day
+By 2026, HubSpot requires OAuth 2.0 or Private App tokens — old API keys no longer work. One-time setup, not a recurring blocker
+HubSpot real-time triggers
+N/A — workaround used
+Instant webhook triggers need HubSpot Professional/Enterprise. Free tier uses 5-minute polling via n8n Schedule Trigger instead — fully workable for a 1-person operation
+n8n VPS setup & SSL/domain
+2 days
+Server provisioning, DNS propagation, and SSL certificate issuance
+Claude API key & rate limits
+Half day
+Account setup and initial usage tier confirmation
+Gmail OAuth / Drive auth
+Half day
+Workspace admin approval and consent screen setup
+Whisper/transcription integration
+1 day
+Audio format standardization and webhook wiring
+n8n workflow debugging (all flows)
+3 days
+Edge cases in message parsing, contact matching, and webhook reliability across all integrations
+Claude prompt tuning (summaries, brief)
+2 days
+Iterative — quality improves over 2–3 rounds with real sample data
+UAT and feedback rounds
+2 days
+Owner testing and fix cycles before launch
+4.1 Action Items to Protect the Timeline
+Start WhatsApp Business verification on Day 1 of Week 1 — it has the longest lead time and blocks Week 2 WhatsApp work
+Set up HubSpot Private App / OAuth 2.0 credentials early — old API keys will not work
+Use n8n Schedule Trigger polling (every 5 min) instead of real-time HubSpot webhooks — fully sufficient for this volume
+Provision the n8n VPS during Week 1 so DNS/SSL is ready before Week 2 development begins
+5. Ongoing Operating Costs
+The system is designed to run at low monthly cost. The following estimates are based on a small-volume founder-led business.
+Item
+Est. Monthly Cost
+Notes
+HubSpot Free CRM
+$0
+Free tier; covers all needed read/write operations via n8n
+n8n (self-hosted VPS)
+$5–$20/mo
+Hetzner/DigitalOcean; adequate for this volume
+Claude API
+$5–$30/mo
+Depends on message volume and brief frequency
+Google Workspace
+$6–$12/mo
+Per user; may already be in use
+WhatsApp Business API
+$0–$15/mo
+Free tier for low volume; per-message cost above threshold
+Whisper / Transcription
+$2–$10/mo
+OpenAI Whisper API; scales with recording volume
+Domain / Hosting (n8n VPS)
+$5–$20/mo
+One-time setup; ongoing server cost
+TOTAL ESTIMATE
+~$23–$107/mo
+Depends on usage volume and upgrade decisions
+5.1 Cost Notes
+HubSpot Free is sufficient — n8n's native HubSpot node handles all needed contact/deal/task/note operations
+Claude API cost depends almost entirely on how frequently the daily brief, summaries, and draft replies are generated
+WhatsApp Business API is free under ~1,000 conversations/month; cost starts above that threshold
+If a VPS is already available from another service, hosting cost may be zero
+McKH Technologies  |  Confidential  |  Prepared for CAR-AGENTS
