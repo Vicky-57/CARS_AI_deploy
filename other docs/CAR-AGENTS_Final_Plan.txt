@@ -1,0 +1,311 @@
+﻿CAR-AGENTS
+
+
+🚨 THE ONE BIG PROBLEM
+Claude Cowork scheduled tasks ONLY run while the laptop is switched on, awake, and the Claude Desktop app is open. If the laptop is closed, asleep, or off at 7am — the morning task simply does not run. Cowork also has no memory between sessions — every run starts completely fresh. This means the original COWORK plan is not truly automatic unless one computer is left on 24/7.
+	
+
+THE FIX:
+→  Move the automation engine from Claude Cowork to n8n. n8n never sleeps, never closes, and runs 24/7 regardless of any laptop.
+→  Claude is still used for all the "thinking" — summarizing, drafting, extracting tasks — but n8n is what triggers it and keeps things running on schedule.
+
+
+FEASIBILITY OF EACH PIECE
+	
+
+Component
+	Feasible?
+	Note
+	HubSpot Free as CRM
+	✅ Yes
+	Confirmed. Free forever, full API access.
+	n8n connects + writes to HubSpot
+	✅ Yes
+	Official node, 18 triggers, 31 actions. Needs OAuth/Private App token (API keys are deprecated).
+	Gmail / Outlook → Claude or n8n
+	✅ Yes
+	Both have official connectors.
+	WhatsApp via Wassenger (Enterprise)
+	✅ Yes
+	Confirmed directly from Wassenger docs. Needs WABA number.
+	Whisper transcription
+	✅ Yes
+	Free, open-source, runs locally.
+	"Runs automatically every morning" via Cowork alone
+	⚠️ Risky
+	Only works if laptop stays on and app stays open. Not reliable for production.
+	"Runs automatically every morning" via n8n on a cloud server
+	✅ Yes
+	True 24/7 automation — this is the fix.
+	HubSpot real-time webhook triggers
+	⚠️ Limited
+	Instant push triggers need HubSpot Pro/Enterprise. Free tier uses n8n polling every 5 minutes instead — fully workable for this volume.
+	Claude connection inside n8n
+	✅ Yes
+	No native n8n node for Claude — connects via n8n's HTTP Request node calling the Anthropic API directly.
+	Document validation (GST, signatures, clauses)
+	⚠️ Partial
+	Claude can flag obvious issues but is not a legal/compliance tool. Needs human review.
+	
+
+
+
+
+
+
+
+
+
+THE FINAL PLAN
+	
+
+1. CRM Foundation
+HubSpot free account. Stores all contacts, companies, deals, tasks, notes. n8n and Claude both read/write to it.
+	
+
+2. Sales & Pipeline
+HubSpot built-in Kanban pipeline. n8n polls HubSpot every 5 minutes (Free tier has no real-time webhooks) and flags deals with no activity. Claude writes the follow-up message.
+	
+
+3. Email
+Gmail and Outlook connected through n8n (always-on server). New emails trigger n8n, which sends the content to Claude to summarise and match to the right HubSpot contact.
+	
+
+4. WhatsApp
+WABA number connected to n8n through Wassenger (Enterprise plan). n8n catches every message instantly, Claude reads and drafts a reply, logs the conversation to HubSpot.
+	
+
+5. Unified Timeline
+Because every email, WhatsApp message, document, and voice note gets logged to HubSpot by n8n + Claude — the HubSpot contact page becomes the single timeline automatically.
+	
+
+6. Document Management
+Google Drive with one folder per client. n8n watches the folder 24/7, logs new files to HubSpot, and renames old versions with a date stamp.
+	
+
+7. Document Validation
+Drop a contract or invoice in a "Validate This" Drive folder. n8n picks it up immediately, Claude reads it, flags missing signatures, blank fields, and unusual clauses, saves a report. Human review still required before relying on it fully.
+	
+
+8. Voice Assistant
+Record a voice note or meeting, drop the audio file in Drive. Whisper (free, installed on the server) converts it to text. Claude summarises it, lists decisions and action items, and n8n creates the matching HubSpot tasks.
+	
+
+9. Workflow Automation
+n8n runs a master check every morning on the always-on server — reads emails, WhatsApp, and notes from the last 24 hours, sends them to Claude to extract every commitment and deadline, and creates HubSpot tasks. This now runs reliably with or without anyone's laptop being on.
+	
+
+
+
+WHAT CHANGED FROM THE ORIGINAL PLAN
+Only one real change: the "brain" (Claude) stays exactly the same, but the "always-running engine" moved from Claude Cowork on a personal laptop to n8n. Everything else — HubSpot, Gmail, WhatsApp via Wassenger, Whisper, Drive — works exactly as planned.
+	
+
+
+
+
+
+DAY-BY-DAY 4-WEEK BUILD PLAN
+	
+
+Mon–Fri working days. Each week builds on the last. Nothing skipped.
+
+
+WEEK 1 — CRM + INFRASTRUCTURE FOUNDATION
+	
+
+Mon
+	Discovery & Setup
+• Map out CAR-AGENTS current process: how leads come in, how deals are won/lost
+• Define pipeline stages: New Inquiry → Consultation → Car Search → Offer Made → Won/Lost
+• Create HubSpot free account, set up company profile
+• 🚨 Start WhatsApp Business (WABA) verification with Meta TODAY — this takes 1-2 weeks to approve and will block Week 2 WhatsApp work if not started now
+	
+
+Tue
+	HubSpot Configuration
+• Set up Contacts, Companies, Deals, Tasks, Notes structure in HubSpot
+• Build the pipeline with the stages from Monday
+• Set up a Private App (OAuth token) in HubSpot for API access — needed for n8n
+	
+
+Wed
+	Server & n8n Setup
+• Rent a small always-on cloud server (e.g. Hetzner, ~€5/mo)
+• Install n8n on the server (Docker setup, takes about 1-2 hours)
+• Confirm n8n is reachable and stays running 24/7
+	
+
+Thu
+	Connect HubSpot to n8n
+• Add HubSpot credentials (OAuth) inside n8n
+• Build and test a simple workflow: create a test contact in HubSpot from n8n
+• Confirm read + write both work correctly
+	
+
+Fri
+	Google Drive Setup
+• Create folder structure: CAR-AGENTS Docs / [Client Name] / Contracts, Invoices, Proposals
+• Create two special folders: "Validate This" and "Transcribe This"
+• Connect Google Drive to n8n, test that n8n can see new files appearing
+	
+
+WEEK 2 — COMMUNICATION INTEGRATION
+	
+
+Mon
+	Gmail / Outlook Setup
+• Connect Gmail and Outlook to n8n
+• Build workflow: new email arrives → n8n captures sender + content
+	
+
+Tue
+	Email → HubSpot Logic
+• Build matching logic: find contact by email address in HubSpot, or create new one if not found
+• Log the email as an activity on the matched contact
+• Test with 5-10 real sample emails
+	
+
+Wed
+	WhatsApp Setup (Part 1)
+• Check status of WABA verification started in Week 1 — follow up with Meta if still pending
+• Set up Wassenger account on the Enterprise plan
+• Connect Wassenger to the WABA number once verified
+	
+
+Thu
+	WhatsApp Setup (Part 2)
+• Connect Wassenger to n8n using their MCP/API integration
+• Build workflow: new WhatsApp message → n8n captures sender phone number + message
+• Match to HubSpot contact by phone number, log as activity, create new contact if needed
+	
+
+Fri
+	Testing Communication Layer
+• Send test emails and WhatsApp messages, confirm both log correctly to HubSpot
+• Fix any contact-matching errors found
+• Confirm the Unified Timeline requirement — check a contact page shows both email + WhatsApp together
+	
+
+⚠️ TIMELINE RISK FLAG
+If Meta's WhatsApp Business verification (started Week 1, Monday) takes the full 2 weeks, WhatsApp work may need to shift slightly later in Week 2. Everything else in Week 2 (email integration) is unaffected and can proceed on schedule regardless.
+	
+
+
+
+WEEK 3 — AI INTELLIGENCE LAYER
+	
+
+Mon
+	Connect Claude to the Workflow
+• Add Claude to n8n via the HTTP Request node calling the Anthropic API directly — Claude has no native n8n node, so this connection method is required
+• Build first AI step: n8n sends an email's content to Claude, asks for a one-line summary
+	
+
+Tue
+	Reply Drafting + Lead Classification
+• Build workflow: Claude reads new lead message, classifies it (new lead / question / complaint)
+• Claude drafts a suggested reply — sent to Maxim for approval, never auto-sent
+	
+
+Wed
+	Document Validation Workflow
+• Build workflow: new file in "Validate This" folder triggers Claude to read it
+• Claude checks for missing signatures, blank fields, unusual clauses
+• Save a validation report next to the original file, log result in HubSpot
+	
+
+Thu
+	Voice-to-Action Workflow
+• Install Whisper on the server (one-time, free)
+• Build workflow: audio file in "Transcribe This" folder → Whisper converts to text → Claude summarises
+• Claude extracts action items → n8n creates matching tasks in HubSpot
+	
+
+Fri
+	Daily Briefing Workflow
+• Build the master morning workflow: pulls new leads, overdue tasks, silent deals, missing documents
+• Claude writes one clean daily summary
+• n8n sends it to Maxim every morning (WhatsApp message or email)
+	
+
+WEEK 4 — TESTING, HARDENING & HANDOVER
+	
+
+Mon
+	End-to-End Testing
+• Run through every workflow with real test scenarios from start to finish
+• New lead → logged correctly? Document → validated correctly? Voice note → task created correctly?
+	
+
+Tue
+	Error Handling
+• Add retry logic for failed steps (e.g. HubSpot API rate limits)
+• Add notifications if a workflow fails, so issues are caught immediately
+	
+
+Wed
+	User Acceptance Testing (UAT)
+• Client tests the system himself with real, current leads and documents
+• Note every confusing or incorrect result
+• Fix issues found same day
+	
+
+Thu
+	Documentation & SOPs
+• Write a simple one-page guide: how to add a document, how to check the daily briefing, who to contact if something breaks
+• Document every workflow for future reference
+	
+
+
+
+Fri
+	Handover & Launch
+• Walk Client through the entire system live
+• Confirm he knows how to approve replies, check tasks, and use HubSpot day-to-day
+• Go live — system runs in production from this day forward
+	
+
+
+
+
+
+TIME RISK REGISTER
+	
+
+The 4 things most likely to silently stretch the timeline if not watched closely.
+
+
+Risk Item
+	Estimated Time
+	Why It Can Slip
+	WhatsApp Business (WABA) verification
+	1–2 weeks
+	Meta manually reviews business documents — can require resubmission if details don't match exactly. This is why it must start Week 1, Day 1.
+	n8n VPS + SSL/domain setup
+	2 days
+	Server provisioning, DNS propagation, and SSL certificate issuance can take longer than expected on the first attempt.
+	n8n workflow debugging across all integrations
+	3 days
+	Edge cases in message parsing, contact matching, and webhook reliability tend to surface only once real data flows through.
+	Claude prompt tuning for summaries & daily brief
+	2 days
+	Output quality improves iteratively — usually takes 2-3 rounds of real sample data before the summaries feel right.
+	
+
+PROTECT THE TIMELINE
+Start WhatsApp verification on Day 1 of Week 1 — it has the longest lead time of anything in this plan and silently blocks Week 2 if delayed. Everything else on this list is manageable within the 4-week window as long as it is tracked, not ignored.
+	
+
+
+
+
+
+BOTTOM LINE
+	
+
+Is 4 weeks realistic?
+Yes — for everything except deep document/legal validation and advanced RAG search, which both need more real-world tuning over time. The 4-week plan above delivers a fully working, reliably automated system. Expect 1-2 extra weeks of fine-tuning after go-live as real edge cases appear — this is normal for any new automation system, not a sign of failure.
+	
+
+CAR-AGENTS · Final Feasibility Review & 4-Week Plan
