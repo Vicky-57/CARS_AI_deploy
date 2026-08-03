@@ -66,8 +66,8 @@ function Sidebar({ online }) {
 
       <div className="sidebar-status">
         {online
-          ? <><span className="status-dot online" /><span>Frappe CRM connected</span></>
-          : <><span className="status-dot" /><span>Frappe CRM offline</span></>
+          ? <><span className="status-dot online" /><span>Supabase & AI connected</span></>
+          : <><span className="status-dot" /><span>System offline</span></>
         }
       </div>
 
@@ -93,7 +93,7 @@ function Sidebar({ online }) {
       <div className="sidebar-footer">
         <div className="nav-item" style={{ color: '#475569', fontSize: '0.72rem', cursor: 'default' }}>
           <Activity size={14} />
-          v5.0.0 — Frappe CRM
+          v5.0.0 — CAR-AGENTS
         </div>
       </div>
     </aside>
