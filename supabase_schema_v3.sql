@@ -78,7 +78,62 @@ CREATE TABLE IF NOT EXISTS meetings (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 7. LEADS TABLE (Inbound Contacts)
+CREATE TABLE IF NOT EXISTS leads (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    email TEXT,
+    phone TEXT,
+    channel TEXT DEFAULT 'MANUAL',
+    intent TEXT DEFAULT 'UNKNOWN',
+    status TEXT DEFAULT 'NEW',
+    message TEXT,
+    manufacturer TEXT,
+    model TEXT,
+    vin TEXT,
+    license_plate TEXT,
+    initial_registration TEXT,
+    mileage TEXT,
+    power_ps TEXT,
+    displacement_ccm TEXT,
+    tuev_until TEXT,
+    price_limit NUMERIC(12, 2),
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 8. COMMUNICATIONS_LOG TABLE (Unified Inbox Timeline)
+CREATE TABLE IF NOT EXISTS communications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
+    channel TEXT,
+    sender_name TEXT,
+    sender_contact TEXT,
+    subject TEXT,
+    body TEXT,
+    is_inbound BOOLEAN DEFAULT TRUE,
+    intent TEXT,
+    ai_summary TEXT,
+    timestamp TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 9. PROJECT MILESTONES TABLE (Sequential Steps Tracking, used by API)
+CREATE TABLE IF NOT EXISTS project_milestones (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+    step_number INT NOT NULL,
+    title TEXT NOT NULL,
+    is_completed BOOLEAN DEFAULT FALSE,
+    completed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- INDEXES FOR PERFORMANCE
+CREATE INDEX IF NOT EXISTS idx_leads_channel ON leads(channel);
+CREATE INDEX IF NOT EXISTS idx_leads_intent ON leads(intent);
+CREATE INDEX IF NOT EXISTS idx_communications_lead ON communications(lead_id);
+CREATE INDEX IF NOT EXISTS idx_project_milestones_project ON project_milestones(project_id);
 CREATE INDEX IF NOT EXISTS idx_projects_type ON projects(project_type);
 CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
 CREATE INDEX IF NOT EXISTS idx_expenses_project ON project_expenses(project_id);
