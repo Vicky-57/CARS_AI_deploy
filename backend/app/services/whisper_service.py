@@ -1,5 +1,9 @@
+"""
+app/services/whisper_service.py
+────────────────────────────────────────────────────────────────────────
+Whisper Audio Transcription Service using faster-whisper.
+"""
 import os
-import shutil
 import tempfile
 from faster_whisper import WhisperModel
 from config import settings
@@ -24,7 +28,7 @@ def transcribe_audio(file_path: str, language: str | None = None) -> str:
 
 
 def transcribe_bytes(audio_bytes: bytes, suffix: str = ".mp3") -> str:
-    """Transcribe audio from bytes, saving to a temp file first."""
+    """Transcribe audio from bytes."""
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(audio_bytes)
         tmp_path = tmp.name

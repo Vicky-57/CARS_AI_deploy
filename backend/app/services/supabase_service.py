@@ -1,3 +1,8 @@
+"""
+app/services/supabase_service.py
+────────────────────────────────────────────────────────────────────────
+Supabase Client Service for database queries and data storage.
+"""
 from database import get_supabase
 from typing import Optional, List, Dict, Any
 from datetime import datetime

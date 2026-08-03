@@ -54,11 +54,11 @@ export default function Dashboard() {
       sub: 'Beschaffung pipeline',
     },
     {
-      label: 'Pending OCR Docs',
-      value: summary.pending_ocr_documents,
+      label: 'Active Projects',
+      value: (summary.active_sell_deals || 0) + (summary.active_buy_deals || 0),
       icon: FileText,
       color: 'amber',
-      sub: 'Awaiting verification',
+      sub: 'Total across pipelines',
     },
   ] : [
     { label: 'New Leads (24h)',    value: '—', icon: Users,      color: 'blue',   sub: '' },
@@ -68,14 +68,14 @@ export default function Dashboard() {
   ];
 
   const intentBadge = (intent) => {
-    if (intent === 'BUY_INTENT')  return <span className="badge badge-buy">Buy</span>;
-    if (intent === 'SELL_INTENT') return <span className="badge badge-sell">Sell</span>;
+    if (intent === 'BUY_INTENT' || intent === 'BUY')  return <span className="badge badge-buy">Buy</span>;
+    if (intent === 'SELL_INTENT' || intent === 'SELL') return <span className="badge badge-sell">Sell</span>;
     return <span className="badge badge-new">New</span>;
   };
 
   const pipelineBadge = (type) => {
-    if (type === 'sell') return <span className="badge badge-sell">Sell</span>;
-    if (type === 'buy')  return <span className="badge badge-buy">Buy</span>;
+    if (type === 'SELL' || type === 'sell') return <span className="badge badge-sell">Sell</span>;
+    if (type === 'BUY'  || type === 'buy')  return <span className="badge badge-buy">Buy</span>;
     return null;
   };
 
@@ -137,14 +137,14 @@ export default function Dashboard() {
               </thead>
               <tbody>
                 {leads.map(lead => (
-                  <tr key={lead.name}>
+                  <tr key={lead.id}>
                     <td style={{ fontWeight: 500 }}>
-                      {`${lead.first_name || ''} ${lead.last_name || ''}`.trim() || lead.email || '—'}
+                      {lead.name || lead.email || '—'}
                     </td>
-                    <td>{pipelineBadge(lead.custom_pipeline_type)}</td>
-                    <td>{intentBadge(lead.custom_client_intent)}</td>
+                    <td>{pipelineBadge(lead.intent)}</td>
+                    <td>{intentBadge(lead.intent)}</td>
                     <td style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                      {timeAgo(lead.creation)}
+                      {timeAgo(lead.created_at)}
                     </td>
                   </tr>
                 ))}
@@ -167,17 +167,17 @@ export default function Dashboard() {
               </div>
               <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {summary.inactive_deals.slice(0, 3).map(deal => (
-                  <div key={deal.name} style={{
+                  <div key={deal.id} style={{
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     padding: '6px 0', borderBottom: '1px solid var(--border)'
                   }}>
                     <div>
-                      <div style={{ fontWeight: 500, fontSize: '0.82rem' }}>{deal.lead_name || deal.name}</div>
+                      <div style={{ fontWeight: 500, fontSize: '0.82rem' }}>{deal.client_name || deal.id}</div>
                       <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                        {deal.custom_pipeline_type?.toUpperCase()} · Last activity {timeAgo(deal.modified)}
+                        {deal.project_type} · Last activity {timeAgo(deal.updated_at)}
                       </div>
                     </div>
-                    {pipelineBadge(deal.custom_pipeline_type)}
+                    {pipelineBadge(deal.project_type)}
                   </div>
                 ))}
               </div>
