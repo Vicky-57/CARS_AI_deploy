@@ -1,0 +1,55 @@
+{
+    "actions": [],
+    "autoname": "format:VDS-{YYYY}-{#####}",
+    "creation": "2026-08-03 00:00:00.000000",
+    "doctype": "DocType",
+    "engine": "InnoDB",
+    "field_order": [
+        "spec_key",
+        "spec_value",
+        "verified",
+        "confidence",
+        "source_field"
+    ],
+    "fields": [
+        {
+            "fieldname": "spec_key",
+            "fieldtype": "Data",
+            "in_list_view": 1,
+            "label": "Field Name",
+            "reqd": 1
+        },
+        {
+            "fieldname": "spec_value",
+            "fieldtype": "Data",
+            "in_list_view": 1,
+            "label": "Extracted Value",
+            "reqd": 1
+        },
+        {
+            "default": "0",
+            "fieldname": "verified",
+            "fieldtype": "Check",
+            "in_list_view": 1,
+            "label": "Verified by User"
+        },
+        {
+            "fieldname": "confidence",
+            "fieldtype": "Float",
+            "in_list_view": 1,
+            "label": "OCR Confidence %",
+            "description": "Confidence score returned by the OCR engine (0-100)"
+        },
+        {
+            "fieldname": "source_field",
+            "fieldtype": "Data",
+            "label": "Contract Placeholder",
+            "description": "Matching double-brace placeholder e.g. {{vin}}"
+        }
+    ],
+    "istable": 1,
+    "module": "Car Agents CRM",
+    "name": "Vehicle Document Spec",
+    "naming_rule": "Expression",
+    "track_changes": 0
+}

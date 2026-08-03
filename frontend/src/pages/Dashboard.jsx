@@ -1,50 +1,29 @@
 import { useState, useEffect } from 'react';
-import { Users, FolderKanban, MessageSquare, Calendar, TrendingUp, Clock, ArrowUpRight } from 'lucide-react';
+import {
+  Users, FolderKanban, MessageSquare, Calendar,
+  ArrowUpRight, Clock, TrendingUp, FileText, AlertTriangle, CheckCircle
+} from 'lucide-react';
 import { api } from '../api/api';
-import { format } from 'date-fns';
-
-const MOCK_STATS = [
-  { label: 'Total Leads', value: '—', icon: Users, color: 'blue', change: '' },
-  { label: 'Active Projects', value: '—', icon: FolderKanban, color: 'green', change: '' },
-  { label: 'Messages Today', value: '—', icon: MessageSquare, color: 'purple', change: '' },
-  { label: "Today's Meetings", value: '—', icon: Calendar, color: 'amber', change: '' },
-];
+import { format, formatDistanceToNow } from 'date-fns';
 
 export default function Dashboard() {
-  const [stats, setStats] = useState(MOCK_STATS);
-  const [leads, setLeads] = useState([]);
+  const [summary, setSummary]   = useState(null);
+  const [leads, setLeads]       = useState([]);
   const [meetings, setMeetings] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading]   = useState(true);
 
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const [leadsData, projectsData, commsData, meetingsData] = await Promise.allSettled([
-          api.getLeads({ limit: 5 }),
-          api.getProjects(),
-          api.getCommunications(),
-          api.getMeetings(),
+        const [summaryRes, leadsRes, meetingsRes] = await Promise.allSettled([
+          api.getPipelineSummary(),
+          api.getLeads({}, 5),
+          api.getMeetings({}, 5),
         ]);
 
-        const l = leadsData.status === 'fulfilled' ? leadsData.value : [];
-        const p = projectsData.status === 'fulfilled' ? projectsData.value : [];
-        const c = commsData.status === 'fulfilled' ? commsData.value : [];
-        const m = meetingsData.status === 'fulfilled' ? meetingsData.value : [];
-
-        const today = new Date().toDateString();
-        const todayComms = c.filter(x => new Date(x.timestamp).toDateString() === today);
-        const todayMeetings = m.filter(x => new Date(x.start_time).toDateString() === today);
-
-        setStats([
-          { label: 'Total Leads', value: l.length || 0, icon: Users, color: 'blue', change: 'All time' },
-          { label: 'Active Projects', value: p.filter(x => x.status === 'ACTIVE').length || 0, icon: FolderKanban, color: 'green', change: `${p.length} total` },
-          { label: 'Messages Today', value: todayComms.length, icon: MessageSquare, color: 'purple', change: 'Email + WhatsApp' },
-          { label: "Today's Meetings", value: todayMeetings.length, icon: Calendar, color: 'amber', change: todayMeetings.length > 0 ? 'Scheduled' : 'None scheduled' },
-        ]);
-        setLeads(l.slice(0, 5));
-        setMeetings(m.slice(0, 4));
-      } catch {
-        // API offline — show defaults
+        if (summaryRes.status === 'fulfilled')  setSummary(summaryRes.value);
+        if (leadsRes.status   === 'fulfilled')  setLeads(leadsRes.value.slice(0, 5));
+        if (meetingsRes.status === 'fulfilled') setMeetings(meetingsRes.value.slice(0, 4));
       } finally {
         setLoading(false);
       }
@@ -52,43 +31,86 @@ export default function Dashboard() {
     fetchAll();
   }, []);
 
+  const stats = summary ? [
+    {
+      label: 'New Leads (24h)',
+      value: summary.new_leads_24h,
+      icon: Users,
+      color: 'blue',
+      sub: 'Last 24 hours',
+    },
+    {
+      label: 'Active SELL Deals',
+      value: summary.active_sell_deals,
+      icon: TrendingUp,
+      color: 'green',
+      sub: 'Vermittlung pipeline',
+    },
+    {
+      label: 'Active BUY Deals',
+      value: summary.active_buy_deals,
+      icon: FolderKanban,
+      color: 'purple',
+      sub: 'Beschaffung pipeline',
+    },
+    {
+      label: 'Pending OCR Docs',
+      value: summary.pending_ocr_documents,
+      icon: FileText,
+      color: 'amber',
+      sub: 'Awaiting verification',
+    },
+  ] : [
+    { label: 'New Leads (24h)',    value: '—', icon: Users,      color: 'blue',   sub: '' },
+    { label: 'Active SELL Deals',  value: '—', icon: TrendingUp, color: 'green',  sub: '' },
+    { label: 'Active BUY Deals',   value: '—', icon: FolderKanban, color: 'purple', sub: '' },
+    { label: 'Pending OCR Docs',   value: '—', icon: FileText,   color: 'amber',  sub: '' },
+  ];
+
+  const intentBadge = (intent) => {
+    if (intent === 'BUY_INTENT')  return <span className="badge badge-buy">Buy</span>;
+    if (intent === 'SELL_INTENT') return <span className="badge badge-sell">Sell</span>;
+    return <span className="badge badge-new">New</span>;
+  };
+
+  const pipelineBadge = (type) => {
+    if (type === 'sell') return <span className="badge badge-sell">Sell</span>;
+    if (type === 'buy')  return <span className="badge badge-buy">Buy</span>;
+    return null;
+  };
+
   const formatTime = (iso) => {
     try { return format(new Date(iso), 'HH:mm'); } catch { return ''; }
   };
 
-  const intentBadge = (intent) => {
-    if (intent === 'BUY') return <span className="badge badge-buy">Buy</span>;
-    if (intent === 'SELL') return <span className="badge badge-sell">Sell</span>;
-    return <span className="badge badge-new">New</span>;
-  };
-
-  const channelBadge = (ch) => {
-    if (ch === 'WHATSAPP') return <span className="badge badge-whatsapp">WhatsApp</span>;
-    if (ch === 'EMAIL') return <span className="badge badge-email">Email</span>;
-    return <span className="badge badge-manual">Manual</span>;
+  const timeAgo = (iso) => {
+    try { return formatDistanceToNow(new Date(iso), { addSuffix: true }); } catch { return ''; }
   };
 
   return (
     <div>
-      {/* Stats */}
+      {/* Stats Grid */}
       <div className="stats-grid">
-        {stats.map(({ label, value, icon: Icon, color, change }) => (
+        {stats.map(({ label, value, icon: Icon, color, sub }) => (
           <div key={label} className="stat-card">
             <div className="stat-card-header">
               <span className={`stat-icon ${color}`}><Icon size={18} /></span>
               <ArrowUpRight size={14} color="var(--text-muted)" />
             </div>
             <div className="stat-value">
-              {loading ? <span className="spinner" style={{ width: 20, height: 20, borderWidth: 2 }} /> : value}
+              {loading
+                ? <span className="spinner" style={{ width: 20, height: 20, borderWidth: 2 }} />
+                : value}
             </div>
             <div className="stat-label">{label}</div>
-            {change && <div className="stat-change">{change}</div>}
+            {sub && <div className="stat-change">{sub}</div>}
           </div>
         ))}
       </div>
 
       {/* Two-column layout */}
       <div className="grid-2">
+
         {/* Recent Leads */}
         <div className="card">
           <div className="card-header">
@@ -108,18 +130,22 @@ export default function Dashboard() {
               <thead>
                 <tr>
                   <th>Name</th>
-                  <th>Channel</th>
+                  <th>Pipeline</th>
                   <th>Intent</th>
-                  <th>Status</th>
+                  <th>Received</th>
                 </tr>
               </thead>
               <tbody>
                 {leads.map(lead => (
-                  <tr key={lead.id}>
-                    <td style={{ fontWeight: 500 }}>{lead.name || '—'}</td>
-                    <td>{channelBadge(lead.channel)}</td>
-                    <td>{intentBadge(lead.intent)}</td>
-                    <td><span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{lead.status}</span></td>
+                  <tr key={lead.name}>
+                    <td style={{ fontWeight: 500 }}>
+                      {`${lead.first_name || ''} ${lead.last_name || ''}`.trim() || lead.email || '—'}
+                    </td>
+                    <td>{pipelineBadge(lead.custom_pipeline_type)}</td>
+                    <td>{intentBadge(lead.custom_client_intent)}</td>
+                    <td style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      {timeAgo(lead.creation)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -127,39 +153,73 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Today's Meetings */}
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title">Today's Meetings</span>
-            <a href="/calendar" style={{ fontSize: '0.72rem', color: 'var(--brand-600)' }}>Calendar →</a>
-          </div>
-          <div className="card-body">
-            {loading ? (
-              <div className="loading-spinner"><div className="spinner" /></div>
-            ) : meetings.length === 0 ? (
-              <div className="empty-state">
-                <Calendar size={28} />
-                <h3>No meetings scheduled</h3>
-                <p>Book a meeting in the Calendar section.</p>
+        {/* Inactive Deals Alert + Today's Meetings */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* Inactive Deals */}
+          {summary && summary.inactive_deals && summary.inactive_deals.length > 0 && (
+            <div className="card" style={{ borderLeft: '3px solid var(--amber-500)' }}>
+              <div className="card-header">
+                <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <AlertTriangle size={15} color="var(--amber-500)" />
+                  Inactive Deals ({summary.inactive_deals.length})
+                </span>
               </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {meetings.map(m => (
-                  <div key={m.id} className={`meeting-card${m.is_onsite ? ' onsite' : ''}`}>
-                    <Clock size={14} color="var(--text-muted)" style={{ marginTop: 2 }} />
+              <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {summary.inactive_deals.slice(0, 3).map(deal => (
+                  <div key={deal.name} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '6px 0', borderBottom: '1px solid var(--border)'
+                  }}>
                     <div>
-                      <div className="meeting-time">{formatTime(m.start_time)} – {formatTime(m.end_time)}</div>
-                      <div className="meeting-title">{m.title}</div>
-                      <div className="meeting-detail">
-                        {m.is_onsite ? '📍 Onsite' : '💻 Online'}
-                        {m.attendee_name ? ` · ${m.attendee_name}` : ''}
+                      <div style={{ fontWeight: 500, fontSize: '0.82rem' }}>{deal.lead_name || deal.name}</div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        {deal.custom_pipeline_type?.toUpperCase()} · Last activity {timeAgo(deal.modified)}
                       </div>
                     </div>
+                    {pipelineBadge(deal.custom_pipeline_type)}
                   </div>
                 ))}
               </div>
-            )}
+            </div>
+          )}
+
+          {/* Today's Meetings */}
+          <div className="card" style={{ flex: 1 }}>
+            <div className="card-header">
+              <span className="card-title">Today's Meetings</span>
+              <a href="/calendar" style={{ fontSize: '0.72rem', color: 'var(--brand-600)' }}>Calendar →</a>
+            </div>
+            <div className="card-body">
+              {loading ? (
+                <div className="loading-spinner"><div className="spinner" /></div>
+              ) : meetings.length === 0 ? (
+                <div className="empty-state">
+                  <Calendar size={28} />
+                  <h3>No meetings today</h3>
+                  <p>Book a meeting in the Calendar section.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {meetings.map(m => (
+                    <div key={m.name} className="meeting-card">
+                      <Clock size={14} color="var(--text-muted)" style={{ marginTop: 2 }} />
+                      <div>
+                        <div className="meeting-time">
+                          {formatTime(m.starts_on)} – {formatTime(m.ends_on)}
+                        </div>
+                        <div className="meeting-title">{m.subject}</div>
+                        <div className="meeting-detail">
+                          {m.event_type === 'Private' ? '💻 Online' : '📍 Onsite'}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
+
         </div>
       </div>
     </div>

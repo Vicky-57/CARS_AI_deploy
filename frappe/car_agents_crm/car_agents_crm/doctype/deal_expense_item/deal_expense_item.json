@@ -1,0 +1,62 @@
+{
+    "actions": [],
+    "autoname": "format:EXP-{YYYY}-{#####}",
+    "creation": "2026-08-03 00:00:00.000000",
+    "doctype": "DocType",
+    "engine": "InnoDB",
+    "field_order": [
+        "expense_date",
+        "expense_category",
+        "description",
+        "amount_eur",
+        "receipt_attachment",
+        "paid_by"
+    ],
+    "fields": [
+        {
+            "fieldname": "expense_date",
+            "fieldtype": "Date",
+            "in_list_view": 1,
+            "label": "Date",
+            "reqd": 1
+        },
+        {
+            "fieldname": "expense_category",
+            "fieldtype": "Select",
+            "in_list_view": 1,
+            "label": "Category",
+            "options": "TÜV Inspection\nDetailing / Cleaning\nTransport / Towing\nOil Change / Service\nAdministration\nPhotography / Marketing\nOther",
+            "reqd": 1
+        },
+        {
+            "fieldname": "description",
+            "fieldtype": "Small Text",
+            "in_list_view": 1,
+            "label": "Description"
+        },
+        {
+            "fieldname": "amount_eur",
+            "fieldtype": "Currency",
+            "in_list_view": 1,
+            "label": "Amount (€)",
+            "options": "EUR",
+            "reqd": 1
+        },
+        {
+            "fieldname": "receipt_attachment",
+            "fieldtype": "Attach Image",
+            "label": "Receipt Photo"
+        },
+        {
+            "fieldname": "paid_by",
+            "fieldtype": "Select",
+            "label": "Paid By",
+            "options": "CAR-AGENTS\nClient\nThird Party"
+        }
+    ],
+    "istable": 1,
+    "module": "Car Agents CRM",
+    "name": "Deal Expense Item",
+    "naming_rule": "Expression",
+    "track_changes": 0
+}

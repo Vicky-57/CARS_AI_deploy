@@ -1,57 +1,61 @@
-import os
-import tempfile
+"""
+backend/routes/ocr.py
+─────────────────────────────────────────────────────────────────────────
+KEPT: OCR & document parsing endpoint.
+All CRM data storage is now handled by Frappe CRM via car_agents_crm.api.
+This route only handles the AI extraction and returns structured JSON.
+─────────────────────────────────────────────────────────────────────────
+"""
 from fastapi import APIRouter, UploadFile, File, HTTPException
-from services import whisper_service, claude_service, pdf_service
+from services.claude_service import extract_client_details, extract_vehicle_specs
+import tempfile, os
 
-router = APIRouter(prefix="/api", tags=["OCR & Voice"])
+router = APIRouter(prefix="/api/ocr", tags=["OCR"])
 
 
-@router.post("/ocr/parse")
-async def parse_document(file: UploadFile = File(...)):
-    """Upload a PDF or image scan → extract raw OCR text."""
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No file provided.")
+@router.post("/client-details")
+async def ocr_client_details(file: UploadFile = File(...)):
+    """
+    Extract personal client details from an uploaded document.
+    Used by Frappe car_agents_crm.api.extract_client_details via HTTP bridge.
 
-    suffix = os.path.splitext(file.filename)[-1].lower()
-    if suffix not in {".pdf", ".png", ".jpg", ".jpeg", ".tiff", ".bmp"}:
-        raise HTTPException(status_code=400, detail="Unsupported file type. Use PDF or image.")
-
-    content = await file.read()
+    Returns: { first_name, last_name, email, phone, address, city,
+               postcode, id_number, nationality }
+    """
+    suffix = os.path.splitext(file.filename)[1]
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(content)
+        tmp.write(await file.read())
         tmp_path = tmp.name
 
     try:
-        text = pdf_service.extract_document_text(tmp_path)
+        result = await extract_client_details(tmp_path)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
-        try:
-            os.unlink(tmp_path)
-        except Exception:
-            pass
-
-    return {
-        "filename": file.filename,
-        "text": text,
-        "char_count": len(text),
-    }
+        os.unlink(tmp_path)
 
 
-@router.post("/voice/transcribe")
-async def transcribe_voice(file: UploadFile = File(...)):
-    """Upload an audio file → Whisper transcription + Claude action extraction."""
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No file provided.")
+@router.post("/vehicle-specs")
+async def ocr_vehicle_specs(file: UploadFile = File(...)):
+    """
+    Extract vehicle specification data from a Fahrzeugdatenträger /
+    Fahrzeugschein image or PDF.
+    Used by Frappe car_agents_crm.api.extract_vehicle_specs via HTTP bridge.
 
-    content = await file.read()
-    suffix = os.path.splitext(file.filename)[-1].lower()
+    Returns: { vin, manufacturer, model, power_kw, power_ps,
+               displacement_ccm, transmission_code, colour_code,
+               initial_registration, tuv_expiry, licence_plate }
+    """
+    suffix = os.path.splitext(file.filename)[1]
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
 
-    # Transcribe via local Whisper
-    transcript = whisper_service.transcribe_bytes(content, suffix=suffix)
-
-    # Extract actions via Claude
-    analysis = await claude_service.extract_voice_actions(transcript)
-
-    return {
-        "transcript": transcript,
-        "analysis": analysis,
-    }
+    try:
+        result = await extract_vehicle_specs(tmp_path)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        os.unlink(tmp_path)
