@@ -110,6 +110,7 @@ export const api = {
   },
 
   generateContract: (projectId, templateType) => aiPost('/api/v1/contracts/generate-pdf', { template_type: templateType, deal_id: projectId }),
+  approveAndUploadContract: (customerName, contractFilename, filePath) => aiPost('/api/v1/contracts/approve-and-upload', { customer_name: customerName, contract_filename: contractFilename, file_path: filePath }),
 
 
   completeMilestone: async (milestoneId) => {

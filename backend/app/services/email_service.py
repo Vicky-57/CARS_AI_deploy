@@ -1,12 +1,12 @@
 """
 app/services/email_service.py
 ────────────────────────────────────────────────────────────────────────
-Inbound Email IMAP Listener & Email Sender Service (W1)
+Inbound Gmail / IMAP Listener & Email Sender Service (W1)
 
 Functions:
-  1. poll_inbound_emails() — Checks Strato IMAP inbox for info@car-agents.de,
-     parses new emails, runs Claude AI intent classification, and saves into Supabase.
-  2. send_email() — Sends email briefings via SMTP.
+  1. poll_inbound_emails() — Checks Gmail / IMAP inbox for primary emails,
+     filters out bulk/newsletters, runs Claude AI intent classification, and saves into Supabase.
+  2. send_email_briefing() — Sends email briefings via SMTP.
 ────────────────────────────────────────────────────────────────────────
 """
 import os
@@ -27,15 +27,15 @@ logger = logging.getLogger("email_service")
 
 async def poll_inbound_emails():
     """
-    Polls Strato IMAP inbox (info@car-agents.de) for unseen emails.
+    Polls Gmail/IMAP inbox for unseen primary emails.
     Processes lead intent via Claude and logs into Supabase.
     """
-    imap_server = os.getenv("IMAP_SERVER", "imap.strato.de")
-    email_user = settings.BRIEFING_EMAIL_RECIPIENT or "info@car-agents.de"
-    email_pass = os.getenv("EMAIL_PASSWORD", "")
+    imap_server = getattr(settings, "IMAP_SERVER", "imap.gmail.com")
+    email_user = getattr(settings, "EMAIL_USER", "") or settings.BRIEFING_EMAIL_RECIPIENT
+    email_pass = getattr(settings, "EMAIL_PASSWORD", "") or os.getenv("EMAIL_PASSWORD", "")
 
-    if not email_pass:
-        logger.debug("IMAP EMAIL_PASSWORD not set. Skipping IMAP poll.")
+    if not email_pass or not email_user:
+        logger.debug("IMAP EMAIL_USER or EMAIL_PASSWORD not set. Skipping IMAP poll.")
         return
 
     try:
@@ -48,11 +48,11 @@ async def poll_inbound_emails():
 
 
 def _process_imap_inbox(server, user, password):
-    """Synchronous IMAP connection and processing."""
+    """Synchronous IMAP connection and processing with Primary filtering."""
     try:
-        mail = imaplib.IMAP4_SSL(server)
+        mail = imaplib.IMAP4_SSL(server, getattr(settings, "IMAP_PORT", 993))
         mail.login(user, password)
-        mail.select("inbox")
+        mail.select("INBOX")
 
         status, messages = mail.search(None, 'UNSEEN')
         if status != "OK" or not messages[0]:
@@ -67,11 +67,20 @@ def _process_imap_inbox(server, user, password):
             raw_email = data[0][1]
             msg = email.message_from_bytes(raw_email)
 
-            subject, encoding = decode_header(msg["Subject"])[0]
-            if isinstance(subject, bytes):
-                subject = subject.decode(encoding or "utf-8")
+            sender = msg.get("From", "")
+            precedence = msg.get("Precedence", "").lower()
+            list_id = msg.get("List-Unsubscribe", "")
 
-            sender = msg.get("From")
+            # FILTER: Skip automated newsletters, bulk marketing, or noreply addresses
+            if "noreply" in sender.lower() or precedence in ["bulk", "junk", "list"] or list_id:
+                logger.info(f"Skipped automated/newsletter email from: {sender}")
+                continue
+
+            subject_header = decode_header(msg.get("Subject", ""))[0]
+            subject = subject_header[0]
+            if isinstance(subject, bytes):
+                subject = subject.decode(subject_header[1] or "utf-8", errors="ignore")
+
             body = ""
             if msg.is_multipart():
                 for part in msg.walk():
@@ -81,10 +90,17 @@ def _process_imap_inbox(server, user, password):
             else:
                 body = msg.get_payload(decode=True).decode("utf-8", errors="ignore")
 
-            logger.info(f"New Inbound Email from {sender}: {subject}")
+            logger.info(f"New Primary Inbound Email from {sender}: {subject}")
 
-            # Run Claude email summariser and intent classifier
-            asyncio.run(_process_email_lead(sender, subject, body))
+            # Process lead asynchronously via event loop
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.create_task(_process_email_lead(sender, subject, body))
+                else:
+                    loop.run_until_complete(_process_email_lead(sender, subject, body))
+            except Exception as ex:
+                logger.error(f"Error executing email lead processor: {str(ex)}")
 
         mail.logout()
     except Exception as e:
@@ -98,13 +114,14 @@ async def _process_email_lead(sender: str, subject: str, body: str):
     summary = res.get("summary", "")
 
     existing_leads = get_all_leads()
-    matched_lead = next((l for l in existing_leads if l.get("email") in sender), None)
+    clean_sender_email = sender.split("<")[-1].replace(">", "").strip() if "<" in sender else sender
+    matched_lead = next((l for l in existing_leads if l.get("email") == clean_sender_email), None)
     lead_id = matched_lead.get("id") if matched_lead else None
 
     if not lead_id:
         new_lead = create_lead({
             "name": sender.split("<")[0].strip() if "<" in sender else sender,
-            "email": sender.split("<")[-1].replace(">", "").strip() if "<" in sender else sender,
+            "email": clean_sender_email,
             "channel": "EMAIL",
             "intent": "SELL" if intent == "SELL_INTENT" else "BUY" if intent == "BUY_INTENT" else "UNKNOWN",
             "status": "NEW",
@@ -116,8 +133,8 @@ async def _process_email_lead(sender: str, subject: str, body: str):
     save_communication({
         "lead_id": lead_id,
         "channel": "EMAIL",
-        "sender_name": sender,
-        "sender_contact": sender,
+        "sender_name": sender.split("<")[0].strip() if "<" in sender else sender,
+        "sender_contact": clean_sender_email,
         "subject": subject,
         "body": body,
         "is_inbound": True,
@@ -128,13 +145,13 @@ async def _process_email_lead(sender: str, subject: str, body: str):
 
 def send_email_briefing(to_email: str, subject: str, html_content: str):
     """Sends HTML email briefing via SMTP."""
-    smtp_server = os.getenv("SMTP_SERVER", "smtp.strato.de")
-    smtp_port = int(os.getenv("SMTP_PORT", 465))
-    smtp_user = settings.BRIEFING_EMAIL_RECIPIENT or "info@car-agents.de"
-    smtp_pass = os.getenv("EMAIL_PASSWORD", "")
+    smtp_server = getattr(settings, "SMTP_SERVER", "smtp.gmail.com")
+    smtp_port = getattr(settings, "SMTP_PORT", 465)
+    smtp_user = getattr(settings, "EMAIL_USER", "") or settings.BRIEFING_EMAIL_RECIPIENT
+    smtp_pass = getattr(settings, "EMAIL_PASSWORD", "") or os.getenv("EMAIL_PASSWORD", "")
 
-    if not smtp_pass:
-        logger.warning("SMTP EMAIL_PASSWORD not configured. Email briefing skipped.")
+    if not smtp_pass or not smtp_user:
+        logger.warning("SMTP EMAIL_USER or EMAIL_PASSWORD not configured. Email briefing skipped.")
         return
 
     try:

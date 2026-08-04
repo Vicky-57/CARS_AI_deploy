@@ -14,7 +14,6 @@ import Deals from './pages/Deals';
 import Communications from './pages/Communications';
 import Contracts from './pages/Contracts';
 import CalendarPage from './pages/Calendar';
-import VoiceNotes from './pages/VoiceNotes';
 import Auth from './pages/Auth';
 import Profile from './pages/Profile';
 import { api } from './api/api';
@@ -179,7 +178,6 @@ export default function App() {
               <Route path="/deals" element={<Deals />} />
               <Route path="/contracts" element={<Contracts />} />
               <Route path="/calendar" element={<CalendarPage />} />
-              <Route path="/voice" element={<VoiceNotes />} />
               <Route path="/profile" element={<Profile />} />
             </Routes>
           </div>

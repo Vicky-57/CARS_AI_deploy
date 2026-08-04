@@ -20,8 +20,14 @@ class Settings(BaseSettings):
     WHATSAPP_VERIFY_TOKEN: str = ""
     BRIEFING_WHATSAPP_RECIPIENT: str = ""
 
-    # Email
-    BRIEFING_EMAIL_RECIPIENT: str = "info@car-agents.de"
+    # Email (Gmail / Custom IMAP & SMTP)
+    IMAP_SERVER: str = "imap.gmail.com"
+    IMAP_PORT: int = 993
+    SMTP_SERVER: str = "smtp.gmail.com"
+    SMTP_PORT: int = 465
+    EMAIL_USER: str = ""
+    EMAIL_PASSWORD: str = ""
+    BRIEFING_EMAIL_RECIPIENT: str = ""
 
     # Local AI services
     WHISPER_MODEL_SIZE: str = "base"
