@@ -18,7 +18,8 @@ This file contains the complete system architecture, latest decisions, database 
  - Realtime WebSockets            - Google OAuth2 & Gmail API     - Auto REST & Realtime APIs
  - Dual Buy/Sell Kanban          - 1-Click PDF Engine            - Contact & Customer Store
  - Net Profit Calculator          - Meta WhatsApp Webhooks        - Deals & Project Ledger
- - Google Drive Upload            - APScheduler Automations       - Calendar & Meetings
+ - Google Drive Upload            - APScheduler Automations       - Google Auth Tokens Store
+ - Google Calendar Sync          - Google Calendar v3 Sync       - Meetings & Conflict Guard
 ```
 
 ---
@@ -50,14 +51,14 @@ This file contains the complete system architecture, latest decisions, database 
 * **Publishable Key:** `sb_publishable_s5EKZcMXdOb6LBSF-I758A_-cS8v1Zm`
 * **Secret Key:** `sb_secret_qM2kIa6iLOXbv_JAUEXNTA_YLbxemoo`
 * **Database Password:** `CARS_AI2026`
-* **Schema File:** `supabase_schema_v3.sql` *(applied to Supabase DB)*
+* **Schema File:** `supabase_schema_v3.sql` *(applied to Supabase DB, includes `google_auth` table)*
 
 ### Backend Environment (`backend/.env`)
 * **PORT:** `9000`
 * **LOCAL_SERVICES_URL:** `http://localhost:9000`
 * **ANTHROPIC_API_KEY:** Configured in `.env` (Claude 3.7 / Sonnet)
 * **WHATSAPP Credentials:** `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN`
-* **GOOGLE OAUTH2 Credentials:** Uses `google_tokens.json` & Google REST APIs for Gmail and Drive.
+* **GOOGLE OAUTH2 Credentials:** Uses `google_auth` table in Supabase & `google_service.py` for token refresh.
 
 ### Frontend Environment (`frontend/.env`)
 * **VITE_SUPABASE_URL:** `https://wvzulyxzuntjnzdykstt.supabase.co`
@@ -66,12 +67,13 @@ This file contains the complete system architecture, latest decisions, database 
 
 ---
 
-## 📂 Google Drive & Gmail REST API Integrations
+## 📂 Integrations Summary (Google, WhatsApp, Contracts)
 
-* **Google OAuth2 (No Passwords Required):** Connects directly with Google permissions (`gmail.readonly`, `gmail.send`, `drive.file`).
-* **Gmail Primary Filtering:** Queries Gmail REST API with `q="label:INBOX category:primary"` to filter out spam and promotional mail.
-* **1-Click Convert Email to Lead:** Calls `POST /api/v1/gmail/convert-lead` to parse primary emails with Claude AI and auto-populate Supabase lead forms.
-* **Conditional Drive Upload:** Uploads generated PDF contracts to `/CAR-AGENTS/Customers/{Customer Name}/Contracts/` **only after explicit client/broker approval**.
+* **Merged Branch:** Integrated `remotes/origin/meetings-google-sync` into `main`.
+* **Google Calendar Sync & Free/Busy:** `google_service.py` handles bi-directional event creation (`create_event`, `update_event`, `delete_event`) & live `check_free_busy` checks against Google Calendar.
+* **Tokens Storage:** OAuth tokens stored securely in Supabase `google_auth` table with automated refresh token management.
+* **Google Drive Storage:** Approved contract PDFs saved to Google Drive under `/Customers/{Customer}/Contracts/`.
+* **Primary Gmail REST API:** Queries Primary category inbox with 1-Click AI Lead Conversion.
 
 ---
 
@@ -82,7 +84,7 @@ This file contains the complete system architecture, latest decisions, database 
 cd "d:\CARS AI\backend"
 python main.py
 ```
-* Interactive Swagger Docs: `http://localhost:9000/docs`
+* Interactive Swagger Docs: `http://localhost:9000/docs` (30 API routes mounted)
 
 ### 2. Start React Portal (Port 5173)
 ```powershell
@@ -93,10 +95,8 @@ npm run dev
 
 ---
 
-## 🔄 Recent Architectural & Feature Decisions
+## 🔄 Recent Branch & Merge History
 
-1. **Direct Google OAuth2 & Gmail REST API:** Replaced IMAP/SMTP password requirements with standard Google Sign-In permissions.
-2. **Primary Inbox Filtering:** Direct Gmail REST API query (`label:INBOX category:primary`) with 1-Click AI Lead Conversion.
-3. **Google Drive Conditional Storage:** Approved contract PDFs saved to Google Drive under `/Customers/{Customer}/Contracts/`.
-4. **Voice Notes Removed:** Cleaned up `/voice` route and unused files.
-5. **Git Synchronization Memory:** `MEMORY.md` automatically updated for seamless continuation across chat sessions.
+1. **Merged `meetings-google-sync`:** Merged commit `21167aca` into `main`. Conflict resolved in `router.py` and `Calendar.jsx`.
+2. **Google Calendar Features:** Added `google_service.py`, `google_auth.py`, `meetings_sync.py`, and `google_auth` table in Supabase.
+3. **Verified Health:** Frontend built in 7.42s; backend initialized 30 API endpoints cleanly.
