@@ -92,7 +92,19 @@ def get_meetings(limit: int = 50) -> List[Dict]:
     return res.data or []
 
 
+def get_meeting_by_id(meeting_id: str) -> Optional[Dict]:
+    sb = get_supabase()
+    res = sb.table("meetings").select("*").eq("id", meeting_id).single().execute()
+    return res.data
+
+
 def create_meeting(payload: Dict) -> Dict:
     sb = get_supabase()
     res = sb.table("meetings").insert(payload).execute()
+    return res.data[0] if res.data else {}
+
+
+def update_meeting(meeting_id: str, updates: Dict) -> Dict:
+    sb = get_supabase()
+    res = sb.table("meetings").update(updates).eq("id", meeting_id).execute()
     return res.data[0] if res.data else {}

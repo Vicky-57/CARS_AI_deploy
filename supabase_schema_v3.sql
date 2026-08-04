@@ -129,6 +129,21 @@ CREATE TABLE IF NOT EXISTS project_milestones (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 10. GOOGLE CALENDAR AUTH TABLE (Private — stores Maxim's OAuth token)
+CREATE TABLE IF NOT EXISTS google_auth (
+    id TEXT PRIMARY KEY,
+    refresh_token TEXT,
+    access_token TEXT,
+    token_expiry TIMESTAMPTZ,
+    connected_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 11. ROLE PRIVILEGES (required — without these, anon/service_role get "permission denied")
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;
+
 -- INDEXES FOR PERFORMANCE
 CREATE INDEX IF NOT EXISTS idx_leads_channel ON leads(channel);
 CREATE INDEX IF NOT EXISTS idx_leads_intent ON leads(intent);

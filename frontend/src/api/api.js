@@ -164,22 +164,66 @@ export const api = {
     return data;
   },
 
+  updateMeeting: async (id, updates) => {
+    const { data, error } = await supabase.from('meetings').update(updates).eq('id', id).select().single();
+    if (error) throw error;
+    return data;
+  },
+
   deleteMeeting: async (id) => {
     const { error } = await supabase.from('meetings').delete().eq('id', id);
     if (error) throw error;
   },
 
-  checkConflict: async (startTime, endTime, isOnsite = true) => {
-    const buffer = isOnsite ? 30 * 60 * 1000 : 0; // 30 min in ms
-    const checkStart = new Date(new Date(startTime).getTime() - buffer).toISOString();
-    const checkEnd   = new Date(new Date(endTime).getTime()   + buffer).toISOString();
+  /**
+   * Conflict engine.
+   * - overlap      → hard block (same date + overlapping times)
+   * - buffer_clash → warn only (onsite meetings need a 30-min travel gap)
+   * - exclude_id   → ignore one meeting (used when editing itself)
+   */
+  checkMeetingConflicts: async ({ start_time, end_time, location_type = 'ONLINE', exclude_id = null }) => {
+    const isOnsite = location_type === 'OFFLINE_ONSITE';
+    const bufferMs = isOnsite ? 30 * 60 * 1000 : 0; // 30 min travel buffer
+    const start = new Date(start_time);
+    const end   = new Date(end_time);
+
+    // Fetch everything inside the widened window so we can classify locally
+    const checkStart = new Date(start.getTime() - bufferMs).toISOString();
+    const checkEnd   = new Date(end.getTime()   + bufferMs).toISOString();
     const { data, error } = await supabase
       .from('meetings')
-      .select('*')
+      .select('id, title, client_name, start_time, end_time, location_type')
       .lt('start_time', checkEnd)
       .gt('end_time', checkStart);
     if (error) throw error;
-    return { has_conflict: data.length > 0, conflicting: data };
+
+    const meetings = (data || []).filter(m => m.id !== exclude_id);
+    const overlaps = [];
+    const bufferClashes = [];
+
+    for (const m of meetings) {
+      const mStart = new Date(m.start_time);
+      const mEnd   = new Date(m.end_time);
+      const isOverlap = mStart < end && mEnd > start;
+      if (isOverlap) {
+        overlaps.push(m);
+        continue;
+      }
+      // Non-overlapping but inside the buffer window → too close for onsite travel
+      const withinStartBuffer = mEnd >= new Date(start.getTime() - bufferMs) && mEnd <= start;
+      const withinEndBuffer   = mStart <= new Date(end.getTime() + bufferMs) && mStart >= end;
+      if (isOnsite && (withinStartBuffer || withinEndBuffer)) {
+        bufferClashes.push(m);
+      }
+    }
+
+    return {
+      has_overlap: overlaps.length > 0,
+      overlapping_meetings: overlaps,
+      has_buffer_clash: bufferClashes.length > 0,
+      buffer_clash_meetings: bufferClashes,
+      buffer_minutes: isOnsite ? 30 : 0,
+    };
   },
 
   // ── PIPELINE SUMMARY (Dashboard) ────────────────────────────────────────────
@@ -206,6 +250,13 @@ export const api = {
 
   // ── VOICE (Local FastAPI AI Services) ────────────────────────────────────────
   transcribeVoice: (formData) => aiUpload('/api/voice/transcribe', formData),
+
+  // ── GOOGLE CALENDAR SYNC (FastAPI) ───────────────────────────────────────────
+  googleAuthUrl:   () => fetch(`${AI_URL}/api/v1/auth/google/url`).then(r => r.json()),
+  googleAuthStatus:() => fetch(`${AI_URL}/api/v1/auth/google/status`).then(r => r.json()),
+  syncMeeting:     (id) => fetch(`${AI_URL}/api/v1/meetings/${id}/sync`, { method: 'POST' }).then(r => r.json()),
+  unsyncMeeting:   (id) => fetch(`${AI_URL}/api/v1/meetings/${id}/sync`, { method: 'DELETE' }).then(r => r.json()),
+  checkGoogleFreeBusy: (startTime, endTime) => aiPost('/api/v1/meetings/free-busy', { start_time: startTime, end_time: endTime }),
 
   // ── REALTIME SUBSCRIPTIONS ───────────────────────────────────────────────────
   subscribeToLeads: (callback) =>
