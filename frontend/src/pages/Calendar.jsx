@@ -413,9 +413,33 @@ export default function CalendarPage() {
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Manage client meetings with 30-min travel conflict guard & Google Calendar sync</p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <div className="pipeline-tabs" style={{ margin: 0 }}>
-            <button className={`pipeline-tab ${viewMode === 'week' ? 'active' : ''}`} onClick={() => setViewMode('week')}>Week</button>
-            <button className={`pipeline-tab ${viewMode === 'month' ? 'active' : ''}`} onClick={() => setViewMode('month')}>Month</button>
+          <div style={{
+            display: 'inline-flex',
+            border: '1.5px solid var(--border)',
+            borderRadius: '10px',
+            overflow: 'hidden',
+            background: 'var(--gray-50)',
+          }}>
+            {['week', 'month'].map(mode => (
+              <button
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                style={{
+                  padding: '8px 20px',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  border: 'none',
+                  borderRight: mode === 'week' ? '1.5px solid var(--border)' : 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.18s',
+                  background: viewMode === mode ? 'var(--brand-500)' : 'transparent',
+                  color: viewMode === mode ? 'white' : 'var(--text-secondary)',
+                  borderRadius: 0,
+                }}
+              >
+                {mode.charAt(0).toUpperCase() + mode.slice(1)}
+              </button>
+            ))}
           </div>
           <button className={`btn ${googleConnected ? 'btn-secondary' : 'btn-secondary'}`} onClick={connectGoogle} disabled={connecting}>
             {googleConnected ? '✅ Google Sync Active' : 'Connect Google Calendar'}
