@@ -33,7 +33,7 @@
   --info:     #06b6d4;
 
   /* Surfaces */
-  --bg:            #f9fafb;
+  --bg:            #f3f4f6;
   --surface:       #ffffff;
   --surface-hover: #f3f4f6;
   --border:        #e5e7eb;
@@ -83,6 +83,22 @@ input, textarea, select {
   font-family: inherit;
   font-size: 0.875rem;
   outline: none;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--gray-300);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gray-400);
 }
 
 /* ─── LAYOUT ──────────────────────────────────────────────────────────────── */
@@ -207,6 +223,27 @@ input, textarea, select {
   padding: 12px 8px;
   border-top: 1px solid #334155;
 }
+
+.popover-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  border-radius: calc(var(--radius) - 4px);
+  cursor: pointer;
+  transition: background var(--transition);
+  text-decoration: none;
+}
+.popover-item:hover { background: var(--surface-hover); }
+.popover-item.text-danger { color: var(--danger); }
+.popover-item.text-danger:hover { background: #fee2e2; }
 
 /* ─── MAIN CONTENT ────────────────────────────────────────────────────────── */
 .main-content {
@@ -491,7 +528,9 @@ tbody tr:last-child td { border-bottom: none; }
   width: 90%;
   max-width: 560px;
   max-height: 90vh;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   animation: slideUp .2s ease;
 }
 @keyframes slideUp {
@@ -680,6 +719,99 @@ tbody tr:last-child td { border-bottom: none; }
   font-size: 0.65rem;
   color: var(--text-muted);
   margin-top: 2px;
+}
+
+/* ─── WHATSAPP CHAT DESIGN ────────────────────────────────────────────────── */
+.wa-chat-bg {
+  background-color: #efeae2;
+  background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png');
+  background-size: cover;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  overflow-y: auto;
+}
+.wa-bubble {
+  padding: 6px 8px 6px 12px;
+  border-radius: 8px;
+  max-width: 75%;
+  font-size: 0.85rem;
+  box-shadow: 0 1px 0.5px rgba(11,20,26,.13);
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  color: #111b21;
+}
+.wa-bubble.inbound {
+  background: #ffffff;
+  align-self: flex-start;
+  border-top-left-radius: 0;
+}
+.wa-bubble.outbound {
+  background: #d9fdd3;
+  align-self: flex-end;
+  border-top-right-radius: 0;
+}
+.wa-time {
+  font-size: 0.65rem;
+  color: #667781;
+  align-self: flex-end;
+  margin-top: 2px;
+  margin-left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ─── EMAIL THREAD DESIGN ─────────────────────────────────────────────────── */
+.email-thread-bg {
+  background-color: #f8fafc;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  overflow-y: auto;
+}
+.email-card {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+.email-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+.email-subject {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+.email-sender {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.email-contact {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.email-time {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.email-body-text {
+  font-size: 0.85rem;
+  color: #374151;
+  white-space: pre-wrap;
+  line-height: 1.6;
 }
 
 /* ─── PIPELINE BOARD ──────────────────────────────────────────────────────── */

@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Mail, MessageSquare, Search } from 'lucide-react';
+import { Mail, MessageSquare, Search, MessageCircle, User } from 'lucide-react';
 import { api } from '../api/api';
 import { format } from 'date-fns';
 
 function getAvatar(contact) {
   const ch = (contact.channel || '').toUpperCase();
-  if (ch === 'WHATSAPP') return { cls: 'avatar-whatsapp', icon: '💬' };
-  if (ch === 'EMAIL') return { cls: 'avatar-email', icon: '✉️' };
-  return { cls: 'avatar-default', icon: '👤' };
+  if (ch === 'WHATSAPP') return { cls: 'avatar-whatsapp', icon: <MessageCircle size={16} /> };
+  if (ch === 'EMAIL') return { cls: 'avatar-email', icon: <Mail size={16} /> };
+  return { cls: 'avatar-default', icon: <User size={16} /> };
 }
 
 function initials(name) {
@@ -19,6 +19,39 @@ function formatTs(iso) {
   try { return format(new Date(iso), 'HH:mm'); } catch { return ''; }
 }
 
+const DUMMY_DATA = [
+  {
+    id: 'dummy-1',
+    channel: 'WHATSAPP',
+    sender_name: 'Maximilian Lorenz',
+    sender_contact: '+49 8404 9385840',
+    body: 'Hello! I am highly interested in the Porsche you have listed. Is it still available for a test drive this weekend?',
+    timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
+    is_inbound: true,
+    ai_summary: 'Interested in test drive'
+  },
+  {
+    id: 'dummy-2',
+    channel: 'EMAIL',
+    sender_name: 'Sarah Schmidt',
+    sender_contact: 'sarah.schmidt@example.de',
+    subject: 'Inquiry: VW Multivan Comfortline',
+    body: 'Hi, I saw your listing for the VW Multivan. Could you please send me the full service history and some interior pictures? Thanks!',
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+    is_inbound: true,
+    ai_summary: 'Requesting service history and photos'
+  },
+  {
+    id: 'dummy-3',
+    channel: 'WHATSAPP',
+    sender_name: 'Klaus Fischer',
+    sender_contact: '+49 151 2345678',
+    body: 'Thanks for sending over the contracts. I will review them with my wife tonight and sign them tomorrow morning.',
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+    is_inbound: true,
+  }
+];
+
 export default function Communications() {
   const [contacts, setContacts] = useState([]);
   const [thread, setThread] = useState([]);
@@ -29,17 +62,45 @@ export default function Communications() {
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    api.getContacts()
-      .then(setContacts)
-      .catch(() => setContacts([]))
+    api.getCommunications()
+      .then(res => {
+        const actualData = Array.isArray(res) ? res : [];
+        setContacts([...DUMMY_DATA, ...actualData]);
+      })
+      .catch(() => setContacts(DUMMY_DATA))
       .finally(() => setLoading(false));
   }, []);
 
   const selectContact = async (c) => {
     setSelected(c);
+    
+    // Handle dummy data specifically to show a fake thread
+    if (c.id.startsWith('dummy-')) {
+      setThreadLoading(true);
+      setTimeout(() => {
+        setThread([
+          c,
+          { 
+            id: c.id + '-reply', 
+            is_inbound: false, 
+            body: c.channel === 'WHATSAPP' ? 'Absolutely, I will arrange that for you right away!' : 'Sure Sarah, I have attached the documents to this email.', 
+            timestamp: new Date().toISOString(),
+            sender_name: 'Admin',
+            channel: c.channel
+          }
+        ]);
+        setThreadLoading(false);
+      }, 300);
+      return;
+    }
+
     if (!c.lead_id) { setThread([c]); return; }
+    
     setThreadLoading(true);
-    try { setThread(await api.getThread(c.lead_id)); }
+    try { 
+      const messages = await api.getCommunications({ lead_id: c.lead_id });
+      setThread(messages.reverse());
+    }
     catch { setThread([c]); }
     finally { setThreadLoading(false); }
   };
@@ -127,25 +188,62 @@ export default function Communications() {
                 {selected.channel === 'EMAIL' ? <Mail size={14} color="var(--text-muted)" style={{ marginLeft: 'auto' }} /> : <MessageSquare size={14} color="var(--text-muted)" style={{ marginLeft: 'auto' }} />}
               </div>
 
-              <div className="thread-messages">
+              <div className={selected.channel === 'WHATSAPP' ? 'wa-chat-bg' : selected.channel === 'EMAIL' ? 'email-thread-bg' : 'thread-messages'}>
                 {threadLoading ? (
                   <div className="loading-spinner"><div className="spinner" /></div>
-                ) : thread.map(msg => (
-                  <div key={msg.id}>
-                    {msg.subject && (
-                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, padding: '0 4px' }}>
-                        Subject: {msg.subject}
+                ) : selected.channel === 'WHATSAPP' ? (
+                  // WhatsApp View
+                  thread.map(msg => (
+                    <div key={msg.id} className={`wa-bubble ${msg.is_inbound !== false ? 'inbound' : 'outbound'}`}>
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{msg.body}</div>
+                      <div className="wa-time">
+                        {format(new Date(msg.timestamp), 'HH:mm')}
+                        {msg.is_inbound === false && <span style={{ color: '#53bdeb', letterSpacing: '-2px', fontSize: '0.8rem', marginLeft: 2 }}>✓✓</span>}
                       </div>
-                    )}
-                    <div className={`message-bubble ${msg.is_inbound !== false ? 'inbound' : 'outbound'}`}>
-                      {msg.body}
+                      {msg.ai_summary && msg.is_inbound !== false && (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--brand-600)', marginTop: 4, borderTop: '1px solid #f0f0f0', paddingTop: 6, fontWeight: 500 }}>
+                          ✨ {msg.ai_summary}
+                        </div>
+                      )}
                     </div>
-                    <div className="message-meta" style={{ textAlign: msg.is_inbound !== false ? 'left' : 'right', padding: '2px 4px' }}>
-                      {format(new Date(msg.timestamp), 'dd.MM.yyyy HH:mm')}
-                      {msg.ai_summary && <span style={{ marginLeft: 6, color: 'var(--brand-600)' }}>· AI: {msg.ai_summary}</span>}
+                  ))
+                ) : selected.channel === 'EMAIL' ? (
+                  // Email View
+                  thread.map(msg => (
+                    <div key={msg.id} className="email-card">
+                      <div className="email-header-top">
+                        <div>
+                          <div className="email-subject">{msg.subject || selected.subject || 'No Subject'}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                            <span className="email-sender">{msg.is_inbound !== false ? (msg.sender_name || 'Client') : 'Admin'}</span>
+                            <span className="email-contact">&lt;{msg.is_inbound !== false ? (msg.sender_contact || '') : 'admin@caragents.com'}&gt;</span>
+                          </div>
+                        </div>
+                        <div className="email-time">
+                          {format(new Date(msg.timestamp), 'MMM d, yyyy, h:mm a')}
+                        </div>
+                      </div>
+                      <div className="email-body-text">{msg.body}</div>
+                      {msg.ai_summary && msg.is_inbound !== false && (
+                        <div style={{ marginTop: 20, padding: '12px 16px', background: 'var(--brand-50)', borderRadius: 8, fontSize: '0.8rem', color: 'var(--brand-700)', border: '1px solid var(--brand-100)' }}>
+                          <strong>✨ AI Summary:</strong> {msg.ai_summary}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  // Fallback View
+                  thread.map(msg => (
+                    <div key={msg.id}>
+                      <div className={`message-bubble ${msg.is_inbound !== false ? 'inbound' : 'outbound'}`}>
+                        {msg.body}
+                      </div>
+                      <div className="message-meta" style={{ textAlign: msg.is_inbound !== false ? 'left' : 'right', padding: '2px 4px' }}>
+                        {format(new Date(msg.timestamp), 'dd.MM.yyyy HH:mm')}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </>
           )}

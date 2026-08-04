@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Upload, Sparkles, User, Mail, Phone, Car, FileText, CheckCircle2, Loader2 } from 'lucide-react';
+import { X, Upload, Sparkles, User, Mail, Phone, Car, FileText, CheckCircle2, Loader2, Contact2 } from 'lucide-react';
 import { api } from '../api/api';
 
 export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
@@ -88,63 +88,72 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
 
   return (
     <div className="modal-overlay">
-      <div className="modal" style={{ maxWidth: 640 }}>
-        <div className="modal-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="modal" style={{ maxWidth: 800 }}>
+        <div className="modal-header" style={{ padding: '24px 28px 20px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{
-              width: 32, height: 32, borderRadius: 8,
+              width: 36, height: 36, borderRadius: 10,
               background: 'linear-gradient(135deg, var(--brand-500), var(--brand-700))',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white'
+              display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white',
+              boxShadow: '0 2px 4px rgba(59,130,246,0.2)'
             }}>
-              <User size={16} />
+              <User size={18} />
             </div>
             <div>
-              <div className="modal-title">Create New Lead</div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+              <div className="modal-title" style={{ fontSize: '1.1rem', fontWeight: 700, letterSpacing: '-0.3px' }}>Create New Lead</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2 }}>
                 Add client details or upload a document to auto-fill
               </div>
             </div>
           </div>
-          <button className="btn-icon" onClick={onClose}><X size={16} /></button>
+          <button className="btn-icon" onClick={onClose} style={{ padding: 8 }}><X size={18} /></button>
         </div>
 
         {/* OCR / Manual Tab Switch */}
-        <div style={{ padding: '12px 24px 0', display: 'flex', gap: 8 }}>
+        <div style={{ padding: '16px 28px 0', display: 'flex', gap: 8 }}>
           <button
             type="button"
             className={`filter-chip ${activeTab === 'ocr' ? 'active' : ''}`}
             onClick={() => setActiveTab('ocr')}
+            style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem' }}
           >
-            <Sparkles size={12} /> OCR Upload & Pre-fill
+            <Sparkles size={14} /> OCR Upload & Pre-fill
           </button>
           <button
             type="button"
             className={`filter-chip ${activeTab === 'manual' ? 'active' : ''}`}
             onClick={() => setActiveTab('manual')}
+            style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem' }}
           >
-            <FileText size={12} /> Manual Entry
+            <FileText size={14} /> Manual Entry
           </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+          <div className="modal-body" style={{ overflowY: 'auto', padding: '20px 28px 28px' }}>
             {activeTab === 'ocr' && (
               <div style={{
-                border: '2px dashed var(--border)', borderRadius: 'var(--radius-lg)',
-                padding: 20, textAlign: 'center', background: 'var(--gray-50)',
-                marginBottom: 20, position: 'relative'
-              }}>
+                border: '2px dashed var(--gray-300)', borderRadius: 'var(--radius-lg)',
+                padding: '32px 20px', textAlign: 'center', background: 'var(--gray-50)',
+                marginBottom: 24, position: 'relative', transition: 'all 0.2s ease',
+                cursor: 'pointer'
+              }}
+              onMouseOver={(e) => { e.currentTarget.style.borderColor = 'var(--brand-400)'; e.currentTarget.style.background = 'var(--brand-50)'; }}
+              onMouseOut={(e) => { e.currentTarget.style.borderColor = 'var(--gray-300)'; e.currentTarget.style.background = 'var(--gray-50)'; }}
+              >
                 {ocrLoading ? (
-                  <div style={{ padding: 12 }}>
-                    <Loader2 size={24} className="spin" color="var(--brand-600)" style={{ margin: '0 auto 8px' }} />
-                    <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>Extracting details using Claude & OCR...</div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Parsing Fahrzeugdatenträger / Client document</div>
+                  <div>
+                    <Loader2 size={28} className="spin" color="var(--brand-600)" style={{ margin: '0 auto 12px' }} />
+                    <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Extracting details using Claude & OCR...</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>Parsing Fahrzeugdatenträger / Client document</div>
                   </div>
                 ) : (
                   <div>
-                    <Upload size={24} color="var(--brand-500)" style={{ margin: '0 auto 8px' }} />
-                    <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>Drop Document or Click to Upload</div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                    <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--white)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+                      <Upload size={20} color="var(--brand-600)" />
+                    </div>
+                    <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Drop Document or Click to Upload</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
                       Upload Fahrzeugschein, Fahrzeugdatenträger, or Client Followup PDF
                     </div>
                     <input
@@ -159,11 +168,11 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
             )}
 
             {/* Client Info Grid */}
-            <div style={{ fontWeight: 600, fontSize: '0.78rem', color: 'var(--brand-600)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              👤 Client Contact Information
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+              <Contact2 size={14} color="var(--brand-500)" /> Client Contact Information
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div className="form-group">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Full Name *</label>
                 <input
                   className="form-input"
@@ -173,7 +182,7 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
                   onChange={e => setForm({ ...form, name: e.target.value })}
                 />
               </div>
-              <div className="form-group">
+              <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Intent Pipeline *</label>
                 <select
                   className="form-select"
@@ -184,7 +193,7 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
                   <option value="BUY">Buy Side (Beschaffung)</option>
                 </select>
               </div>
-              <div className="form-group">
+              <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Email Address</label>
                 <input
                   className="form-input"
@@ -194,7 +203,7 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
                   onChange={e => setForm({ ...form, email: e.target.value })}
                 />
               </div>
-              <div className="form-group">
+              <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Phone Number</label>
                 <input
                   className="form-input"
@@ -206,11 +215,11 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
             </div>
 
             {/* Vehicle Info Grid */}
-            <div style={{ fontWeight: 600, fontSize: '0.78rem', color: 'var(--brand-600)', margin: '16px 0 8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              🚗 Vehicle Specifications (Auto-extracted or Manual)
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+              <Car size={14} color="var(--brand-500)" /> Vehicle Specifications (Auto-extracted or Manual)
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div className="form-group">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Manufacturer</label>
                 <input
                   className="form-input"
@@ -219,7 +228,7 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
                   onChange={e => setForm({ ...form, manufacturer: e.target.value })}
                 />
               </div>
-              <div className="form-group">
+              <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Vehicle Model</label>
                 <input
                   className="form-input"
@@ -228,7 +237,7 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
                   onChange={e => setForm({ ...form, model: e.target.value })}
                 />
               </div>
-              <div className="form-group">
+              <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">VIN (17-digit)</label>
                 <input
                   className="form-input"
@@ -237,7 +246,7 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
                   onChange={e => setForm({ ...form, vin: e.target.value })}
                 />
               </div>
-              <div className="form-group">
+              <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">License Plate / Budget (€)</label>
                 <input
                   className="form-input"
@@ -260,10 +269,10 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
             </div>
           </div>
 
-          <div className="modal-footer">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? <Loader2 size={14} className="spin" /> : <CheckCircle2 size={14} />}
+          <div className="modal-footer" style={{ padding: '16px 28px', background: 'var(--gray-50)', borderRadius: '0 0 var(--radius-xl) var(--radius-xl)' }}>
+            <button type="button" className="btn btn-secondary" onClick={onClose} style={{ padding: '10px 16px' }}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={submitting} style={{ padding: '10px 16px' }}>
+              {submitting ? <Loader2 size={16} className="spin" /> : <CheckCircle2 size={16} />}
               Save Lead to Supabase
             </button>
           </div>

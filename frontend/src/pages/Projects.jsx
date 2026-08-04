@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FolderKanban, Plus, RefreshCw, Calculator, Car, CheckCircle, Clock, ChevronRight } from 'lucide-react';
+import { FolderKanban, Plus, RefreshCw, Calculator, Car, CheckCircle, Clock, ChevronRight, Tag, Search, Banknote, User } from 'lucide-react';
 import { api } from '../api/api';
 import LeadModal from '../components/LeadModal';
 import ExpenseModal from '../components/ExpenseModal';
@@ -73,65 +73,95 @@ export default function Projects() {
   };
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', paddingBottom: 20 }}>
       {/* Header & Controls */}
-      <div className="page-header">
+      <div className="page-header" style={{ alignItems: 'flex-end', marginBottom: 24, flexShrink: 0 }}>
         <div className="page-header-left">
-          <h1>Dual Brokerage Pipelines</h1>
-          <p>Manage active vehicle sales (Vermittlung) and procurement (Beschaffung)</p>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '-0.5px' }}>Dual Brokerage Pipelines</h1>
+          <p style={{ fontSize: '0.9rem' }}>Manage active vehicle sales and procurement projects</p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" onClick={loadProjects}><RefreshCw size={14} /> Refresh</button>
-          <button className="btn btn-primary" onClick={() => setIsLeadModalOpen(true)}><Plus size={14} /> Create New Deal / Lead</button>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button className="btn btn-secondary" onClick={loadProjects} style={{ padding: '8px 16px' }}>
+            <RefreshCw size={14} /> Refresh
+          </button>
+          <button className="btn btn-primary" onClick={() => setIsLeadModalOpen(true)} style={{ padding: '8px 16px' }}>
+            <Plus size={16} /> New Deal
+          </button>
         </div>
       </div>
 
       {/* Pipeline Tabs */}
-      <div className="pipeline-tabs" style={{ marginBottom: 20 }}>
+      <div style={{ display: 'flex', gap: 16, marginBottom: 24, flexShrink: 0 }}>
         <button
-          className={`pipeline-tab ${tab === 'SELL' ? 'active' : ''}`}
           onClick={() => setTab('SELL')}
+          style={{
+            padding: '12px 24px', borderRadius: 'var(--radius-lg)', display: 'inline-flex', alignItems: 'center', gap: 10,
+            background: tab === 'SELL' ? 'var(--brand-50)' : 'var(--surface)',
+            border: `1px solid ${tab === 'SELL' ? 'var(--brand-500)' : 'var(--gray-200)'}`,
+            boxShadow: tab === 'SELL' ? '0 4px 12px rgba(var(--brand-500-rgb), 0.1)' : '0 1px 2px rgba(0,0,0,0.02)',
+            color: tab === 'SELL' ? 'var(--brand-700)' : 'var(--text-secondary)',
+            fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', transition: 'all 0.2s'
+          }}
         >
-          🏷️ SELL SIDE — Vermittlung (Vehicle Sale)
+          <Tag size={16} color={tab === 'SELL' ? 'var(--brand-600)' : 'var(--text-muted)'} />
+          SELL SIDE — Vermittlung
         </button>
         <button
-          className={`pipeline-tab ${tab === 'BUY' ? 'active' : ''}`}
           onClick={() => setTab('BUY')}
+          style={{
+            padding: '12px 24px', borderRadius: 'var(--radius-lg)', display: 'inline-flex', alignItems: 'center', gap: 10,
+            background: tab === 'BUY' ? 'var(--brand-50)' : 'var(--surface)',
+            border: `1px solid ${tab === 'BUY' ? 'var(--brand-500)' : 'var(--gray-200)'}`,
+            boxShadow: tab === 'BUY' ? '0 4px 12px rgba(var(--brand-500-rgb), 0.1)' : '0 1px 2px rgba(0,0,0,0.02)',
+            color: tab === 'BUY' ? 'var(--brand-700)' : 'var(--text-secondary)',
+            fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', transition: 'all 0.2s'
+          }}
         >
-          🔍 BUY SIDE — Beschaffung (Procurement)
+          <Search size={16} color={tab === 'BUY' ? 'var(--brand-600)' : 'var(--text-muted)'} />
+          BUY SIDE — Beschaffung
         </button>
       </div>
 
       {/* Kanban Stages Board */}
       {loading ? (
-        <div className="card" style={{ padding: 40, textAlign: 'center' }}>
-          <div className="spinner" style={{ margin: '0 auto 12px' }} />
-          <div>Loading projects from Supabase...</div>
+        <div className="card" style={{ padding: 60, textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="spinner" style={{ margin: '0 auto 16px', width: 32, height: 32, borderWidth: 3 }} />
+          <div style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Loading projects...</div>
         </div>
       ) : (
-        <div style={{ display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 16, flex: 1, alignItems: 'flex-start' }}>
           {stages.map((stage, idx) => {
             const list = byStage(stage);
             return (
-              <div key={stage} style={{ minWidth: 260, flex: '0 0 260px' }}>
+              <div key={stage} style={{ 
+                minWidth: 320, flex: '0 0 320px', 
+                background: 'var(--gray-50)', 
+                borderRadius: 'var(--radius-lg)', 
+                padding: '16px',
+                display: 'flex', flexDirection: 'column',
+                maxHeight: '100%',
+                border: '1px solid var(--gray-200)'
+              }}>
                 <div style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  marginBottom: 10, padding: '0 4px'
+                  marginBottom: 16, paddingBottom: 12, borderBottom: '2px solid var(--gray-200)'
                 }}>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--text-secondary)' }}>
-                    {idx + 1}. {stage}
+                  <span style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-primary)' }}>
+                    <span style={{ color: 'var(--brand-500)', marginRight: 4 }}>{idx + 1}.</span> {stage}
                   </span>
-                  <span className="badge badge-manual">{list.length}</span>
+                  <span className="badge" style={{ background: 'var(--gray-200)', color: 'var(--text-primary)', fontWeight: 700 }}>
+                    {list.length}
+                  </span>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', paddingRight: 4 }}>
                   {list.length === 0 ? (
                     <div style={{
-                      border: '2px dashed var(--border)', borderRadius: 'var(--radius-lg)',
-                      padding: 20, textAlign: 'center', fontSize: '0.72rem', color: 'var(--text-muted)',
-                      background: 'var(--surface)'
+                      border: '2px dashed var(--gray-300)', borderRadius: 'var(--radius)',
+                      padding: '30px 20px', textAlign: 'center', fontSize: '0.8rem', color: 'var(--gray-400)',
+                      fontWeight: 600
                     }}>
-                      No active projects
+                      Empty Stage
                     </div>
                   ) : list.map(p => {
                     const totalExpenses = (p.project_expenses || []).reduce((s, x) => s + (parseFloat(x.amount) || 0), 0);
@@ -141,54 +171,60 @@ export default function Projects() {
                     const netProfit = (p.agreed_sale_price || 0) - totalInvestment;
 
                     return (
-                      <div key={p.id} className="project-card" style={{ position: 'relative' }}>
-                        <div className="project-card-header">
+                      <div key={p.id} className="card" style={{ padding: 16, border: '1px solid var(--gray-200)', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', position: 'relative' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                           <div>
-                            <div className="project-client">{p.client_name}</div>
+                            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <User size={14} color="var(--gray-400)" /> {p.client_name}
+                            </div>
                             {p.target_vehicle && (
-                              <div className="project-vehicle">
-                                <Car size={12} style={{ display: 'inline', marginRight: 4 }} />
-                                {p.target_vehicle}
+                              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <Car size={14} color="var(--brand-500)" /> {p.target_vehicle}
                               </div>
                             )}
                           </div>
                         </div>
 
                         {p.vin && (
-                          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontFamily: 'monospace', marginBottom: 8 }}>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'monospace', marginBottom: 12, padding: '4px 8px', background: 'var(--gray-50)', borderRadius: 4, display: 'inline-block' }}>
                             VIN: {p.vin}
                           </div>
                         )}
 
                         {/* Financial Mini Badge */}
                         <div style={{
-                          background: 'var(--gray-50)', borderRadius: 'var(--radius)',
-                          padding: '6px 8px', fontSize: '0.72rem', display: 'flex',
-                          justify: 'space-between', alignItems: 'center', marginBottom: 10
+                          background: netProfit >= 0 ? '#f0fdf4' : '#fef2f2',
+                          border: `1px solid ${netProfit >= 0 ? '#bbf7d0' : '#fecaca'}`,
+                          borderRadius: 'var(--radius)',
+                          padding: '8px 10px', fontSize: '0.75rem', display: 'flex',
+                          justifyContent: 'space-between', alignItems: 'center', marginBottom: 12
                         }}>
-                          <span>Net Profit:</span>
-                          <strong style={{ color: netProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                          <span style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <Banknote size={14} /> Net Profit:
+                          </span>
+                          <strong style={{ color: netProfit >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: '0.8rem' }}>
                             € {netProfit.toLocaleString(undefined, { minimumFractionDigits: 0 })}
                           </strong>
                         </div>
 
                         {/* Action buttons */}
-                        <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                        <div style={{ display: 'flex', gap: 8 }}>
                           <button
                             className="btn btn-secondary btn-sm"
-                            style={{ flex: 1 }}
+                            style={{ flex: 1, justifyContent: 'center', padding: '8px' }}
                             onClick={() => setSelectedExpenseProject(p)}
                           >
-                            <Calculator size={12} /> Financials
+                            <Calculator size={14} /> Financials
                           </button>
 
                           {idx < stages.length - 1 && (
                             <button
                               className="btn btn-primary btn-sm"
                               title="Advance to next stage"
+                              style={{ padding: '8px 12px' }}
                               onClick={(e) => advanceStage(p, e)}
                             >
-                              <ChevronRight size={12} />
+                              <ChevronRight size={16} />
                             </button>
                           )}
                         </div>

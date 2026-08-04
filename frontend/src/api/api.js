@@ -109,6 +109,9 @@ export const api = {
     return data;
   },
 
+  generateContract: (projectId, templateType) => aiPost('/api/v1/contracts/generate-pdf', { template_type: templateType, deal_id: projectId }),
+
+
   completeMilestone: async (milestoneId) => {
     const { data, error } = await supabase
       .from('project_milestones')
