@@ -3,6 +3,7 @@ app/services/claude_service.py
 ────────────────────────────────────────────────────────────────────────
 Claude AI operations for CAR-AGENTS:
   - Intent classification (BUY_INTENT / SELL_INTENT)
+  - Inbound email summarisation & AI reply drafting
   - Client details extraction from OCR documents
   - Vehicle specs extraction from Fahrzeugdatenträger / Fahrzeugschein
   - Voice transcript action item parsing
@@ -60,6 +61,30 @@ Respond ONLY with this exact JSON (no markdown):
         "intent": result.get("intent", "UNKNOWN"),
         "confidence": float(result.get("confidence", 0.0)),
         "summary": result.get("summary", ""),
+    }
+
+
+async def summarize_email(subject: str, body: str) -> dict:
+    """Summarise an inbound email, classify intent, and draft an AI response."""
+    prompt = f"""You are an assistant for CAR-AGENTS, a German automotive broker.
+
+Email Subject: {subject}
+Email Body: {body}
+
+Respond ONLY with this JSON (no markdown):
+{{
+  "intent": "BUY_INTENT | SELL_INTENT | UNKNOWN",
+  "summary": "2-3 sentence German summary",
+  "urgency": "high | medium | low",
+  "suggested_reply": "Short professional German reply"
+}}"""
+    raw = await call_claude(prompt, max_tokens=512)
+    result = _parse_json(raw)
+    return {
+        "intent": result.get("intent", "UNKNOWN"),
+        "summary": result.get("summary", body[:200]),
+        "urgency": result.get("urgency", "low"),
+        "suggested_reply": result.get("suggested_reply", ""),
     }
 
 

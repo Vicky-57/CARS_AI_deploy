@@ -1,137 +1,221 @@
 import { useState, useEffect } from 'react';
-import { FolderKanban, RefreshCw, Euro, Car, FileText } from 'lucide-react';
+import { FolderKanban, Plus, RefreshCw, Calculator, Car, CheckCircle, Clock, ChevronRight } from 'lucide-react';
 import { api } from '../api/api';
+import LeadModal from '../components/LeadModal';
+import ExpenseModal from '../components/ExpenseModal';
 
-const STAGES_SELL = ['Lead','Onboarding','Vehicle Docs','Marketing','Negotiation','Closed'];
-const STAGES_BUY  = ['Lead','Requirements','Contract','Sourcing','Inspection','Acquired'];
+const STAGES_SELL = [
+  'Onboarding & Lead Capture',
+  'Vehicle Docs & Specs',
+  'Marketing & Listing',
+  'Buyer Negotiation',
+  'Contract Signing',
+  'Handover & Close'
+];
+
+const STAGES_BUY = [
+  'Requirement Capture',
+  'Procurement Contract',
+  'Vehicle Sourcing',
+  'Technical Inspection',
+  'Price Negotiation',
+  'Delivery & Acquisition'
+];
 
 export default function Projects() {
-  const [tab, setTab]         = useState('sell');
-  const [deals, setDeals]     = useState([]);
-  const [selected, setSelected] = useState(null);
+  const [tab, setTab] = useState('SELL');
+  const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const load = async () => {
+  const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
+  const [selectedExpenseProject, setSelectedExpenseProject] = useState(null);
+
+  const loadProjects = async () => {
     setLoading(true);
     try {
-      const data = await api.getDeals(tab);
-      setDeals(data);
+      const data = await api.getProjects(tab);
+      setProjects(data || []);
+    } catch (err) {
+      console.error('Failed to load projects:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { load(); setSelected(null); }, [tab]);
+  useEffect(() => {
+    loadProjects();
 
-  const stages = tab === 'sell' ? STAGES_SELL : STAGES_BUY;
+    // Subscribe to realtime updates from Supabase!
+    const sub = api.subscribeToProjects(() => {
+      loadProjects();
+    });
+    return () => {
+      if (sub) sub.unsubscribe();
+    };
+  }, [tab]);
 
-  const byStage = (stage) => deals.filter(d => (d.status || 'Lead') === stage);
+  const stages = tab === 'SELL' ? STAGES_SELL : STAGES_BUY;
 
-  const ocrBadge = (s) => {
-    if (s === 'Verified')  return <span className="badge badge-whatsapp">Verified</span>;
-    if (s === 'Processed') return <span className="badge badge-email">Processed</span>;
-    return <span className="badge badge-new">Pending OCR</span>;
+  const byStage = (stageName) => projects.filter(p => (p.current_stage || stages[0]) === stageName);
+
+  const advanceStage = async (project, e) => {
+    e.stopPropagation();
+    const currentIndex = stages.indexOf(project.current_stage);
+    if (currentIndex < stages.length - 1) {
+      const nextStage = stages[currentIndex + 1];
+      try {
+        await api.updateProject(project.id, { current_stage: nextStage });
+        loadProjects();
+      } catch (err) {
+        alert('Could not update stage: ' + err.message);
+      }
+    }
   };
 
   return (
     <div>
-      {/* Pipeline Tab Switch */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
-        {['sell','buy'].map(t => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={tab === t ? 'btn-primary' : 'btn-ghost'}
-            style={{ textTransform: 'capitalize' }}
-          >
-            {t === 'sell' ? '🏷️ SELL — Vermittlung' : '🔍 BUY — Beschaffung'}
-          </button>
-        ))}
-        <button className="btn-ghost" style={{ marginLeft: 'auto' }} onClick={load}>
-          <RefreshCw size={14} />
+      {/* Header & Controls */}
+      <div className="page-header">
+        <div className="page-header-left">
+          <h1>Dual Brokerage Pipelines</h1>
+          <p>Manage active vehicle sales (Vermittlung) and procurement (Beschaffung)</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-secondary" onClick={loadProjects}><RefreshCw size={14} /> Refresh</button>
+          <button className="btn btn-primary" onClick={() => setIsLeadModalOpen(true)}><Plus size={14} /> Create New Deal / Lead</button>
+        </div>
+      </div>
+
+      {/* Pipeline Tabs */}
+      <div className="pipeline-tabs" style={{ marginBottom: 20 }}>
+        <button
+          className={`pipeline-tab ${tab === 'SELL' ? 'active' : ''}`}
+          onClick={() => setTab('SELL')}
+        >
+          🏷️ SELL SIDE — Vermittlung (Vehicle Sale)
+        </button>
+        <button
+          className={`pipeline-tab ${tab === 'BUY' ? 'active' : ''}`}
+          onClick={() => setTab('BUY')}
+        >
+          🔍 BUY SIDE — Beschaffung (Procurement)
         </button>
       </div>
 
-      {/* Kanban Board */}
+      {/* Kanban Stages Board */}
       {loading ? (
-        <div className="loading-spinner"><div className="spinner" /></div>
+        <div className="card" style={{ padding: 40, textAlign: 'center' }}>
+          <div className="spinner" style={{ margin: '0 auto 12px' }} />
+          <div>Loading projects from Supabase...</div>
+        </div>
       ) : (
-        <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8 }}>
-          {stages.map(stage => (
-            <div key={stage} style={{ minWidth: 200, flex: '0 0 200px' }}>
-              <div style={{
-                fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)',
-                textTransform: 'uppercase', letterSpacing: '0.06em',
-                marginBottom: 8, padding: '0 4px'
-              }}>
-                {stage} <span style={{ fontWeight: 400 }}>({byStage(stage).length})</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {byStage(stage).length === 0 ? (
-                  <div style={{
-                    border: '2px dashed var(--border)', borderRadius: 8,
-                    padding: 12, textAlign: 'center',
-                    fontSize: '0.72rem', color: 'var(--text-muted)'
-                  }}>
-                    Empty
-                  </div>
-                ) : byStage(stage).map(deal => (
-                  <div
-                    key={deal.name}
-                    className="card"
-                    style={{ cursor: 'pointer', padding: 12, margin: 0,
-                             border: selected?.name === deal.name ? '2px solid var(--brand-500)' : undefined }}
-                    onClick={() => setSelected(selected?.name === deal.name ? null : deal)}
-                  >
-                    <div style={{ fontWeight: 600, fontSize: '0.82rem', marginBottom: 4 }}>
-                      {deal.lead_name || deal.name}
+        <div style={{ display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 16 }}>
+          {stages.map((stage, idx) => {
+            const list = byStage(stage);
+            return (
+              <div key={stage} style={{ minWidth: 260, flex: '0 0 260px' }}>
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  marginBottom: 10, padding: '0 4px'
+                }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--text-secondary)' }}>
+                    {idx + 1}. {stage}
+                  </span>
+                  <span className="badge badge-manual">{list.length}</span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {list.length === 0 ? (
+                    <div style={{
+                      border: '2px dashed var(--border)', borderRadius: 'var(--radius-lg)',
+                      padding: 20, textAlign: 'center', fontSize: '0.72rem', color: 'var(--text-muted)',
+                      background: 'var(--surface)'
+                    }}>
+                      No active projects
                     </div>
-                    {deal.custom_vehicle_model && (
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', gap: 4, alignItems: 'center' }}>
-                        <Car size={11} /> {deal.custom_manufacturer} {deal.custom_vehicle_model}
+                  ) : list.map(p => {
+                    const totalExpenses = (p.project_expenses || []).reduce((s, x) => s + (parseFloat(x.amount) || 0), 0);
+                    const totalLaborHours = (p.project_labor || []).reduce((s, x) => s + (parseFloat(x.hours_spent) || 0), 0);
+                    const laborCost = totalLaborHours * (p.hourly_rate || 20);
+                    const totalInvestment = (p.purchase_price || 0) + totalExpenses + laborCost;
+                    const netProfit = (p.agreed_sale_price || 0) - totalInvestment;
+
+                    return (
+                      <div key={p.id} className="project-card" style={{ position: 'relative' }}>
+                        <div className="project-card-header">
+                          <div>
+                            <div className="project-client">{p.client_name}</div>
+                            {p.target_vehicle && (
+                              <div className="project-vehicle">
+                                <Car size={12} style={{ display: 'inline', marginRight: 4 }} />
+                                {p.target_vehicle}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {p.vin && (
+                          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontFamily: 'monospace', marginBottom: 8 }}>
+                            VIN: {p.vin}
+                          </div>
+                        )}
+
+                        {/* Financial Mini Badge */}
+                        <div style={{
+                          background: 'var(--gray-50)', borderRadius: 'var(--radius)',
+                          padding: '6px 8px', fontSize: '0.72rem', display: 'flex',
+                          justify: 'space-between', alignItems: 'center', marginBottom: 10
+                        }}>
+                          <span>Net Profit:</span>
+                          <strong style={{ color: netProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                            € {netProfit.toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                          </strong>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            style={{ flex: 1 }}
+                            onClick={() => setSelectedExpenseProject(p)}
+                          >
+                            <Calculator size={12} /> Financials
+                          </button>
+
+                          {idx < stages.length - 1 && (
+                            <button
+                              className="btn btn-primary btn-sm"
+                              title="Advance to next stage"
+                              onClick={(e) => advanceStage(p, e)}
+                            >
+                              <ChevronRight size={12} />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    )}
-                    <div style={{ marginTop: 6 }}>{ocrBadge(deal.custom_ocr_status)}</div>
-                  </div>
-                ))}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      {/* Deal Detail Panel */}
-      {selected && (
-        <div className="card" style={{ marginTop: 16 }}>
-          <div className="card-header">
-            <span className="card-title">{selected.lead_name}</span>
-            <button className="btn-ghost" onClick={() => setSelected(null)}>✕</button>
-          </div>
-          <div className="card-body">
-            <div className="form-grid">
-              {[
-                ['VIN',              selected.custom_vin],
-                ['Manufacturer',     selected.custom_manufacturer],
-                ['Model',            selected.custom_vehicle_model],
-                ['OCR Status',       selected.custom_ocr_status],
-                ['Net Profit',       selected.custom_net_profit ? `€ ${selected.custom_net_profit}` : '—'],
-                ['Follow-up Date',   selected.custom_followup_target_date || '—'],
-              ].map(([label, val]) => (
-                <div key={label} className="form-group">
-                  <label className="form-label">{label}</label>
-                  <div style={{ padding: '6px 0', fontWeight: 500, fontSize: '0.88rem' }}>{val || '—'}</div>
-                </div>
-              ))}
-            </div>
-            <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-              <a href={`http://localhost:8080/crm/deals/${selected.name}`}
-                 target="_blank" rel="noreferrer" className="btn-primary">
-                Open in Frappe CRM ↗
-              </a>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Create Lead Modal */}
+      <LeadModal
+        isOpen={isLeadModalOpen}
+        onClose={() => setIsLeadModalOpen(false)}
+        onLeadCreated={loadProjects}
+      />
+
+      {/* Expenses & Calculator Modal */}
+      <ExpenseModal
+        isOpen={!!selectedExpenseProject}
+        onClose={() => setSelectedExpenseProject(null)}
+        project={selectedExpenseProject}
+        onExpensesUpdated={loadProjects}
+      />
     </div>
   );
 }

@@ -1,189 +1,182 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus, Search, RefreshCw } from 'lucide-react';
+import { Users, Plus, Search, RefreshCw, Mail, Phone, Car, Tag } from 'lucide-react';
 import { api } from '../api/api';
-
-const PIPELINE_OPTS = ['', 'sell', 'buy'];
-const INTENT_OPTS   = ['', 'BUY_INTENT', 'SELL_INTENT', 'UNKNOWN'];
+import LeadModal from '../components/LeadModal';
 
 export default function Leads() {
-  const [leads, setLeads]     = useState([]);
+  const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [pipeline, setPipeline] = useState('');
-  const [search, setSearch]   = useState('');
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({
-    first_name: '', last_name: '', email: '', mobile_no: '',
-    custom_client_intent: '', custom_pipeline_type: '', source: 'Manual',
-  });
+  const [search, setSearch] = useState('');
+  const [intentFilter, setIntentFilter] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const load = async () => {
+  const loadLeads = async () => {
     setLoading(true);
     try {
-      const filters = pipeline ? { custom_pipeline_type: pipeline } : {};
+      const filters = intentFilter ? { intent: intentFilter } : {};
       const data = await api.getLeads(filters);
-      setLeads(data);
+      setLeads(data || []);
+    } catch (err) {
+      console.error('Failed to load leads:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { load(); }, [pipeline]);
+  useEffect(() => {
+    loadLeads();
+
+    // Subscribe to realtime changes in Supabase!
+    const sub = api.subscribeToLeads(() => {
+      loadLeads();
+    });
+    return () => {
+      if (sub) sub.unsubscribe();
+    };
+  }, [intentFilter]);
 
   const filtered = leads.filter(l => {
-    const name = `${l.first_name || ''} ${l.last_name || ''}`.toLowerCase();
-    return !search || name.includes(search.toLowerCase()) || (l.email || '').includes(search.toLowerCase());
+    const query = search.toLowerCase();
+    const name = (l.name || '').toLowerCase();
+    const email = (l.email || '').toLowerCase();
+    const vehicle = `${l.manufacturer || ''} ${l.model || ''}`.toLowerCase();
+    return !search || name.includes(query) || email.includes(query) || vehicle.includes(query);
   });
 
-  const handleCreate = async (e) => {
-    e.preventDefault();
-    try {
-      await api.createLead(form);
-      setShowForm(false);
-      setForm({ first_name: '', last_name: '', email: '', mobile_no: '',
-                custom_client_intent: '', custom_pipeline_type: '', source: 'Manual' });
-      load();
-    } catch (err) {
-      alert('Error creating lead: ' + err.message);
-    }
-  };
-
   const intentBadge = (i) => {
-    if (i === 'BUY_INTENT')  return <span className="badge badge-buy">Buy</span>;
-    if (i === 'SELL_INTENT') return <span className="badge badge-sell">Sell</span>;
-    return <span className="badge badge-new">—</span>;
-  };
-
-  const pipelineBadge = (p) => {
-    if (p === 'sell') return <span className="badge badge-sell">Sell</span>;
-    if (p === 'buy')  return <span className="badge badge-buy">Buy</span>;
-    return <span className="badge badge-new">Unset</span>;
+    if (i === 'BUY' || i === 'BUY_INTENT') return <span className="badge badge-buy">Buy Intent</span>;
+    if (i === 'SELL' || i === 'SELL_INTENT') return <span className="badge badge-sell">Sell Intent</span>;
+    return <span className="badge badge-new">New</span>;
   };
 
   return (
     <div>
-      {/* Toolbar */}
-      <div className="card-header" style={{ marginBottom: 16, background: 'none', padding: 0 }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ position: 'relative' }}>
-            <Search size={14} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <input
-              className="input"
-              style={{ paddingLeft: 28, width: 220 }}
-              placeholder="Search name or email…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-          </div>
-          <select className="input" value={pipeline} onChange={e => setPipeline(e.target.value)} style={{ width: 140 }}>
-            <option value="">All Pipelines</option>
-            <option value="sell">Sell (Vermittlung)</option>
-            <option value="buy">Buy (Beschaffung)</option>
-          </select>
-          <button className="btn-ghost" onClick={load}><RefreshCw size={14} /></button>
+      {/* Header */}
+      <div className="page-header">
+        <div className="page-header-left">
+          <h1>Lead Management</h1>
+          <p>Inbound client inquiries from Email, WhatsApp, and Web Forms</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowForm(true)}>
-          <Plus size={14} /> New Lead
+        <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
+          <Plus size={14} /> New Lead (with OCR)
         </button>
       </div>
 
-      {/* Create Form */}
-      {showForm && (
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header">
-            <span className="card-title">Create Lead</span>
-            <button className="btn-ghost" onClick={() => setShowForm(false)}>✕</button>
-          </div>
-          <form className="card-body" onSubmit={handleCreate}>
-            <div className="form-grid">
-              <div className="form-group">
-                <label className="form-label">First Name *</label>
-                <input className="input" required value={form.first_name}
-                  onChange={e => setForm({...form, first_name: e.target.value})} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Last Name</label>
-                <input className="input" value={form.last_name}
-                  onChange={e => setForm({...form, last_name: e.target.value})} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Email</label>
-                <input className="input" type="email" value={form.email}
-                  onChange={e => setForm({...form, email: e.target.value})} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Phone</label>
-                <input className="input" value={form.mobile_no}
-                  onChange={e => setForm({...form, mobile_no: e.target.value})} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Pipeline</label>
-                <select className="input" value={form.custom_pipeline_type}
-                  onChange={e => setForm({...form, custom_pipeline_type: e.target.value})}>
-                  <option value="">Unknown</option>
-                  <option value="sell">Sell (Vermittlung)</option>
-                  <option value="buy">Buy (Beschaffung)</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Intent</label>
-                <select className="input" value={form.custom_client_intent}
-                  onChange={e => setForm({...form, custom_client_intent: e.target.value})}>
-                  <option value="">Unknown</option>
-                  <option value="SELL_INTENT">Sell Intent</option>
-                  <option value="BUY_INTENT">Buy Intent</option>
-                </select>
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-              <button type="submit" className="btn-primary">Create Lead</button>
-              <button type="button" className="btn-ghost" onClick={() => setShowForm(false)}>Cancel</button>
-            </div>
-          </form>
+      {/* Filters & Search Bar */}
+      <div className="filters-row">
+        <div className="search-bar">
+          <Search size={14} />
+          <input
+            placeholder="Search leads by name, email, or car model..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
         </div>
-      )}
 
-      {/* Table */}
+        <div style={{ display: 'flex', gap: 4 }}>
+          <button
+            className={`filter-chip ${intentFilter === '' ? 'active' : ''}`}
+            onClick={() => setIntentFilter('')}
+          >
+            All Leads
+          </button>
+          <button
+            className={`filter-chip ${intentFilter === 'SELL' ? 'active' : ''}`}
+            onClick={() => setIntentFilter('SELL')}
+          >
+            🏷️ Sell Intent
+          </button>
+          <button
+            className={`filter-chip ${intentFilter === 'BUY' ? 'active' : ''}`}
+            onClick={() => setIntentFilter('BUY')}
+          >
+            🔍 Buy Intent
+          </button>
+        </div>
+
+        <button className="btn btn-secondary btn-icon" onClick={loadLeads} style={{ marginLeft: 'auto' }}>
+          <RefreshCw size={14} />
+        </button>
+      </div>
+
+      {/* Leads Table */}
       <div className="card">
         <div className="card-header">
-          <span className="card-title">All Leads <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>({filtered.length})</span></span>
+          <span className="card-title">All Inquiries ({filtered.length})</span>
         </div>
+
         {loading ? (
-          <div className="loading-spinner"><div className="spinner" /></div>
+          <div className="card-body" style={{ textAlign: 'center', padding: 40 }}>
+            <div className="spinner" style={{ margin: '0 auto 12px' }} />
+            <div>Loading leads from Supabase...</div>
+          </div>
         ) : filtered.length === 0 ? (
-          <div className="empty-state">
-            <Users size={32} />
+          <div className="card-body" style={{ textAlign: 'center', padding: 40 }}>
+            <Users size={32} color="var(--text-muted)" style={{ margin: '0 auto 12px' }} />
             <h3>No leads found</h3>
-            <p>Leads arrive automatically from Email (W1) and WhatsApp (W2).</p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4 }}>
+              Click "+ New Lead" to create a record or upload a document to auto-fill.
+            </p>
           </div>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>Pipeline</th>
-                <th>Intent</th>
-                <th>Source</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(l => (
-                <tr key={l.name}>
-                  <td style={{ fontWeight: 500 }}>
-                    {`${l.first_name || ''} ${l.last_name || ''}`.trim() || '—'}
-                  </td>
-                  <td style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{l.email || '—'}</td>
-                  <td style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{l.mobile_no || '—'}</td>
-                  <td>{pipelineBadge(l.custom_pipeline_type)}</td>
-                  <td>{intentBadge(l.custom_client_intent)}</td>
-                  <td style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{l.source || '—'}</td>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Client Name</th>
+                  <th>Contact Info</th>
+                  <th>Vehicle Requested / Owned</th>
+                  <th>Pipeline Intent</th>
+                  <th>Channel</th>
+                  <th>Created</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map(lead => (
+                  <tr key={lead.id}>
+                    <td style={{ fontWeight: 600 }}>{lead.name || '—'}</td>
+                    <td>
+                      <div style={{ fontSize: '0.78rem' }}>{lead.email || '—'}</div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{lead.phone || ''}</div>
+                    </td>
+                    <td>
+                      {lead.manufacturer || lead.model ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <Car size={12} color="var(--brand-600)" />
+                          <span>{lead.manufacturer} {lead.model}</span>
+                        </div>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)' }}>—</span>
+                      )}
+                      {lead.vin && (
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                          VIN: {lead.vin}
+                        </div>
+                      )}
+                    </td>
+                    <td>{intentBadge(lead.intent)}</td>
+                    <td>
+                      <span className={`badge ${lead.channel === 'WHATSAPP' ? 'badge-whatsapp' : lead.channel === 'EMAIL' ? 'badge-email' : 'badge-manual'}`}>
+                        {lead.channel || 'Manual'}
+                      </span>
+                    </td>
+                    <td style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      {lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
+
+      {/* Modal */}
+      <LeadModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onLeadCreated={loadLeads}
+      />
     </div>
   );
 }
