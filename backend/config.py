@@ -32,13 +32,17 @@ class Settings(BaseSettings):
     # Local AI services
     WHISPER_MODEL_SIZE: str = "base"
 
-    # Google Drive
-    GOOGLE_DRIVE_FOLDER_ID: str = ""
-    CONTRACT_TEMPLATE_ID: str = ""
-    GOOGLE_DRIVE_VOICE_FOLDER_ID: str = ""
+    # Google Calendar OAuth
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_REDIRECT_URI: str = "http://localhost:9000/api/v1/auth/google/callback"
+    GOOGLE_CALENDAR_ID: str = "primary"
+    GOOGLE_AUTH_URI: str = "https://accounts.google.com/o/oauth2/auth"
+    GOOGLE_TOKEN_URI: str = "https://oauth2.googleapis.com/token"
+    GOOGLE_SCOPES: str = "https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.freebusy"
 
     class Config:
-        env_file = "../.env"
+        env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
         extra = "ignore"
 
 
