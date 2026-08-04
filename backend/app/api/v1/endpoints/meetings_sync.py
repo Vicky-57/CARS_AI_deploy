@@ -2,21 +2,88 @@
 app/api/v1/endpoints/meetings_sync.py
 ────────────────────────────────────────────────────────────────────────
 Meeting ↔ Google Calendar sync engine endpoints:
-  POST   /meetings/{id}/sync         → create or update the Google event (dedup)
-  DELETE /meetings/{id}/sync         → delete the Google event
-  POST   /meetings/free-busy         → check Maxim's Google calendar for clashes
+  GET    /meetings/google-events       → fetch Google Calendar events for a date range
+  POST   /meetings/{id}/sync           → create or update the Google event (dedup)
+  DELETE /meetings/{id}/sync           → delete the Google event
+  POST   /meetings/free-busy           → check Google calendar for clashes
 ────────────────────────────────────────────────────────────────────────
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional, List
+import json, urllib.request, urllib.parse
+from datetime import datetime, timedelta
 
 from app.services.google_service import (
     create_event, update_event, delete_event, check_free_busy, is_connected,
+    _get_valid_access_token
 )
 from app.services.supabase_service import get_meeting_by_id, update_meeting
 
 router = APIRouter(prefix="/meetings", tags=["Meeting Calendar Sync"])
+
+
+CALENDAR_API = "https://www.googleapis.com/calendar/v3"
+
+
+@router.get("/google-events")
+async def get_google_calendar_events(
+    time_min: str = Query(None, description="ISO8601 start, e.g. 2026-08-01T00:00:00Z"),
+    time_max: str = Query(None, description="ISO8601 end, e.g. 2026-08-31T23:59:59Z"),
+    max_results: int = Query(50),
+):
+    """Fetch events directly from Google Calendar for the given date range."""
+    if not is_connected():
+        return {"connected": False, "events": []}
+
+    token = _get_valid_access_token()
+    if not token:
+        return {"connected": False, "events": []}
+
+    # Default: current month
+    if not time_min:
+        now = datetime.utcnow()
+        time_min = now.replace(day=1, hour=0, minute=0, second=0).isoformat() + "Z"
+    if not time_max:
+        now = datetime.utcnow()
+        # last day of month approximation
+        time_max = (now.replace(day=1, hour=0, minute=0, second=0) + timedelta(days=45)).isoformat() + "Z"
+
+    params = urllib.parse.urlencode({
+        "timeMin": time_min,
+        "timeMax": time_max,
+        "maxResults": max_results,
+        "singleEvents": "true",
+        "orderBy": "startTime",
+    })
+    url = f"{CALENDAR_API}/calendars/primary/events?{params}"
+    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            data = json.loads(r.read().decode("utf-8"))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Google Calendar fetch failed: {str(e)}")
+
+    events = []
+    for item in data.get("items", []):
+        start = item.get("start", {})
+        end = item.get("end", {})
+        events.append({
+            "id": "google_" + item.get("id", ""),
+            "google_event_id": item.get("id"),
+            "title": item.get("summary", "(No title)"),
+            "client_name": "",
+            "start_time": start.get("dateTime") or (start.get("date", "") + "T00:00:00"),
+            "end_time": end.get("dateTime") or (end.get("date", "") + "T23:59:59"),
+            "location_address": item.get("location", ""),
+            "notes": item.get("description", ""),
+            "location_type": "GOOGLE_CALENDAR",
+            "source": "google",
+        })
+
+    return {"connected": True, "events": events, "count": len(events)}
+
+
 
 
 class FreeBusyRequest(BaseModel):

@@ -1,11 +1,12 @@
 from fastapi import APIRouter
 from app.api.v1.endpoints import (
-    ocr, voice, classify, contracts, projects,
+    auth, ocr, voice, classify, contracts, projects,
     webhooks, briefings, gmail_auth, google_auth, meetings_sync
 )
 
 api_router = APIRouter(prefix="/api/v1")
 
+api_router.include_router(auth.router)
 api_router.include_router(ocr.router)
 api_router.include_router(voice.router)
 api_router.include_router(classify.router)

@@ -1,8 +1,8 @@
-import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Users, FolderKanban, MessageSquare,
-  FileText, Calendar, Mic, Car, Activity, ChevronRight, Wifi, WifiOff, User, Briefcase,
+  FileText, Calendar, Car, User, Briefcase,
   ChevronsUpDown, LogOut, Settings
 } from 'lucide-react';
 
@@ -16,7 +16,7 @@ import Contracts from './pages/Contracts';
 import CalendarPage from './pages/Calendar';
 import Auth from './pages/Auth';
 import Profile from './pages/Profile';
-import { api } from './api/api';
+import { api, supabase } from './api/api';
 
 const NAV = [
   {
@@ -40,25 +40,11 @@ const NAV = [
     items: [
       { path: '/contracts', icon: FileText, label: 'Documentation' },
       { path: '/calendar', icon: Calendar, label: 'Calendar' },
-      // { path: '/voice', icon: Mic, label: 'Voice Notes' },
     ],
   },
 ];
 
-const PAGE_TITLES = {
-  '/': 'Dashboard',
-  '/leads': 'Leads',
-  '/customers': 'Customers',
-  '/communications': 'Communications',
-  '/projects': 'Projects',
-  '/deals': 'Deals',
-  '/contracts': 'Documentation',
-  '/calendar': 'Calendar',
-  '/voice': 'Voice Notes',
-  '/profile': 'Profile Settings',
-};
-
-function Sidebar({ online, onLogout }) {
+function Sidebar({ online, onLogout, userProfile }) {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   return (
@@ -101,11 +87,19 @@ function Sidebar({ online, onLogout }) {
           onClick={() => setShowProfileMenu(!showProfileMenu)}
         >
           <div style={{ width: 32, height: 32, borderRadius: 6, background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <User size={18} color="#f1f5f9" />
+            {userProfile?.picture ? (
+              <img src={userProfile.picture} alt="User" style={{ width: 28, height: 28, borderRadius: '50%' }} />
+            ) : (
+              <User size={18} color="#f1f5f9" />
+            )}
           </div>
           <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
-            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>Admin User</div>
-            <div style={{ fontSize: '0.75rem', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>admin@caragents.com</div>
+            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
+              {userProfile?.name || (userProfile?.email ? userProfile.email.split('@')[0] : 'Vikas Broker')}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
+              {userProfile?.email || 'vikaspurohit105@gmail.com'}
+            </div>
           </div>
           <ChevronsUpDown size={16} color="#94a3b8" />
         </button>
@@ -150,23 +144,63 @@ function Sidebar({ online, onLogout }) {
 
 export default function App() {
   const [online, setOnline] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return !!localStorage.getItem('car_agents_user');
+  });
+  const [userProfile, setUserProfile] = useState(() => {
+    try {
+      const stored = localStorage.getItem('car_agents_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch { return null; }
+  });
 
   useEffect(() => {
     // Check connection
     api.health()
       .then(() => setOnline(true))
       .catch(() => setOnline(false));
+
+    // Fetch dynamic user profile from Google OAuth Status if connected
+    if (api.googleAuthStatus) {
+      api.googleAuthStatus()
+        .then(res => {
+          if (res && res.connected) {
+            const profile = {
+              name: res.name || (res.email ? res.email.split('@')[0] : 'Vikas Broker'),
+              email: res.email || 'vikaspurohit105@gmail.com',
+              picture: res.picture || null
+            };
+            setUserProfile(profile);
+            localStorage.setItem('car_agents_user', JSON.stringify(profile));
+          }
+        })
+        .catch(() => {});
+    }
   }, []);
 
+  const handleLogin = (user) => {
+    const profile = user || { email: 'vikaspurohit105@gmail.com', name: 'Vikas Broker' };
+    setUserProfile(profile);
+    localStorage.setItem('car_agents_user', JSON.stringify(profile));
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('car_agents_user');
+    localStorage.removeItem('car_agents_token');
+    supabase.auth.signOut().catch(() => {});
+    setUserProfile(null);
+    setIsAuthenticated(false);
+  };
+
   if (!isAuthenticated) {
-    return <Auth onLogin={() => setIsAuthenticated(true)} />;
+    return <Auth onLogin={handleLogin} />;
   }
 
   return (
     <BrowserRouter>
       <div className="portal-layout">
-        <Sidebar online={online} onLogout={() => setIsAuthenticated(false)} />
+        <Sidebar online={online} onLogout={handleLogout} userProfile={userProfile} />
         <div className="main-content">
           <div className="page-content">
             <Routes>

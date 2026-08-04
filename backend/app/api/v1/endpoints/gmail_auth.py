@@ -2,11 +2,11 @@ import os
 import json
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
+from config import settings
+from app.services.google_service import build_auth_url, exchange_code, is_connected
 from app.services.gmail_api_service import (
     fetch_primary_unread_emails,
-    convert_gmail_to_lead,
-    TOKEN_FILE,
-    SCOPES
+    convert_gmail_to_lead
 )
 
 router = APIRouter(prefix="/gmail", tags=["Google OAuth2 & Gmail API"])
@@ -20,54 +20,20 @@ class ConvertLeadRequest(BaseModel):
 def get_google_auth_url():
     """
     Returns the Google OAuth2 consent URL for the user to sign in with Google.
-    No passwords required!
+    Unifies Gmail, Google Drive, and Google Calendar permissions!
     """
-    client_secrets_file = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "client_secrets.json"))
-
-    if not os.path.exists(client_secrets_file):
-        # Return structured guidance if client_secrets.json is not placed yet
+    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
         return {
-            "status": "pending_setup",
+            "status": "pending_credentials",
             "auth_url": None,
-            "message": "Please place your Google OAuth2 client_secrets.json in backend/ or set GOOGLE_CLIENT_ID in environment."
+            "message": "Please enter your GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in backend/.env to enable 1-click Google permission!"
         }
 
     try:
-        from google_auth_oauthlib.flow import Flow
-        flow = Flow.from_client_secrets_file(
-            client_secrets_file,
-            scopes=SCOPES,
-            redirect_uri="http://localhost:9000/api/v1/gmail/callback"
-        )
-        auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline')
-        return {"status": "ready", "auth_url": auth_url}
+        url = build_auth_url()
+        return {"status": "ready", "auth_url": url}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/callback")
-def google_oauth_callback(code: str = Query(...)):
-    """
-    Callback endpoint where Google redirects after the user clicks 'Allow' on Google permissions screen.
-    Exchanges auth code for access & refresh tokens.
-    """
-    client_secrets_file = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "client_secrets.json"))
-    try:
-        from google_auth_oauthlib.flow import Flow
-        flow = Flow.from_client_secrets_file(
-            client_secrets_file,
-            scopes=SCOPES,
-            redirect_uri="http://localhost:9000/api/v1/gmail/callback"
-        )
-        flow.fetch_token(code=code)
-        credentials = flow.credentials
-
-        with open(TOKEN_FILE, 'w') as token_file:
-            token_file.write(credentials.to_json())
-
-        return {"status": "success", "message": "Google Account connected successfully! You can close this window."}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"OAuth callback failed: {str(e)}")
 
 
 @router.get("/primary-emails")

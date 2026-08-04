@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { Calendar, Plus, X, AlertTriangle, Trash2, Pencil, MapPin, Video, User as UserIcon, Clock } from 'lucide-react';
+import { Calendar, Plus, X, AlertTriangle, Trash2, Pencil, Clock, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { api } from '../api/api';
-import { format, startOfWeek, addDays, isSameDay, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfWeek, addDays, isSameDay, startOfMonth, endOfMonth, addWeeks, subWeeks, addMonths, subMonths, parseISO } from 'date-fns';
 
+// ─── Meeting Modal ────────────────────────────────────────────────────────────
 function MeetingModal({ meeting, onClose, onSaved }) {
-  const isEdit = !!meeting;
+  const isEdit = !!meeting && !meeting.id?.startsWith('google_');
 
   const toInputValue = (iso) => {
     if (!iso) return '';
@@ -22,22 +23,22 @@ function MeetingModal({ meeting, onClose, onSaved }) {
   };
 
   const buildInitialForm = () => {
-    if (meeting) {
+    if (meeting && isEdit) {
       return {
         title: meeting?.title || '',
-        client_name: meeting?.client_name || meeting?.attendee_name || '',
-        client_phone: meeting?.client_phone || meeting?.attendee_contact || '',
+        client_name: meeting?.client_name || '',
+        client_phone: meeting?.client_phone || '',
         start_time: toInputValue(meeting.start_time),
         end_time: toInputValue(meeting.end_time),
-        location_type: meeting?.location_type || (meeting?.is_onsite ? 'OFFLINE_ONSITE' : 'ONLINE'),
-        location_address: meeting?.location_address || meeting?.location || '',
+        location_type: meeting?.location_type === 'OFFLINE_ONSITE' ? 'OFFLINE_ONSITE' : 'ONLINE',
+        location_address: meeting?.location_address || '',
         notes: meeting?.notes || '',
       };
     }
-    const start = nextSlot();
-    const end = new Date(start.getTime() + 30 * 60 * 1000);
+    const start = meeting?.start_time ? new Date(meeting.start_time) : nextSlot();
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
     return {
-      title: '', client_name: '', client_phone: '',
+      title: meeting?.title || '', client_name: '', client_phone: '',
       start_time: format(start, "yyyy-MM-dd'T'HH:mm"),
       end_time: format(end, "yyyy-MM-dd'T'HH:mm"),
       location_type: 'ONLINE', location_address: '', notes: '',
@@ -58,15 +59,6 @@ function MeetingModal({ meeting, onClose, onSaved }) {
   const end = new Date(form.end_time);
   const timesValid = !isNaN(start.getTime()) && !isNaN(end.getTime()) && end > start;
 
-  const isOwnGoogleEvent = (b) => {
-    if (!meeting || !meeting.start_time || !meeting.end_time) return false;
-    const ownStart = new Date(meeting.start_time).getTime();
-    const ownEnd = new Date(meeting.end_time).getTime();
-    const bStart = new Date(b.start).getTime();
-    const bEnd = new Date(b.end).getTime();
-    return Math.abs(bStart - ownStart) < 60000 && Math.abs(bEnd - ownEnd) < 60000;
-  };
-
   const checkConflict = async () => {
     if (!timesValid) return { portal: null, google: null };
     setChecking(true);
@@ -77,14 +69,10 @@ function MeetingModal({ meeting, onClose, onSaved }) {
           ? api.checkGoogleFreeBusy(start.toISOString(), end.toISOString()).catch(() => null)
           : null,
       ]);
-      if (googleRes?.busy) googleRes.busy = googleRes.busy.filter(b => !isOwnGoogleEvent(b));
-      const result = { portal: portalRes, google: googleRes };
       setConflict(portalRes);
       setGoogleBusy(googleRes);
-      return result;
+      return { portal: portalRes, google: googleRes };
     } catch {
-      setConflict(null);
-      setGoogleBusy(null);
       return { portal: null, google: null };
     } finally { setChecking(false); }
   };
@@ -120,22 +108,14 @@ function MeetingModal({ meeting, onClose, onSaved }) {
       onSaved();
       onClose();
     } catch (e) {
-      alert((isEdit ? 'Could not update' : 'Could not create') + ' meeting: ' + e.message);
+      alert('Could not save meeting: ' + e.message);
     } finally { setSaving(false); }
   };
 
   const handleSave = async () => {
     if (!timesValid || !form.client_name.trim()) return;
-    const { portal, google } = await checkConflict();
+    const { portal } = await checkConflict();
     if (portal?.has_overlap) return;
-
-    const bufferClash = portal?.has_buffer_clash;
-    const googleClash = google?.connected && google?.busy?.length;
-
-    if ((bufferClash || googleClash) && !bookAnyway) {
-      setBookAnyway(true);
-      return;
-    }
     await save();
   };
 
@@ -161,17 +141,11 @@ function MeetingModal({ meeting, onClose, onSaved }) {
               <input className="form-input" type="datetime-local" value={form.end_time} min={form.start_time || undefined} onChange={e => { set('end_time', e.target.value); setConflict(null); setBookAnyway(false); }} />
             </div>
           </div>
-          {form.start_time && form.end_time && !timesValid && (
-            <div className="conflict-alert">
-              <AlertTriangle size={16} />
-              <div><strong>Invalid time range.</strong><div>End time must be after start time.</div></div>
-            </div>
-          )}
 
           <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <input type="checkbox" id="is_onsite" checked={isOnsite} onChange={e => { set('location_type', e.target.checked ? 'OFFLINE_ONSITE' : 'ONLINE'); setConflict(null); setBookAnyway(false); }} />
             <label htmlFor="is_onsite" className="form-label" style={{ margin: 0 }}>
-              Onsite meeting (adds 30-min travel buffer for conflict check)
+              Onsite meeting (30-min travel buffer)
             </label>
           </div>
 
@@ -199,36 +173,26 @@ function MeetingModal({ meeting, onClose, onSaved }) {
 
           {checking && <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Checking for conflicts…</p>}
 
-          {conflict?.has_conflict && (
-            <div className="conflict-alert" style={{ background: '#fef2f2', border: '1px solid #fca5a5', padding: 12, borderRadius: 8, color: '#991b1b', marginBottom: 12 }}>
+          {conflict?.has_overlap && (
+            <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', padding: 12, borderRadius: 8, color: '#991b1b', marginBottom: 12, display: 'flex', gap: 8 }}>
               <AlertTriangle size={16} />
-              <div>
-                <strong>Scheduling Conflict Detected!</strong>
-                <div style={{ fontSize: '0.8rem' }}>Includes 30-min travel buffer for onsite visits.</div>
-              </div>
+              <div><strong>Scheduling Conflict!</strong> Another meeting already exists in this slot.</div>
             </div>
           )}
 
-          {googleBusy?.connected && googleBusy?.busy?.length > 0 && !bookAnyway && (
-            <div className="conflict-alert" style={{ background: '#fef2f2', border: '1px solid #fca5a5', padding: 12, borderRadius: 8, color: '#991b1b', marginBottom: 12 }}>
+          {googleBusy?.connected && googleBusy?.busy?.length > 0 && (
+            <div style={{ background: '#fffbeb', border: '1px solid #fde68a', padding: 12, borderRadius: 8, color: '#92400e', marginBottom: 12, display: 'flex', gap: 8 }}>
               <AlertTriangle size={16} />
-              <div>
-                <strong>Google Calendar Event Clash!</strong>
-                <div>Clashes with Google Calendar: {googleBusy.busy.map(b => `${format(new Date(b.start), 'HH:mm')}–${format(new Date(b.end), 'HH:mm')}`).join(', ')}</div>
-              </div>
+              <div><strong>Google Calendar Busy:</strong> {googleBusy.busy.map(b => `${format(new Date(b.start), 'HH:mm')}–${format(new Date(b.end), 'HH:mm')}`).join(', ')}</div>
             </div>
           )}
 
           {bookAnyway && (
-            <div className="conflict-alert" style={{ background: '#fffbeb', border: '1px solid #fde68a', padding: 12, borderRadius: 8, color: '#92400e', marginBottom: 12 }}>
-              <div>
-                <strong>Reschedule or book anyway?</strong>
-                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                  <button type="button" className="btn btn-secondary" onClick={() => { setBookAnyway(false); startRef.current?.focus(); }}>Reschedule</button>
-                  <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
-                    {saving ? 'Saving…' : (isEdit ? 'Save Anyway' : 'Book Anyway')}
-                  </button>
-                </div>
+            <div style={{ background: '#fffbeb', border: '1px solid #fde68a', padding: 12, borderRadius: 8, color: '#92400e', marginBottom: 12 }}>
+              <strong>Book anyway?</strong>
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button type="button" className="btn btn-secondary" onClick={() => { setBookAnyway(false); startRef.current?.focus(); }}>Reschedule</button>
+                <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Book Anyway'}</button>
               </div>
             </div>
           )}
@@ -244,105 +208,68 @@ function MeetingModal({ meeting, onClose, onSaved }) {
   );
 }
 
-function WeekView({ meetings }) {
-  const today = new Date();
-  const weekStart = startOfWeek(today, { weekStartsOn: 1 });
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-
+// ─── Event pill ───────────────────────────────────────────────────────────────
+function EventPill({ m, onClick }) {
+  const isGoogle = m.source === 'google';
+  const isOnsite = m.location_type === 'OFFLINE_ONSITE';
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 12 }}>
-      {days.map(day => {
-        const dayMeetings = meetings.filter(m => {
-          try { return isSameDay(new Date(m.start_time), day); } catch { return false; }
-        });
-        const isToday = isSameDay(day, today);
-        return (
-          <div key={day.toISOString()} style={{
-            borderRadius: 'var(--radius-lg)',
-            border: isToday ? '2px solid var(--brand-500)' : '1px solid var(--border)',
-            background: 'var(--surface)',
-            minHeight: 180,
-            padding: 8,
-            display: 'flex', flexDirection: 'column',
-          }}>
-            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: isToday ? 'var(--brand-600)' : 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase' }}>
-              {format(day, 'EEE')}<br />
-              <span style={{ fontSize: '1.1rem', color: isToday ? 'var(--brand-700)' : 'var(--text-primary)' }}>{format(day, 'd')}</span>
-            </div>
-            {dayMeetings.map(m => (
-              <div key={m.id} style={{
-                background: (m.location_type === 'OFFLINE_ONSITE' || m.is_onsite) ? '#fef3c7' : 'var(--brand-100)',
-                color: (m.location_type === 'OFFLINE_ONSITE' || m.is_onsite) ? '#92400e' : 'var(--brand-700)',
-                borderRadius: 4,
-                padding: '4px 6px',
-                fontSize: '0.68rem',
-                fontWeight: 600,
-                marginBottom: 4,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}>
-                {format(new Date(m.start_time), 'HH:mm')} {m.title} {m.google_event_id ? '✅' : ''}
-              </div>
-            ))}
-          </div>
-        );
-      })}
+    <div
+      onClick={() => onClick && onClick(m)}
+      title={`${m.title}${m.client_name ? ' · ' + m.client_name : ''}`}
+      style={{
+        background: isGoogle ? '#e8f0fe' : isOnsite ? '#fef3c7' : 'var(--brand-100)',
+        color: isGoogle ? '#1a56db' : isOnsite ? '#92400e' : 'var(--brand-700)',
+        borderLeft: `3px solid ${isGoogle ? '#4285F4' : isOnsite ? '#f59e0b' : 'var(--brand-500)'}`,
+        borderRadius: 4,
+        padding: '3px 6px',
+        fontSize: '0.68rem',
+        fontWeight: 600,
+        marginBottom: 3,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        cursor: 'pointer',
+      }}
+    >
+      {format(new Date(m.start_time), 'HH:mm')} {m.title}
+      {isGoogle && <span style={{ marginLeft: 3, opacity: 0.7 }}>📅</span>}
     </div>
   );
 }
 
-function MonthView({ meetings }) {
+// ─── Week View ────────────────────────────────────────────────────────────────
+function WeekView({ meetings, weekStart, onEventClick, onDayClick }) {
   const today = new Date();
-  const monthStart = startOfMonth(today);
-  const monthEnd = endOfMonth(today);
-  const startDay = startOfWeek(monthStart, { weekStartsOn: 1 });
-  const days = [];
-  for (let d = new Date(startDay); d <= monthEnd; d = addDays(d, 1)) {
-    days.push(new Date(d));
-  }
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8 }}>
-      {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(dow => (
-        <div key={dow} style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textAlign: 'center' }}>{dow}</div>
-      ))}
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 10 }}>
       {days.map(day => {
-        const inMonth = day.getMonth() === today.getMonth();
         const dayMeetings = meetings.filter(m => {
           try { return isSameDay(new Date(m.start_time), day); } catch { return false; }
-        });
+        }).sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
         const isToday = isSameDay(day, today);
         return (
-          <div key={day.toISOString()} style={{
-            borderRadius: 'var(--radius)',
-            border: `1px solid ${isToday ? 'var(--brand-500)' : 'var(--border)'}`,
-            background: isToday ? 'var(--brand-50)' : (inMonth ? 'var(--surface)' : 'var(--bg)'),
-            padding: '8px 6px',
-            minHeight: 78,
-            opacity: inMonth ? 1 : 0.45,
-          }}>
-            <div style={{ fontSize: '0.7rem', fontWeight: 600, color: isToday ? 'var(--brand-600)' : (inMonth ? 'var(--text-primary)' : 'var(--text-muted)'), marginBottom: 4 }}>
-              {format(day, 'd')}
+          <div
+            key={day.toISOString()}
+            onClick={() => onDayClick && onDayClick(day)}
+            style={{
+              borderRadius: 'var(--radius-lg)',
+              border: isToday ? '2px solid var(--brand-500)' : '1px solid var(--border)',
+              background: isToday ? 'var(--brand-50)' : 'var(--surface)',
+              minHeight: 160,
+              padding: 8,
+              display: 'flex', flexDirection: 'column',
+              cursor: 'pointer',
+            }}
+          >
+            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: isToday ? 'var(--brand-600)' : 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase' }}>
+              {format(day, 'EEE')}<br />
+              <span style={{ fontSize: '1.2rem', color: isToday ? 'var(--brand-700)' : 'var(--text-primary)' }}>{format(day, 'd')}</span>
             </div>
-            {dayMeetings.slice(0, 3).map(m => (
-              <div key={m.id} style={{
-                background: (m.location_type === 'OFFLINE_ONSITE' || m.is_onsite) ? '#fef3c7' : 'var(--brand-100)',
-                color: (m.location_type === 'OFFLINE_ONSITE' || m.is_onsite) ? '#92400e' : 'var(--brand-700)',
-                borderRadius: 4,
-                padding: '2px 4px',
-                fontSize: '0.6rem',
-                fontWeight: 500,
-                marginBottom: 2,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}>
-                {format(new Date(m.start_time), 'HH:mm')} {m.title}
-              </div>
-            ))}
-            {dayMeetings.length > 3 && (
-              <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>+{dayMeetings.length - 3} more</div>
+            {dayMeetings.map(m => <EventPill key={m.id} m={m} onClick={onEventClick} />)}
+            {dayMeetings.length === 0 && (
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 'auto', textAlign: 'center', paddingBottom: 8 }}>—</div>
             )}
           </div>
         );
@@ -351,44 +278,190 @@ function MonthView({ meetings }) {
   );
 }
 
-export default function CalendarPage() {
-  const [meetings, setMeetings] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [viewMode, setViewMode] = useState('week');
-  const [googleConnected, setGoogleConnected] = useState(false);
-  const [connecting, setConnecting] = useState(false);
+// ─── Month View ───────────────────────────────────────────────────────────────
+function MonthView({ meetings, currentMonth, onEventClick, onDayClick }) {
+  const today = new Date();
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(currentMonth);
+  const startDay = startOfWeek(monthStart, { weekStartsOn: 1 });
+  const days = [];
+  for (let d = new Date(startDay); d <= monthEnd || days.length % 7 !== 0; d = addDays(d, 1)) {
+    days.push(new Date(d));
+    if (days.length > 42) break;
+  }
 
-  const load = async () => {
-    setLoading(true);
-    try { 
-      const data = await api.getMeetings();
-      setMeetings(data || []);
-    } catch { 
-      setMeetings([]); 
-    } finally { 
-      setLoading(false); 
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
+      {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(dow => (
+        <div key={dow} style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center', padding: '4px 0', textTransform: 'uppercase' }}>{dow}</div>
+      ))}
+      {days.map(day => {
+        const inMonth = day.getMonth() === currentMonth.getMonth();
+        const dayMeetings = meetings.filter(m => {
+          try { return isSameDay(new Date(m.start_time), day); } catch { return false; }
+        }).sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+        const isToday = isSameDay(day, today);
+        return (
+          <div
+            key={day.toISOString()}
+            onClick={() => onDayClick && onDayClick(day)}
+            style={{
+              borderRadius: 'var(--radius)',
+              border: `1px solid ${isToday ? 'var(--brand-500)' : 'var(--border)'}`,
+              background: isToday ? 'var(--brand-50)' : (inMonth ? 'var(--surface)' : 'var(--bg)'),
+              padding: '6px 5px',
+              minHeight: 80,
+              opacity: inMonth ? 1 : 0.35,
+              cursor: 'pointer',
+              transition: 'background 0.15s',
+            }}
+          >
+            <div style={{ fontSize: '0.72rem', fontWeight: isToday ? 800 : 600, color: isToday ? 'var(--brand-600)' : (inMonth ? 'var(--text-primary)' : 'var(--text-muted)'), marginBottom: 4, textAlign: 'center' }}>
+              {format(day, 'd')}
+            </div>
+            {dayMeetings.slice(0, 3).map(m => <EventPill key={m.id} m={m} onClick={onEventClick} />)}
+            {dayMeetings.length > 3 && (
+              <div style={{ fontSize: '0.6rem', color: 'var(--brand-600)', fontWeight: 600 }}>+{dayMeetings.length - 3} more</div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Day Detail Panel ─────────────────────────────────────────────────────────
+function DayPanel({ day, meetings, onEdit, onDelete, onClose }) {
+  const dayMeetings = meetings
+    .filter(m => { try { return isSameDay(new Date(m.start_time), day); } catch { return false; } })
+    .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+
+  return (
+    <div style={{
+      position: 'fixed', right: 0, top: 0, bottom: 0, width: 340,
+      background: 'var(--surface)', borderLeft: '1px solid var(--border)',
+      zIndex: 200, display: 'flex', flexDirection: 'column',
+      boxShadow: '-4px 0 24px rgba(0,0,0,0.1)',
+    }}>
+      <div style={{ padding: '20px 20px 12px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>{format(day, 'EEEE')}</div>
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{format(day, 'MMMM d, yyyy')}</div>
+        </div>
+        <button className="btn-icon" onClick={onClose}><X size={18} /></button>
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+        {dayMeetings.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+            <Calendar size={30} style={{ opacity: 0.3, marginBottom: 8 }} /><br />
+            No meetings this day
+          </div>
+        ) : dayMeetings.map(m => {
+          const isGoogle = m.source === 'google';
+          const isOnsite = m.location_type === 'OFFLINE_ONSITE';
+          return (
+            <div key={m.id} style={{
+              background: isGoogle ? '#f0f4ff' : 'var(--bg)', borderRadius: 10,
+              border: `1px solid ${isGoogle ? '#c7d7f5' : 'var(--border)'}`,
+              padding: '12px 14px', marginBottom: 10,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.88rem', flex: 1 }}>
+                  {isGoogle && <span style={{ fontSize: '0.7rem', background: '#e8f0fe', color: '#1a56db', borderRadius: 4, padding: '1px 5px', marginRight: 5 }}>Google</span>}
+                  {m.title}
+                </div>
+                {!isGoogle && (
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button className="btn-icon" onClick={() => onEdit(m)} title="Edit"><Pencil size={13} /></button>
+                    <button className="btn-icon" onClick={() => onDelete(m.id)} title="Delete"><Trash2 size={13} color="var(--danger)" /></button>
+                  </div>
+                )}
+              </div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--brand-600)', marginTop: 4 }}>
+                🕐 {format(new Date(m.start_time), 'HH:mm')} – {format(new Date(m.end_time), 'HH:mm')}
+              </div>
+              {m.client_name && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>👤 {m.client_name}</div>}
+              {m.location_address && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>📍 {m.location_address}</div>}
+              {m.notes && <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 4, fontStyle: 'italic' }}>{m.notes}</div>}
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 6 }}>
+                {isOnsite ? '🚗 Onsite' : isGoogle ? '📅 Google Calendar' : '💻 Online'}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Calendar Page ───────────────────────────────────────────────────────
+export default function CalendarPage() {
+  const today = new Date();
+  const [supabaseMeetings, setSupabaseMeetings] = useState([]);
+  const [googleEvents, setGoogleEvents]         = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [showModal, setShowModal]   = useState(false);
+  const [editing, setEditing]       = useState(null);
+  const [viewMode, setViewMode]     = useState('week');
+  const [currentWeek, setCurrentWeek]   = useState(startOfWeek(today, { weekStartsOn: 1 }));
+  const [currentMonth, setCurrentMonth] = useState(startOfMonth(today));
+  const [selectedDay, setSelectedDay]   = useState(null);
+  const [googleConnected, setGoogleConnected] = useState(false);
+
+  // Merge Supabase + Google events (dedup by google_event_id)
+  const allMeetings = (() => {
+    const supabaseGoogleIds = new Set(supabaseMeetings.map(m => m.google_event_id).filter(Boolean));
+    const filteredGoogle = googleEvents.filter(e => !supabaseGoogleIds.has(e.google_event_id));
+    return [...supabaseMeetings, ...filteredGoogle];
+  })();
+
+  const loadData = async (silent = false) => {
+    if (!silent) setLoading(true);
+    else setRefreshing(true);
+    try {
+      // Load Supabase meetings
+      const sbData = await api.getMeetings();
+      setSupabaseMeetings(sbData || []);
+
+      // Load Google Calendar events for current visible range
+      if (viewMode === 'week') {
+        const timeMin = currentWeek.toISOString();
+        const timeMax = addDays(currentWeek, 7).toISOString();
+        const res = await api.getGoogleCalendarEvents(timeMin, timeMax).catch(() => ({ events: [] }));
+        setGoogleEvents(res.events || []);
+        setGoogleConnected(!!res.connected);
+      } else {
+        const timeMin = startOfMonth(currentMonth).toISOString();
+        const timeMax = endOfMonth(currentMonth).toISOString();
+        const res = await api.getGoogleCalendarEvents(timeMin, timeMax).catch(() => ({ events: [] }));
+        setGoogleEvents(res.events || []);
+        setGoogleConnected(!!res.connected);
+      }
+    } catch (e) {
+      console.error('Calendar load error:', e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    load();
-    if (api.googleAuthStatus) {
-      api.googleAuthStatus().then(r => setGoogleConnected(!!r.connected)).catch(() => setGoogleConnected(false));
-    }
-  }, []);
+  useEffect(() => { loadData(); }, [viewMode, currentWeek, currentMonth]);
 
-  const connectGoogle = async () => {
-    setConnecting(true);
-    try {
-      if (api.googleAuthUrl) {
-        const res = await api.googleAuthUrl();
-        if (res.url) window.open(res.url, '_blank');
-        else alert('Google OAuth not configured. Check settings in backend.');
-      }
-    } catch (e) { alert('Could not start Google connect: ' + e.message); }
-    finally { setConnecting(false); }
+  const goTodayWeek  = () => setCurrentWeek(startOfWeek(today, { weekStartsOn: 1 }));
+  const goTodayMonth = () => setCurrentMonth(startOfMonth(today));
+
+  const prevPeriod = () => viewMode === 'week' ? setCurrentWeek(w => subWeeks(w, 1)) : setCurrentMonth(m => subMonths(m, 1));
+  const nextPeriod = () => viewMode === 'week' ? setCurrentWeek(w => addWeeks(w, 1)) : setCurrentMonth(m => addMonths(m, 1));
+
+  const periodLabel = viewMode === 'week'
+    ? `${format(currentWeek, 'MMM d')} – ${format(addDays(currentWeek, 6), 'MMM d, yyyy')}`
+    : format(currentMonth, 'MMMM yyyy');
+
+  const handleDayClick = (day) => setSelectedDay(day);
+  const handleEventClick = (m) => {
+    if (m.source === 'google') { setSelectedDay(new Date(m.start_time)); return; }
+    setEditing(m); setShowModal(true);
   };
 
   const cancel = async (id) => {
@@ -396,121 +469,175 @@ export default function CalendarPage() {
     try {
       if (api.unsyncMeeting) await api.unsyncMeeting(id).catch(() => {});
       await api.deleteMeeting(id);
-      load();
+      setSelectedDay(null);
+      loadData(true);
     } catch (e) { alert(e.message); }
   };
 
-  const upcoming = meetings
-    .filter(m => new Date(m.start_time) >= new Date())
+  // Today's meetings for the summary strip
+  const todayMeetings = allMeetings
+    .filter(m => { try { return isSameDay(new Date(m.start_time), today); } catch { return false; } })
     .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+
+  const upcoming = allMeetings
+    .filter(m => new Date(m.end_time) >= new Date())
+    .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
+    .slice(0, 10);
 
   return (
     <div style={{ paddingBottom: 40 }}>
       {/* Header */}
-      <div className="page-header" style={{ alignItems: 'flex-end', marginBottom: 24 }}>
+      <div className="page-header" style={{ alignItems: 'flex-end', marginBottom: 20 }}>
         <div className="page-header-left">
           <h1 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Calendar & Appointments</h1>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Manage client meetings with 30-min travel conflict guard & Google Calendar sync</p>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            Portal meetings + Google Calendar events — 30-min travel conflict guard
+          </p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <div style={{
-            display: 'inline-flex',
-            border: '1.5px solid var(--border)',
-            borderRadius: '10px',
-            overflow: 'hidden',
-            background: 'var(--gray-50)',
-          }}>
+          <button className="btn btn-secondary" onClick={() => loadData(true)} disabled={refreshing} title="Refresh">
+            <RefreshCw size={14} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
+          </button>
+          {/* Week / Month toggle */}
+          <div style={{ display: 'inline-flex', border: '1.5px solid var(--border)', borderRadius: 10, overflow: 'hidden', background: 'var(--gray-50)' }}>
             {['week', 'month'].map(mode => (
-              <button
-                key={mode}
-                onClick={() => setViewMode(mode)}
-                style={{
-                  padding: '8px 20px',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  border: 'none',
-                  borderRight: mode === 'week' ? '1.5px solid var(--border)' : 'none',
-                  cursor: 'pointer',
-                  transition: 'all 0.18s',
-                  background: viewMode === mode ? 'var(--brand-500)' : 'transparent',
-                  color: viewMode === mode ? 'white' : 'var(--text-secondary)',
-                  borderRadius: 0,
-                }}
-              >
-                {mode.charAt(0).toUpperCase() + mode.slice(1)}
-              </button>
+              <button key={mode} onClick={() => setViewMode(mode)} style={{
+                padding: '8px 18px', fontSize: '0.875rem', fontWeight: 600,
+                border: 'none', borderRight: mode === 'week' ? '1.5px solid var(--border)' : 'none',
+                cursor: 'pointer', transition: 'all 0.18s',
+                background: viewMode === mode ? 'var(--brand-500)' : 'transparent',
+                color: viewMode === mode ? 'white' : 'var(--text-secondary)', borderRadius: 0,
+              }}>{mode.charAt(0).toUpperCase() + mode.slice(1)}</button>
             ))}
           </div>
-          <button className={`btn ${googleConnected ? 'btn-secondary' : 'btn-secondary'}`} onClick={connectGoogle} disabled={connecting}>
-            {googleConnected ? '✅ Google Sync Active' : 'Connect Google Calendar'}
-          </button>
+          <span style={{ fontSize: '0.75rem', background: googleConnected ? '#dcfce7' : '#fef3c7', color: googleConnected ? '#15803d' : '#92400e', borderRadius: 20, padding: '4px 10px', fontWeight: 600 }}>
+            {googleConnected ? '✅ Google Synced' : '⚠ Not Connected'}
+          </span>
           <button className="btn btn-primary" onClick={() => { setEditing(null); setShowModal(true); }}>
             <Plus size={14} /> Book Meeting
           </button>
         </div>
       </div>
 
-      {/* View (week or month) */}
+      {/* Today's meetings strip */}
+      {todayMeetings.length > 0 && (
+        <div style={{ background: 'linear-gradient(135deg, var(--brand-600), var(--brand-800))', borderRadius: 12, padding: '14px 20px', marginBottom: 16, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ color: 'white', fontWeight: 700, fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
+            📅 Today · {format(today, 'EEEE, MMMM d')}
+          </div>
+          {todayMeetings.map(m => (
+            <div key={m.id} onClick={() => { setSelectedDay(today); }} style={{
+              background: 'rgba(255,255,255,0.15)', color: 'white', borderRadius: 20,
+              padding: '4px 12px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
+              border: '1px solid rgba(255,255,255,0.25)',
+            }}>
+              {format(new Date(m.start_time), 'HH:mm')} {m.title}
+              {m.source === 'google' && <span style={{ marginLeft: 4, opacity: 0.8 }}>📅</span>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Calendar View Card */}
       <div className="card" style={{ marginBottom: 20 }}>
-        <div className="card-header">
-          <span className="card-title">{viewMode === 'week' ? 'This Week' : 'This Month'}</span>
+        <div className="card-header" style={{ justifyContent: 'space-between' }}>
+          <span className="card-title">{periodLabel}</span>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button className="btn btn-secondary" style={{ padding: '4px 10px' }} onClick={prevPeriod}><ChevronLeft size={16} /></button>
+            <button className="btn btn-secondary" style={{ padding: '4px 12px', fontSize: '0.8rem' }}
+              onClick={viewMode === 'week' ? goTodayWeek : goTodayMonth}>Today</button>
+            <button className="btn btn-secondary" style={{ padding: '4px 10px' }} onClick={nextPeriod}><ChevronRight size={16} /></button>
+          </div>
         </div>
         <div className="card-body">
-          {loading ? <div className="card-body" style={{ textAlign: 'center' }}><div className="spinner" style={{ margin: '0 auto' }} /></div> : (
-            viewMode === 'week'
-              ? <WeekView meetings={meetings} />
-              : <MonthView meetings={meetings} />
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '40px 0' }}><div className="spinner" style={{ margin: '0 auto' }} /></div>
+          ) : viewMode === 'week' ? (
+            <WeekView meetings={allMeetings} weekStart={currentWeek} onEventClick={handleEventClick} onDayClick={handleDayClick} />
+          ) : (
+            <MonthView meetings={allMeetings} currentMonth={currentMonth} onEventClick={handleEventClick} onDayClick={handleDayClick} />
           )}
+          {/* Legend */}
+          <div style={{ display: 'flex', gap: 16, marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border)', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+            <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#e8f0fe', border: '1px solid #4285F4', marginRight: 4 }} />Google Calendar</span>
+            <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: 'var(--brand-100)', border: '1px solid var(--brand-500)', marginRight: 4 }} />Portal Meeting (Online)</span>
+            <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#fef3c7', border: '1px solid #f59e0b', marginRight: 4 }} />Portal Meeting (Onsite)</span>
+          </div>
         </div>
       </div>
 
       {/* Upcoming list */}
       <div className="card">
-        <div className="card-header" style={{ justifyContent: 'space-between' }}>
+        <div className="card-header">
           <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Clock size={16} color="var(--brand-600)" /> Upcoming Meetings ({upcoming.length})
+            <Clock size={16} color="var(--brand-600)" /> Upcoming ({upcoming.length})
           </span>
         </div>
         <div className="card-body">
-          {loading ? (
-            <div className="spinner" style={{ margin: '0 auto' }} />
-          ) : upcoming.length === 0 ? (
+          {upcoming.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-muted)' }}>
               <Calendar size={36} style={{ opacity: 0.3, marginBottom: 8 }} />
-              <div>No upcoming meetings. Click "Book Meeting" to schedule.</div>
+              <div>No upcoming meetings.</div>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
-              {upcoming.map(m => (
-                <div key={m.id} className="project-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>
-                      {m.title} {m.google_event_id ? '✅' : ''}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
+              {upcoming.map(m => {
+                const isGoogle = m.source === 'google';
+                const isOnsite = m.location_type === 'OFFLINE_ONSITE';
+                return (
+                  <div key={m.id} style={{
+                    padding: '12px 14px', borderRadius: 10,
+                    border: `1px solid ${isGoogle ? '#c7d7f5' : 'var(--border)'}`,
+                    background: isGoogle ? '#f8faff' : 'var(--surface)',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+                  }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {isGoogle && <span style={{ fontSize: '0.65rem', background: '#e8f0fe', color: '#1a56db', borderRadius: 4, padding: '1px 5px', flexShrink: 0 }}>Google</span>}
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</span>
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--brand-600)', marginTop: 3 }}>
+                        {format(new Date(m.start_time), 'EEE, MMM d · HH:mm')} – {format(new Date(m.end_time), 'HH:mm')}
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                        {isOnsite ? '📍 Onsite' : isGoogle ? '📅 Google Cal' : '💻 Online'}
+                        {m.client_name ? ` · ${m.client_name}` : ''}
+                      </div>
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--brand-600)', marginTop: 2 }}>
-                      {format(new Date(m.start_time), 'EEEE, MMM d · HH:mm')} – {format(new Date(m.end_time), 'HH:mm')}
-                    </div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 4 }}>
-                      {(m.location_type === 'OFFLINE_ONSITE' || m.is_onsite) ? '📍 Onsite' : '💻 Online'}
-                      {m.client_name ? ` · ${m.client_name}` : ''}
-                    </div>
+                    {!isGoogle && (
+                      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                        <button className="btn-icon" onClick={() => { setEditing(m); setShowModal(true); }} title="Edit"><Pencil size={13} /></button>
+                        <button className="btn-icon" onClick={() => cancel(m.id)} title="Delete"><Trash2 size={13} color="var(--danger)" /></button>
+                      </div>
+                    )}
                   </div>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <button className="btn-icon" onClick={() => { setEditing(m); setShowModal(true); }} title="Edit meeting">
-                      <Pencil size={14} />
-                    </button>
-                    <button className="btn-icon" onClick={() => cancel(m.id)} title="Cancel meeting">
-                      <Trash2 size={14} color="var(--danger)" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
       </div>
 
-      {showModal && <MeetingModal meeting={editing || undefined} onClose={() => setShowModal(false)} onSaved={load} />}
+      {/* Day panel */}
+      {selectedDay && (
+        <DayPanel
+          day={selectedDay}
+          meetings={allMeetings}
+          onEdit={m => { setEditing(m); setShowModal(true); setSelectedDay(null); }}
+          onDelete={cancel}
+          onClose={() => setSelectedDay(null)}
+        />
+      )}
+
+      {showModal && (
+        <MeetingModal
+          meeting={editing || undefined}
+          onClose={() => { setShowModal(false); setEditing(null); }}
+          onSaved={() => loadData(true)}
+        />
+      )}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

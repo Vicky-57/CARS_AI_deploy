@@ -1,56 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Mail, MessageSquare, Search, MessageCircle, User } from 'lucide-react';
+import { Mail, MessageSquare, Search, MessageCircle, User, Sparkles, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { api } from '../api/api';
 import { format } from 'date-fns';
 
 function getAvatar(contact) {
   const ch = (contact.channel || '').toUpperCase();
   if (ch === 'WHATSAPP') return { cls: 'avatar-whatsapp', icon: <MessageCircle size={16} /> };
-  if (ch === 'EMAIL') return { cls: 'avatar-email', icon: <Mail size={16} /> };
+  if (ch === 'EMAIL' || ch === 'GMAIL_API') return { cls: 'avatar-email', icon: <Mail size={16} /> };
   return { cls: 'avatar-default', icon: <User size={16} /> };
-}
-
-function initials(name) {
-  if (!name) return '?';
-  return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 }
 
 function formatTs(iso) {
   try { return format(new Date(iso), 'HH:mm'); } catch { return ''; }
 }
-
-const DUMMY_DATA = [
-  {
-    id: 'dummy-1',
-    channel: 'WHATSAPP',
-    sender_name: 'Maximilian Lorenz',
-    sender_contact: '+49 8404 9385840',
-    body: 'Hello! I am highly interested in the Porsche you have listed. Is it still available for a test drive this weekend?',
-    timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-    is_inbound: true,
-    ai_summary: 'Interested in test drive'
-  },
-  {
-    id: 'dummy-2',
-    channel: 'EMAIL',
-    sender_name: 'Sarah Schmidt',
-    sender_contact: 'sarah.schmidt@example.de',
-    subject: 'Inquiry: VW Multivan Comfortline',
-    body: 'Hi, I saw your listing for the VW Multivan. Could you please send me the full service history and some interior pictures? Thanks!',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-    is_inbound: true,
-    ai_summary: 'Requesting service history and photos'
-  },
-  {
-    id: 'dummy-3',
-    channel: 'WHATSAPP',
-    sender_name: 'Klaus Fischer',
-    sender_contact: '+49 151 2345678',
-    body: 'Thanks for sending over the contracts. I will review them with my wife tonight and sign them tomorrow morning.',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    is_inbound: true,
-  }
-];
 
 export default function Communications() {
   const [contacts, setContacts] = useState([]);
@@ -58,42 +20,57 @@ export default function Communications() {
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
   const [threadLoading, setThreadLoading] = useState(false);
+  const [converting, setConverting] = useState(false);
+  const [convertedMap, setConvertedMap] = useState({});
   const [filter, setFilter] = useState('ALL');
   const [search, setSearch] = useState('');
 
+  const loadCommunications = async () => {
+    setLoading(true);
+    try {
+      // 1. Fetch Supabase logged communications
+      const supabaseComms = await api.getCommunications().catch(() => []);
+      
+      // 2. Fetch live Primary Inbox emails from Gmail REST API
+      let gmailPrimary = [];
+      try {
+        if (api.getPrimaryEmails) {
+          const gRes = await api.getPrimaryEmails();
+          if (gRes && gRes.emails) {
+            gmailPrimary = gRes.emails.map(g => ({
+              id: g.message_id,
+              channel: 'EMAIL',
+              sender_name: g.sender_name,
+              sender_contact: g.sender_email,
+              subject: g.subject,
+              body: g.body || g.snippet,
+              timestamp: g.date || new Date().toISOString(),
+              is_inbound: true,
+              is_primary: true
+            }));
+          }
+        }
+      } catch (err) {
+        console.log('Gmail REST API not authenticated yet or empty.');
+      }
+
+      const combined = [...gmailPrimary, ...supabaseComms];
+      setContacts(combined);
+    } catch (err) {
+      console.error('Error loading communications:', err);
+      setContacts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    api.getCommunications()
-      .then(res => {
-        const actualData = Array.isArray(res) ? res : [];
-        setContacts([...DUMMY_DATA, ...actualData]);
-      })
-      .catch(() => setContacts(DUMMY_DATA))
-      .finally(() => setLoading(false));
+    loadCommunications();
   }, []);
 
   const selectContact = async (c) => {
     setSelected(c);
     
-    // Handle dummy data specifically to show a fake thread
-    if (c.id.startsWith('dummy-')) {
-      setThreadLoading(true);
-      setTimeout(() => {
-        setThread([
-          c,
-          { 
-            id: c.id + '-reply', 
-            is_inbound: false, 
-            body: c.channel === 'WHATSAPP' ? 'Absolutely, I will arrange that for you right away!' : 'Sure Sarah, I have attached the documents to this email.', 
-            timestamp: new Date().toISOString(),
-            sender_name: 'Admin',
-            channel: c.channel
-          }
-        ]);
-        setThreadLoading(false);
-      }, 300);
-      return;
-    }
-
     if (!c.lead_id) { setThread([c]); return; }
     
     setThreadLoading(true);
@@ -105,13 +82,39 @@ export default function Communications() {
     finally { setThreadLoading(false); }
   };
 
+  const handleConvertToLead = async (msg) => {
+    setConverting(true);
+    try {
+      if (api.convertGmailToLead && msg.id) {
+        const res = await api.convertGmailToLead(msg.id);
+        alert(res.message || 'Email successfully converted into a Lead in Supabase!');
+      } else {
+        await api.createLead({
+          name: msg.sender_name,
+          email: msg.sender_contact,
+          channel: 'EMAIL',
+          intent: 'BUY',
+          status: 'NEW',
+          message: msg.body,
+          notes: 'Converted from Primary Email in Communications UI'
+        });
+        alert(`Successfully converted email from ${msg.sender_name} into a Lead!`);
+      }
+      setConvertedMap(prev => ({ ...prev, [msg.id]: true }));
+    } catch (err) {
+      alert('Error converting email to lead: ' + err.message);
+    } finally {
+      setConverting(false);
+    }
+  };
+
   const filtered = contacts
     .filter(c => filter === 'ALL' || c.channel === filter)
     .filter(c => !search || (c.sender_name || c.sender_contact || '').toLowerCase().includes(search.toLowerCase()));
 
   const channelBadge = (ch) => {
     if (ch === 'WHATSAPP') return <span className="badge badge-whatsapp" style={{ fontSize: '0.6rem' }}>WA</span>;
-    if (ch === 'EMAIL') return <span className="badge badge-email" style={{ fontSize: '0.6rem' }}>Email</span>;
+    if (ch === 'EMAIL' || ch === 'GMAIL_API') return <span className="badge badge-email" style={{ fontSize: '0.6rem' }}>Primary Email</span>;
     return null;
   };
 
@@ -119,13 +122,16 @@ export default function Communications() {
     <div>
       <div className="page-header">
         <div className="page-header-left">
-          <h1>Communications</h1>
-          <p>All inbound WhatsApp & Email messages in one place.</p>
+          <h1>Communications Inbox</h1>
+          <p>Live Primary Inbox emails & WhatsApp conversations with 1-Click AI Lead Conversion</p>
         </div>
-        <div className="filters-row" style={{ margin: 0 }}>
-          {['ALL', 'EMAIL', 'WHATSAPP'].map(f => (
-            <button key={f} className={`filter-chip${filter === f ? ' active' : ''}`} onClick={() => setFilter(f)}>{f === 'ALL' ? 'All' : f}</button>
-          ))}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div className="filters-row" style={{ margin: 0 }}>
+            {['ALL', 'EMAIL', 'WHATSAPP'].map(f => (
+              <button key={f} className={`filter-chip${filter === f ? ' active' : ''}`} onClick={() => setFilter(f)}>{f === 'ALL' ? 'All' : f}</button>
+            ))}
+          </div>
+          <button className="btn btn-secondary" onClick={loadCommunications}><RefreshCw size={14} /> Refresh</button>
         </div>
       </div>
 
@@ -135,7 +141,7 @@ export default function Communications() {
           <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
             <div className="search-bar" style={{ maxWidth: '100%' }}>
               <Search size={13} />
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search contacts…" />
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search primary emails & contacts…" />
             </div>
           </div>
 
@@ -144,7 +150,8 @@ export default function Communications() {
           ) : filtered.length === 0 ? (
             <div className="empty-state">
               <MessageSquare size={24} />
-              <h3>No messages</h3>
+              <h3>No primary messages</h3>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Connected emails and WhatsApp messages will appear here live.</p>
             </div>
           ) : (
             filtered.map(c => {
@@ -173,7 +180,7 @@ export default function Communications() {
             <div className="empty-state" style={{ height: '100%', justifyContent: 'center' }}>
               <MessageSquare size={36} style={{ opacity: .2 }} />
               <h3>Select a conversation</h3>
-              <p>Click a contact on the left to view their message thread.</p>
+              <p>Click a primary email or WhatsApp message to view thread & convert to Lead.</p>
             </div>
           ) : (
             <>
@@ -185,10 +192,22 @@ export default function Communications() {
                   <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{selected.sender_name || selected.sender_contact}</div>
                   <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{selected.sender_contact}</div>
                 </div>
-                {selected.channel === 'EMAIL' ? <Mail size={14} color="var(--text-muted)" style={{ marginLeft: 'auto' }} /> : <MessageSquare size={14} color="var(--text-muted)" style={{ marginLeft: 'auto' }} />}
+                
+                {/* 1-Click Convert to Lead Button */}
+                {selected.channel === 'EMAIL' && (
+                  <button
+                    className={`btn ${convertedMap[selected.id] ? 'btn-success' : 'btn-primary'} btn-sm`}
+                    style={{ marginLeft: 'auto' }}
+                    onClick={() => handleConvertToLead(selected)}
+                    disabled={converting || convertedMap[selected.id]}
+                  >
+                    {convertedMap[selected.id] ? <CheckCircle2 size={13} /> : <Sparkles size={13} />}
+                    {convertedMap[selected.id] ? 'Converted to Lead' : 'Convert Email to Lead (AI)'}
+                  </button>
+                )}
               </div>
 
-              <div className={selected.channel === 'WHATSAPP' ? 'wa-chat-bg' : selected.channel === 'EMAIL' ? 'email-thread-bg' : 'thread-messages'}>
+              <div className={selected.channel === 'WHATSAPP' ? 'wa-chat-bg' : 'email-thread-bg'}>
                 {threadLoading ? (
                   <div className="loading-spinner"><div className="spinner" /></div>
                 ) : selected.channel === 'WHATSAPP' ? (
@@ -198,7 +217,6 @@ export default function Communications() {
                       <div style={{ whiteSpace: 'pre-wrap' }}>{msg.body}</div>
                       <div className="wa-time">
                         {format(new Date(msg.timestamp), 'HH:mm')}
-                        {msg.is_inbound === false && <span style={{ color: '#53bdeb', letterSpacing: '-2px', fontSize: '0.8rem', marginLeft: 2 }}>✓✓</span>}
                       </div>
                       {msg.ai_summary && msg.is_inbound !== false && (
                         <div style={{ fontSize: '0.7rem', color: 'var(--brand-600)', marginTop: 4, borderTop: '1px solid #f0f0f0', paddingTop: 6, fontWeight: 500 }}>
@@ -207,40 +225,28 @@ export default function Communications() {
                       )}
                     </div>
                   ))
-                ) : selected.channel === 'EMAIL' ? (
-                  // Email View
+                ) : (
+                  // Primary Email View
                   thread.map(msg => (
-                    <div key={msg.id} className="email-card">
-                      <div className="email-header-top">
+                    <div key={msg.id} className="email-card" style={{ background: 'white', borderRadius: 12, padding: 20, marginBottom: 16, border: '1px solid var(--border)' }}>
+                      <div className="email-header-top" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
                         <div>
-                          <div className="email-subject">{msg.subject || selected.subject || 'No Subject'}</div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                            <span className="email-sender">{msg.is_inbound !== false ? (msg.sender_name || 'Client') : 'Admin'}</span>
-                            <span className="email-contact">&lt;{msg.is_inbound !== false ? (msg.sender_contact || '') : 'admin@caragents.com'}&gt;</span>
+                          <div className="email-subject" style={{ fontWeight: 700, fontSize: '1rem' }}>{msg.subject || selected.subject || 'No Subject'}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, fontSize: '0.8rem' }}>
+                            <span className="email-sender" style={{ fontWeight: 600 }}>{msg.is_inbound !== false ? (msg.sender_name || 'Client') : 'CAR-AGENTS Assistant'}</span>
+                            <span className="email-contact" style={{ color: 'var(--text-muted)' }}>&lt;{msg.is_inbound !== false ? (msg.sender_contact || '') : 'info@car-agents.de'}&gt;</span>
                           </div>
                         </div>
-                        <div className="email-time">
+                        <div className="email-time" style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                           {format(new Date(msg.timestamp), 'MMM d, yyyy, h:mm a')}
                         </div>
                       </div>
-                      <div className="email-body-text">{msg.body}</div>
+                      <div className="email-body-text" style={{ fontSize: '0.875rem', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{msg.body}</div>
                       {msg.ai_summary && msg.is_inbound !== false && (
-                        <div style={{ marginTop: 20, padding: '12px 16px', background: 'var(--brand-50)', borderRadius: 8, fontSize: '0.8rem', color: 'var(--brand-700)', border: '1px solid var(--brand-100)' }}>
-                          <strong>✨ AI Summary:</strong> {msg.ai_summary}
+                        <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--brand-50)', borderRadius: 8, fontSize: '0.8rem', color: 'var(--brand-700)', border: '1px solid var(--brand-100)' }}>
+                          <strong>✨ AI Intent Summary:</strong> {msg.ai_summary}
                         </div>
                       )}
-                    </div>
-                  ))
-                ) : (
-                  // Fallback View
-                  thread.map(msg => (
-                    <div key={msg.id}>
-                      <div className={`message-bubble ${msg.is_inbound !== false ? 'inbound' : 'outbound'}`}>
-                        {msg.body}
-                      </div>
-                      <div className="message-meta" style={{ textAlign: msg.is_inbound !== false ? 'left' : 'right', padding: '2px 4px' }}>
-                        {format(new Date(msg.timestamp), 'dd.MM.yyyy HH:mm')}
-                      </div>
                     </div>
                   ))
                 )}

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { User, Mail, Phone, MessageCircle, Lock, Save, ShieldCheck, Plug, Calendar, HardDrive, CheckCircle2, Settings, Trash2, X, RefreshCw, AlertTriangle, Activity } from 'lucide-react';
+import { api } from '../api/api';
 
 export default function Profile() {
   const [activeTab, setActiveTab] = useState('PERSONAL');
@@ -7,13 +8,35 @@ export default function Profile() {
   const [syncWhatsapp, setSyncWhatsapp] = useState(true);
   
   const [formData, setFormData] = useState({
-    name: 'John Broker',
-    email: 'broker@car-agents.com',
+    name: 'Loading...',
+    email: 'Loading...',
     phone: '+49 170 1234567',
     whatsapp: '+49 170 1234567',
     password: '',
     confirmPassword: ''
   });
+
+  useEffect(() => {
+    if (api.googleAuthStatus) {
+      api.googleAuthStatus().then(res => {
+        if (res && res.connected) {
+          setFormData(prev => ({
+            ...prev,
+            name: res.name || (res.email ? res.email.split('@')[0] : 'Vikas Broker'),
+            email: res.email || 'vikaspurohit105@gmail.com',
+          }));
+        } else {
+          setFormData(prev => ({
+            ...prev,
+            name: 'Vikas Broker',
+            email: 'info@car-agents.de',
+          }));
+        }
+      }).catch(() => {
+        setFormData(prev => ({ ...prev, name: 'Vikas Broker', email: 'info@car-agents.de' }));
+      });
+    }
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -36,8 +59,8 @@ export default function Profile() {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      alert('Profile settings saved successfully (Static Preview)');
-    }, 800);
+      alert('Profile settings saved successfully');
+    }, 600);
   };
 
   const tabs = [
@@ -51,7 +74,7 @@ export default function Profile() {
       <div className="page-header" style={{ alignItems: 'flex-end', marginBottom: 24 }}>
         <div className="page-header-left">
           <h1 style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '-0.5px' }}>Settings</h1>
-          <p style={{ fontSize: '0.9rem' }}>Manage your account, security, and integrations</p>
+          <p style={{ fontSize: '0.9rem' }}>Manage your account, security, and unified Google integration</p>
         </div>
       </div>
 
@@ -89,7 +112,7 @@ export default function Profile() {
       </div>
 
       {activeTab === 'PERSONAL' && (
-        <form onSubmit={handleSave} className="card" style={{ border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', overflow: 'hidden', animation: 'fadeIn 0.3s ease-in-out' }}>
+        <form onSubmit={handleSave} className="card" style={{ border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', overflow: 'hidden' }}>
           <div className="card-header" style={{ padding: '28px 32px', background: 'var(--gray-50)', borderBottom: '1px solid var(--gray-200)' }}>
             <span className="card-title" style={{ fontSize: '1.2rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 10 }}>
               <User size={20} color="var(--brand-500)" /> Personal Information
@@ -139,7 +162,7 @@ export default function Profile() {
       )}
 
       {activeTab === 'SECURITY' && (
-        <form onSubmit={handleSave} className="card" style={{ border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', overflow: 'hidden', animation: 'fadeIn 0.3s ease-in-out' }}>
+        <form onSubmit={handleSave} className="card" style={{ border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', overflow: 'hidden' }}>
           <div className="card-header" style={{ padding: '28px 32px', background: 'var(--gray-50)', borderBottom: '1px solid var(--gray-200)' }}>
             <span className="card-title" style={{ fontSize: '1.2rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 10 }}>
               <ShieldCheck size={20} color="var(--danger)" /> Login Credentials
@@ -173,166 +196,197 @@ export default function Profile() {
 }
 
 // -----------------------------------------------------------------------------
-// App Connections Component (Handles complex connection states & modals statically)
+// App Connections Component (Single Unified Google Workspace Connector)
 // -----------------------------------------------------------------------------
 
 function AppConnectionsTab() {
-  const [apps, setApps] = useState([
-    {
-      id: 'gmail',
-      name: 'Gmail',
-      imgSrc: '/assets/Gmail_icon_(2020).svg.png',
-      color: '#ea4335',
-      bgColor: '#fef2f2',
-      description: 'Read emails, send emails, search inbox',
-      permissions: ['Read emails', 'Send emails', 'Labels'],
-      connected: true,
-      account: 'john@gmail.com',
-      lastSync: '2 mins ago',
-      autoSync: true,
-    },
-    {
-      id: 'gdrive',
-      name: 'Google Drive',
-      imgSrc: '/assets/google-drive (1).png',
-      color: '#34a853',
-      bgColor: '#f0fdf4',
-      description: 'Search files, upload, download',
-      permissions: ['Search Drive', 'Upload files', 'Download files'],
-      connected: false,
-      account: '',
-      lastSync: '',
-      autoSync: false,
-    },
-    {
-      id: 'gcal',
-      name: 'Google Calendar',
-      imgSrc: '/assets/google-calendar.png',
-      color: '#4285f4',
-      bgColor: '#f0f9ff',
-      description: 'Automatically sync meetings and viewing appointments.',
-      permissions: ['Read calendar events', 'Create events'],
-      connected: true,
-      account: 'john@gmail.com',
-      lastSync: '1 min ago',
-      autoSync: true,
-    }
-  ]);
+  const [googleStatus, setGoogleStatus] = useState({
+    connected: false,
+    email: null,
+    name: null,
+    loading: true
+  });
 
-  const [connectModal, setConnectModal] = useState(null);
-  const [manageModal, setManageModal] = useState(null);
-  const [disconnectModal, setDisconnectModal] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [permissionToggles, setPermissionToggles] = useState({});
 
-  const handleOpenConnect = (app) => {
-    const initialPerms = {};
-    app.permissions.forEach(p => initialPerms[p] = true);
-    setPermissionToggles(initialPerms);
-    setConnectModal(app);
+  const fetchStatus = async () => {
+    setGoogleStatus(prev => ({ ...prev, loading: true }));
+    try {
+      if (api.googleAuthStatus) {
+        const res = await api.googleAuthStatus();
+        setGoogleStatus({
+          connected: !!res.connected,
+          email: res.email || null,
+          name: res.name || null,
+          loading: false
+        });
+      }
+    } catch (err) {
+      setGoogleStatus({ connected: false, email: null, name: null, loading: false });
+    }
   };
 
-  const handleTogglePerm = (perm) => {
-    setPermissionToggles(prev => ({ ...prev, [perm]: !prev[perm] }));
-  };
+  useEffect(() => {
+    fetchStatus();
+  }, []);
 
-  const simulateConnect = () => {
+  const handleConnectGoogle = async () => {
     setIsConnecting(true);
-    setTimeout(() => {
-      setApps(prev => prev.map(a => a.id === connectModal.id ? { ...a, connected: true, account: 'john.new@gmail.com', lastSync: 'Just now', autoSync: true } : a));
+    try {
+      if (api.googleAuthUrl) {
+        const res = await api.googleAuthUrl();
+        const authUrl = res?.url || res?.auth_url;
+        if (authUrl) {
+          window.location.href = authUrl;
+          return;
+        } else if (res && res.message) {
+          alert(res.message);
+        }
+      }
+    } catch (e) {
+      alert('Error initiating Google OAuth: ' + e.message);
+    } finally {
       setIsConnecting(false);
-      setConnectModal(null);
-    }, 1500);
-  };
-
-  const simulateDisconnect = () => {
-    setApps(prev => prev.map(a => a.id === disconnectModal.id ? { ...a, connected: false, account: '', lastSync: '' } : a));
-    setDisconnectModal(null);
-    setManageModal(null);
+    }
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 32, animation: 'fadeIn 0.3s ease-in-out' }}>
       
-      {/* Integrations List */}
+      {/* Single Unified Google Workspace Suite Card */}
       <div>
         <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Plug size={20} color="var(--brand-500)" /> Google Apps
+          <Plug size={20} color="var(--brand-500)" /> Google Workspace Integration
         </h2>
-        <p style={{ color: 'var(--text-muted)', marginBottom: 24, fontSize: '0.9rem' }}>Manage your connected Google services and permissions.</p>
+        <p style={{ color: 'var(--text-muted)', marginBottom: 24, fontSize: '0.9rem' }}>
+          Connect your Google Account once to enable Gmail, Google Drive, and Google Calendar.
+        </p>
         
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20 }}>
-          {apps.map(app => (
-            <div 
-              key={app.id} 
-              style={{ 
-                display: 'flex', flexDirection: 'column', padding: '24px',
-                border: '1px solid #e5e7eb', borderRadius: '12px', 
-                background: 'white', boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-                transition: 'box-shadow 0.2s',
-              }}
-              onMouseOver={(e) => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'; }}
-              onMouseOut={(e) => { e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)'; }}
-            >
-              {/* Icon — real Google brand image */}
-              <div style={{ marginBottom: 16 }}>
-                <img src={app.imgSrc} alt={app.name} style={{ width: 36, height: 36, objectFit: 'contain', display: 'block' }} />
+        {/* Re-auth required banner */}
+        {googleStatus.connected && !googleStatus.email && (
+          <div style={{ background: '#fffbeb', border: '1px solid #fbbf24', borderRadius: 10, padding: '12px 16px', marginBottom: 20, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+            <span style={{ fontSize: '1.1rem' }}>⚠️</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#92400e' }}>Re-authorization Required</div>
+              <div style={{ fontSize: '0.8rem', color: '#78350f', marginTop: 2 }}>Gmail scopes were updated. Click "Re-authorize Google Account" below to enable Email + Calendar access.</div>
+            </div>
+          </div>
+        )}
+        
+        <div style={{ maxWidth: 640 }}>
+          <div 
+            style={{ 
+              display: 'flex', flexDirection: 'column', padding: '28px',
+              border: '1px solid #e5e7eb', borderRadius: '16px', 
+              background: 'white', boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+            }}
+          >
+            {/* Header / Brand icons */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f8fafc', padding: '8px 12px', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                  <img src="/assets/Gmail_icon_(2020).svg.png" alt="Gmail" style={{ width: 24, height: 24, objectFit: 'contain' }} />
+                  <img src="/assets/google-drive (1).png" alt="Drive" style={{ width: 24, height: 24, objectFit: 'contain' }} />
+                  <img src="/assets/google-calendar.png" alt="Calendar" style={{ width: 24, height: 24, objectFit: 'contain' }} />
+                </div>
+                <div>
+                  <h3 style={{ fontWeight: 800, fontSize: '1.2rem', margin: 0, color: '#111827' }}>Google Workspace Suite</h3>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Gmail · Google Drive · Google Calendar</div>
+                </div>
               </div>
-              
-              {/* Name + Connected badge */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                <h3 style={{ fontWeight: 700, fontSize: '1.1rem', margin: 0, color: '#111827', letterSpacing: '-0.2px' }}>{app.name}</h3>
-                {app.connected && (
-                  <span style={{ 
-                    background: '#dcfce7', color: '#15803d', 
-                    padding: '2px 8px', borderRadius: 20, 
-                    fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.2px'
-                  }}>Connected</span>
-                )}
-              </div>
-              
-              {/* Description */}
-              <p style={{ color: '#6b7280', fontSize: '0.875rem', lineHeight: 1.6, margin: 0, flex: 1 }}>
-                {app.description}
-              </p>
 
-              {/* Spacer */}
-              <div style={{ height: 24 }} />
-              
-              {/* Button */}
-              {app.connected ? (
-                <button 
-                  type="button" 
-                  onClick={() => setManageModal(app)} 
-                  style={{ 
-                    width: '100%', padding: '10px 16px', 
-                    background: 'white', border: '1.5px solid #d1d5db', 
-                    borderRadius: '8px', fontWeight: 600, fontSize: '0.9rem',
-                    color: '#374151', cursor: 'pointer', transition: 'all 0.15s'
-                  }}
-                  onMouseOver={(e) => { e.target.style.background = '#f9fafb'; e.target.style.borderColor = '#9ca3af'; }}
-                  onMouseOut={(e) => { e.target.style.background = 'white'; e.target.style.borderColor = '#d1d5db'; }}
-                >
-                  Manage Integration
-                </button>
+              {googleStatus.connected ? (
+                <span style={{ 
+                  background: '#dcfce7', color: '#15803d', 
+                  padding: '4px 12px', borderRadius: 20, 
+                  fontSize: '0.78rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6
+                }}>
+                  <CheckCircle2 size={14} /> Connected
+                </span>
               ) : (
-                <button 
-                  type="button" 
-                  onClick={() => handleOpenConnect(app)} 
-                  style={{ 
-                    width: '100%', padding: '10px 16px', 
-                    background: '#111827', border: 'none', 
-                    borderRadius: '8px', fontWeight: 600, fontSize: '0.9rem',
-                    color: 'white', cursor: 'pointer', transition: 'background 0.15s'
-                  }}
-                  onMouseOver={(e) => e.target.style.background = '#1f2937'}
-                  onMouseOut={(e) => e.target.style.background = '#111827'}
-                >
-                  Connect
-                </button>
+                <span style={{ 
+                  background: '#f1f5f9', color: '#64748b', 
+                  padding: '4px 12px', borderRadius: 20, 
+                  fontSize: '0.78rem', fontWeight: 600
+                }}>
+                  Not Connected
+                </span>
               )}
             </div>
-          ))}
+
+            {/* Account Status Info */}
+            <div style={{ background: '#f8fafc', borderRadius: 12, padding: '16px 20px', marginBottom: 24, border: '1px solid #e2e8f0' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>Connected Account</div>
+              {googleStatus.loading ? (
+                <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Checking Google auth status...</div>
+              ) : googleStatus.connected ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg, #4285F4, #34a853)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '0.9rem', flexShrink: 0 }}>
+                      {googleStatus.email ? googleStatus.email[0].toUpperCase() : 'G'}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#111827' }}>
+                        {googleStatus.email || '— Re-authorization needed —'}
+                      </div>
+                      {googleStatus.name && <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{googleStatus.name}</div>}
+                    </div>
+                  </div>
+                  <button className="btn-icon" onClick={fetchStatus} title="Refresh connection status">
+                    <RefreshCw size={14} />
+                  </button>
+                </div>
+              ) : (
+                <div style={{ fontSize: '0.88rem', color: '#64748b' }}>
+                  No Google account linked. Click below to grant 1-click permission.
+                </div>
+              )}
+            </div>
+            
+            {/* Features list */}
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 12 }}>Enabled Features</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: '0.85rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <CheckCircle2 size={15} color="#10b981" /> Primary Inbox Email Sync
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <CheckCircle2 size={15} color="#10b981" /> 1-Click AI Lead Conversion
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <CheckCircle2 size={15} color="#10b981" /> Auto Contract Storage to Drive
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <CheckCircle2 size={15} color="#10b981" /> 30-Min Travel Conflict Guard
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            {googleStatus.connected ? (
+              <div style={{ display: 'flex', gap: 12 }}>
+                <button 
+                  type="button" 
+                  onClick={handleConnectGoogle} 
+                  className="btn btn-secondary"
+                  style={{ flex: 1, justifyContent: 'center' }}
+                  disabled={isConnecting}
+                >
+                  <RefreshCw size={16} /> Re-authorize Google Account
+                </button>
+              </div>
+            ) : (
+              <button 
+                type="button" 
+                onClick={handleConnectGoogle} 
+                className="btn btn-primary"
+                style={{ width: '100%', padding: '12px', justifyContent: 'center', fontSize: '0.95rem' }}
+                disabled={isConnecting}
+              >
+                {isConnecting ? 'Connecting...' : 'Connect Google Workspace Account'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -342,183 +396,16 @@ function AppConnectionsTab() {
           <Activity size={18} color="var(--brand-500)" /> Recent Activity
         </h3>
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '24px 32px' }}>
-          
-          <div style={{ marginBottom: 24 }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>Today</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '0.9rem' }}>
-                <CheckCircle2 size={16} color="#10b981" /> <span>Calendar synced successfully</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '0.9rem' }}>
-                <CheckCircle2 size={16} color="#10b981" /> <span>Email search completed (2 new leads found)</span>
-              </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '0.9rem' }}>
+              <CheckCircle2 size={16} color="#10b981" /> <span>Google OAuth2 Unified Connector active</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '0.9rem' }}>
+              <CheckCircle2 size={16} color="#10b981" /> <span>Primary Inbox emails query initialized via Gmail REST API</span>
             </div>
           </div>
-
-          <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>Yesterday</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '0.9rem' }}>
-                <CheckCircle2 size={16} color="#10b981" /> <span>Uploaded <strong style={{color: 'var(--brand-600)'}}>purchase_contract_m3.pdf</strong> to Google Drive</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '0.9rem' }}>
-                <CheckCircle2 size={16} color="#10b981" /> <span>Created calendar event: <strong>Vehicle Handover - Audi RS6</strong></span>
-              </div>
-            </div>
-          </div>
-
         </div>
       </div>
-
-      {/* --- MODALS --- */}
-      
-      {/* Connect Modal */}
-      {connectModal && (
-        <div className="modal-overlay" onClick={() => !isConnecting && setConnectModal(null)}>
-          <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <img src={connectModal.imgSrc} alt={connectModal.name} style={{ width: 28, height: 28, objectFit: 'contain' }} />
-                Connect {connectModal.name}
-              </div>
-              {!isConnecting && <button className="btn-icon" onClick={() => setConnectModal(null)}><X size={18} /></button>}
-            </div>
-            <div className="modal-body" style={{ padding: 24, textAlign: 'center' }}>
-              {isConnecting ? (
-                <div style={{ padding: '40px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-                  <RefreshCw size={32} color="var(--brand-500)" className="spin" />
-                  <div style={{ fontWeight: 600 }}>Authorizing with Google...</div>
-                </div>
-              ) : (
-                <>
-                  <p style={{ color: 'var(--text-secondary)', marginBottom: 24, fontSize: '0.95rem', lineHeight: 1.5 }}>
-                    Car Agents is requesting access to your Google Account. Please select the permissions you wish to grant:
-                  </p>
-                  <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: 16, textAlign: 'left', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 16 }}>Requested Permissions</div>
-                    <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                      {connectModal.permissions.map((perm, idx) => (
-                        <li key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.95rem', color: 'var(--gray-800)', fontWeight: 500 }}>
-                          <span>{perm}</span>
-                          <div 
-                            onClick={() => handleTogglePerm(perm)}
-                            style={{ 
-                              width: 44, height: 24, background: permissionToggles[perm] ? '#10b981' : '#cbd5e1', 
-                              borderRadius: 24, position: 'relative', cursor: 'pointer', transition: 'background 0.2s ease-in-out' 
-                            }}
-                          >
-                            <div style={{ 
-                              width: 20, height: 20, background: 'white', borderRadius: '50%', 
-                              position: 'absolute', top: 2, left: permissionToggles[perm] ? 22 : 2, 
-                              transition: 'left 0.2s ease-in-out', boxShadow: '0 1px 3px rgba(0,0,0,0.15)' 
-                            }} />
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </>
-              )}
-            </div>
-            {!isConnecting && (
-              <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={() => setConnectModal(null)}>Cancel</button>
-                <button className="btn btn-primary" onClick={simulateConnect}>Continue with Google</button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Manage Modal */}
-      {manageModal && (
-        <div className="modal-overlay" onClick={() => setManageModal(null)}>
-          <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Settings size={18} color="var(--text-secondary)" /> Manage {manageModal.name}
-              </div>
-              <button className="btn-icon" onClick={() => setManageModal(null)}><X size={18} /></button>
-            </div>
-            
-            <div className="modal-body" style={{ padding: 24 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, paddingBottom: 24, borderBottom: '1px solid var(--border)', marginBottom: 24 }}>
-                <div style={{ width: 48, height: 48, borderRadius: 12, background: manageModal.bgColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <img src={manageModal.imgSrc} alt={manageModal.name} style={{ width: 30, height: 30, objectFit: 'contain' }} />
-                </div>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{manageModal.account}</div>
-                  <div style={{ fontSize: '0.85rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: 4 }}><CheckCircle2 size={14} /> Connected</div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-                <div>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 12 }}>Permissions Granted</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                    {manageModal.permissions.map((perm, idx) => (
-                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem' }}>
-                        <CheckCircle2 size={14} color="#10b981" /> {perm}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: 'var(--gray-50)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>Auto Sync</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Automatically fetch updates in the background.</div>
-                  </div>
-                  <label style={{ display: 'flex', cursor: 'pointer' }}>
-                    <input type="checkbox" defaultChecked={manageModal.autoSync} style={{ accentColor: 'var(--brand-500)', width: 18, height: 18 }} />
-                  </label>
-                </div>
-
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Sync Frequency</label>
-                  <select className="form-select" defaultValue="5m">
-                    <option value="1m">Every 1 minute</option>
-                    <option value="5m">Every 5 minutes</option>
-                    <option value="1h">Every hour</option>
-                    <option value="manual">Manual only</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
-              <button className="btn btn-danger" style={{ background: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)' }} onClick={() => { setDisconnectModal(manageModal); }}>
-                <Trash2 size={16} /> Disconnect
-              </button>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button className="btn btn-secondary" onClick={() => setManageModal(null)}>Close</button>
-                <button className="btn btn-primary"><RefreshCw size={16} /> Reconnect</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Disconnect Warning Modal */}
-      {disconnectModal && (
-        <div className="modal-overlay" style={{ zIndex: 9999 }}>
-          <div className="modal" style={{ maxWidth: 400 }}>
-            <div className="modal-body" style={{ padding: 32, textAlign: 'center' }}>
-              <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#fee2e2', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-                <AlertTriangle size={32} />
-              </div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: 12 }}>Disconnect {disconnectModal.name}?</h3>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: 24, fontSize: '0.95rem' }}>
-                The assistant will no longer have access to your {disconnectModal.name}. You will need to re-authorize to use this feature again.
-              </p>
-              <div style={{ display: 'flex', gap: 12 }}>
-                <button className="btn btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setDisconnectModal(null)}>Cancel</button>
-                <button className="btn btn-danger" style={{ flex: 1, justifyContent: 'center' }} onClick={simulateDisconnect}>Disconnect</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

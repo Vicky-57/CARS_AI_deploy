@@ -4,8 +4,8 @@ import os
 
 class Settings(BaseSettings):
     # Supabase
-    SUPABASE_URL: str = ""
-    SUPABASE_SECRET_KEY: str = ""
+    SUPABASE_URL: str = "https://wvzulyxzuntjnzdykstt.supabase.co"
+    SUPABASE_SECRET_KEY: str = "sb_secret_qM2kIa6iLOXbv_JAUEXNTA_YLbxemoo"
 
     # Anthropic Claude
     ANTHROPIC_API_KEY: str = ""
@@ -32,14 +32,14 @@ class Settings(BaseSettings):
     # Local AI services
     WHISPER_MODEL_SIZE: str = "base"
 
-    # Google Calendar OAuth
-    GOOGLE_CLIENT_ID: str = ""
-    GOOGLE_CLIENT_SECRET: str = ""
+    # Unified Google OAuth2 (Gmail, Drive, Calendar)
+    GOOGLE_CLIENT_ID: str = "84319482531-ucitebq3ohngvast159nrtklbu2mngq7.apps.googleusercontent.com"
+    GOOGLE_CLIENT_SECRET: str = "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"
     GOOGLE_REDIRECT_URI: str = "http://localhost:9000/api/v1/auth/google/callback"
     GOOGLE_CALENDAR_ID: str = "primary"
     GOOGLE_AUTH_URI: str = "https://accounts.google.com/o/oauth2/auth"
     GOOGLE_TOKEN_URI: str = "https://oauth2.googleapis.com/token"
-    GOOGLE_SCOPES: str = "https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.freebusy"
+    GOOGLE_SCOPES: str = "openid email profile https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.freebusy"
 
     class Config:
         env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")

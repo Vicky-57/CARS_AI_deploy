@@ -39,6 +39,25 @@ async function aiPost(path, body) {
 // ─────────────────────────────────────────────────────────────────────────────
 export const api = {
 
+  // ── Portal Authentication ────────────────────────────────────────────────────
+  login: async (userId, password) => {
+    const res = await fetch(`${AI_URL}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, password }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Invalid credentials');
+    }
+    const data = await res.json();
+    // Persist token
+    localStorage.setItem('car_agents_token', data.access_token);
+    return data;
+  },
+
+  getToken: () => localStorage.getItem('car_agents_token'),
+
   // ── Health ──────────────────────────────────────────────────────────────────
   health:   () => supabase.from('leads').select('id', { count: 'exact', head: true }),
   aiHealth: () => fetch(`${AI_URL}/health`).then(r => r.json()),
@@ -181,17 +200,13 @@ export const api = {
 
   /**
    * Conflict engine.
-   * - overlap      → hard block (same date + overlapping times)
-   * - buffer_clash → warn only (onsite meetings need a 30-min travel gap)
-   * - exclude_id   → ignore one meeting (used when editing itself)
    */
   checkMeetingConflicts: async ({ start_time, end_time, location_type = 'ONLINE', exclude_id = null }) => {
     const isOnsite = location_type === 'OFFLINE_ONSITE';
-    const bufferMs = isOnsite ? 30 * 60 * 1000 : 0; // 30 min travel buffer
+    const bufferMs = isOnsite ? 30 * 60 * 1000 : 0;
     const start = new Date(start_time);
     const end   = new Date(end_time);
 
-    // Fetch everything inside the widened window so we can classify locally
     const checkStart = new Date(start.getTime() - bufferMs).toISOString();
     const checkEnd   = new Date(end.getTime()   + bufferMs).toISOString();
     const { data, error } = await supabase
@@ -213,7 +228,6 @@ export const api = {
         overlaps.push(m);
         continue;
       }
-      // Non-overlapping but inside the buffer window → too close for onsite travel
       const withinStartBuffer = mEnd >= new Date(start.getTime() - bufferMs) && mEnd <= start;
       const withinEndBuffer   = mStart <= new Date(end.getTime() + bufferMs) && mStart >= end;
       if (isOnsite && (withinStartBuffer || withinEndBuffer)) {
@@ -252,15 +266,53 @@ export const api = {
   extractVehicleSpecs:  (formData) => aiUpload('/api/ocr/vehicle-specs', formData),
   classifyIntent:       (message)  => aiPost('/classify-intent', { message }),
 
-  // ── VOICE (Local FastAPI AI Services) ────────────────────────────────────────
-  transcribeVoice: (formData) => aiUpload('/api/voice/transcribe', formData),
+  // ── GMAIL REST API & GOOGLE OAUTH2 ─────────────────────────────────────────
+  googleAuthUrl: () => fetch(`${AI_URL}/api/v1/auth/google/url`).then(r => r.json()),
+  getPrimaryEmails: () => fetch(`${AI_URL}/api/v1/gmail/primary-emails`).then(r => r.json()),
+  convertGmailToLead: (messageId) => aiPost('/api/v1/gmail/convert-lead', { message_id: messageId }),
 
   // ── GOOGLE CALENDAR SYNC (FastAPI) ───────────────────────────────────────────
-  googleAuthUrl:   () => fetch(`${AI_URL}/api/v1/auth/google/url`).then(r => r.json()),
   googleAuthStatus:() => fetch(`${AI_URL}/api/v1/auth/google/status`).then(r => r.json()),
   syncMeeting:     (id) => fetch(`${AI_URL}/api/v1/meetings/${id}/sync`, { method: 'POST' }).then(r => r.json()),
   unsyncMeeting:   (id) => fetch(`${AI_URL}/api/v1/meetings/${id}/sync`, { method: 'DELETE' }).then(r => r.json()),
   checkGoogleFreeBusy: (startTime, endTime) => aiPost('/api/v1/meetings/free-busy', { start_time: startTime, end_time: endTime }),
+
+  getGoogleCalendarEvents: (timeMin, timeMax) => {
+    const params = new URLSearchParams();
+    if (timeMin) params.append('time_min', timeMin);
+    if (timeMax) params.append('time_max', timeMax);
+    return fetch(`${AI_URL}/api/v1/meetings/google-events?${params}`).then(r => r.json());
+  },
+
+  // Alias so Calendar.jsx can call api.checkConflict()
+  checkConflict: async (startIso, endIso, isOnsite) => {
+    const AI_URL_local = import.meta.env.VITE_AI_URL || 'http://localhost:9000';
+    const res = await fetch(`${AI_URL_local}/api/v1/meetings/free-busy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ start_time: startIso, end_time: endIso }),
+    });
+    const google = res.ok ? await res.json() : null;
+    // Also check Supabase meetings for overlap
+    const buffer = isOnsite ? 30 * 60 * 1000 : 0;
+    const start = new Date(startIso);
+    const end = new Date(endIso);
+    const checkStart = new Date(start.getTime() - buffer).toISOString();
+    const checkEnd = new Date(end.getTime() + buffer).toISOString();
+    const { data } = await supabase
+      .from('meetings')
+      .select('id, title, client_name, start_time, end_time, location_type')
+      .lt('start_time', checkEnd)
+      .gt('end_time', checkStart);
+    const overlaps = (data || []).filter(m => new Date(m.start_time) < end && new Date(m.end_time) > start);
+    return {
+      has_conflict: overlaps.length > 0,
+      has_overlap: overlaps.length > 0,
+      overlapping_meetings: overlaps,
+      has_buffer_clash: isOnsite && (data || []).length > overlaps.length,
+      buffer_clash_meetings: [],
+    };
+  },
 
   // ── REALTIME SUBSCRIPTIONS ───────────────────────────────────────────────────
   subscribeToLeads: (callback) =>
