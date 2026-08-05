@@ -1,13 +1,28 @@
 import { useState, useEffect } from 'react';
-import { Users, Search, RefreshCw, Mail, Phone, Clock, Star, UserPlus, Repeat, Plus, X, Briefcase } from 'lucide-react';
-import { api } from '../api/api';
+import { Users, Search, RefreshCw, Mail, Phone, Clock, Star, UserPlus, Repeat, Plus, X, Briefcase, Car, Eye, Trash2, Edit3 } from 'lucide-react';
+import { api, supabase } from '../api/api';
 import CreateProjectModal from '../components/CreateProjectModal';
+
+function getCustomerCar(customer) {
+  if (!customer || !customer.interactions) return null;
+  for (const inter of customer.interactions) {
+    const item = inter.details || {};
+    if (item.target_vehicle) return item.target_vehicle;
+    if (item.vehicle) return item.vehicle;
+    if (item.manufacturer || item.model) return `${item.manufacturer || ''} ${item.model || ''}`.trim();
+    const text = `${item.subject || ''} ${item.message || ''} ${item.notes || ''}`;
+    const match = text.match(/(Porsche\s+[\w\d\.\s\(\)\-]+|BMW\s+[\w\d\.\s\-]+|Audi\s+[\w\d\.\s\-]+|Mercedes-?Benz?\s+[\w\d\.\s\-]+|VW\s+[\w\d\.\s\-]+)/i);
+    if (match) return match[0].split('\n')[0].split('-')[0].trim().slice(0, 30);
+  }
+  return null;
+}
 
 export default function Customers() {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('NEW');
+  const [selectedCustomerDetail, setSelectedCustomerDetail] = useState(null);
 
   // Add customer modal & project creation state
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
@@ -17,6 +32,8 @@ export default function Customers() {
     email: '',
     phone: '',
     intent: 'BUY',
+    vehicle: '',
+    year: '',
     notes: ''
   });
   const [savingCustomer, setSavingCustomer] = useState(false);
@@ -105,14 +122,19 @@ export default function Customers() {
     if (e) e.preventDefault();
     setSavingCustomer(true);
     try {
+      const vehicleDesc = [newCustomerForm.vehicle, newCustomerForm.year ? `(${newCustomerForm.year})` : ''].filter(Boolean).join(' ');
+
       await api.createLead({
         name: newCustomerForm.name,
         email: newCustomerForm.email || null,
         phone: newCustomerForm.phone || null,
         intent: newCustomerForm.intent,
+        vehicle: vehicleDesc || null,
         channel: 'DIRECT_CALL',
         status: 'NEW',
-        notes: newCustomerForm.notes || 'Added directly from Customers Directory'
+        notes: newCustomerForm.notes 
+          ? `${newCustomerForm.notes}${vehicleDesc ? ` | Vehicle: ${vehicleDesc}` : ''}`
+          : (vehicleDesc ? `Vehicle requested/offered: ${vehicleDesc}` : 'Added directly from Customers Directory')
       });
 
       alert(`Customer ${newCustomerForm.name} successfully created!`);
@@ -126,6 +148,24 @@ export default function Customers() {
       alert('Error creating customer: ' + err.message);
     } finally {
       setSavingCustomer(false);
+    }
+  };
+
+  const handleDeleteCustomer = async (customer, e) => {
+    if (e) e.stopPropagation();
+    const name = customer.name || customer.email || 'this customer';
+    if (!window.confirm(`Are you sure you want to delete customer "${name}"?`)) return;
+
+    try {
+      if (customer.email) {
+        await supabase.from('leads').delete().eq('email', customer.email);
+        await supabase.from('projects').delete().eq('client_email', customer.email);
+      }
+      alert(`Customer ${name} successfully deleted.`);
+      if (selectedCustomerDetail?.id === customer.id) setSelectedCustomerDetail(null);
+      loadCustomers();
+    } catch (err) {
+      alert('Error deleting customer: ' + err.message);
     }
   };
 
@@ -227,6 +267,7 @@ export default function Customers() {
                   <th style={{ paddingLeft: 24, paddingTop: 16, paddingBottom: 16 }}>Client</th>
                   <th>Email</th>
                   <th>Phone</th>
+                  <th>Vehicle / Car Interest</th>
                   {activeTab === 'NEW' ? (
                     <th>Total Leads</th>
                   ) : (
@@ -237,6 +278,7 @@ export default function Customers() {
                   )}
                   <th>Type</th>
                   <th>Last Active</th>
+                  <th style={{ textAlign: 'right', paddingRight: 24 }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -273,6 +315,19 @@ export default function Customers() {
                         {customer.phone || <span style={{ color: 'var(--text-muted)' }}>—</span>}
                       </div>
                     </td>
+                    <td>
+                      {(() => {
+                        const car = getCustomerCar(customer);
+                        return car ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', fontWeight: 600, color: 'var(--brand-700)' }}>
+                            <Car size={13} color="var(--brand-600)" />
+                            <span>{car}</span>
+                          </div>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        );
+                      })()}
+                    </td>
                     {activeTab === 'NEW' ? (
                       <td>
                         <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>
@@ -304,6 +359,26 @@ export default function Customers() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <Clock size={12} />
                         {customer.last_interaction ? new Date(customer.last_interaction).toLocaleDateString() : '—'}
+                      </div>
+                    </td>
+                    <td style={{ textAlign: 'right', paddingRight: 24 }}>
+                      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => setSelectedCustomerDetail(customer)}
+                          style={{ padding: '6px 10px', fontSize: '0.75rem', gap: 4 }}
+                          title="View / Edit Customer Details"
+                        >
+                          <Eye size={13} /> View
+                        </button>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={(e) => handleDeleteCustomer(customer, e)}
+                          style={{ padding: '6px 8px', color: '#ef4444', borderColor: '#fca5a5' }}
+                          title="Delete Customer Record"
+                        >
+                          <Trash2 size={13} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -373,6 +448,29 @@ export default function Customers() {
                   </select>
                 </div>
 
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Vehicle (Make & Model)</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="e.g. Porsche 911 Carrera S or BMW 320i"
+                      value={newCustomerForm.vehicle}
+                      onChange={e => setNewCustomerForm({ ...newCustomerForm, vehicle: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Year (Baujahr)</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="e.g. 2021 or 2017+"
+                      value={newCustomerForm.year}
+                      onChange={e => setNewCustomerForm({ ...newCustomerForm, year: e.target.value })}
+                    />
+                  </div>
+                </div>
+
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label">Notes & Initial Inquiry</label>
                   <textarea
@@ -415,6 +513,120 @@ export default function Customers() {
         defaultStatus="ACTIVE"
         defaultType={newCustomerForm.intent}
       />
+
+      {/* Customer Details / View Modal */}
+      {selectedCustomerDetail && (
+        <div className="modal-overlay" onClick={() => setSelectedCustomerDetail(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 640 }}>
+            <div className="modal-header" style={{ borderBottom: '1px solid var(--border)', paddingBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{
+                  width: 48, height: 48, borderRadius: '50%',
+                  background: selectedCustomerDetail.interactions.length > 1 ? 'linear-gradient(135deg, var(--brand-500), var(--brand-700))' : 'linear-gradient(135deg, var(--gray-200), var(--gray-400))',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '1.1rem', fontWeight: 800, color: 'white'
+                }}>
+                  {getInitials(selectedCustomerDetail.name, selectedCustomerDetail.email)}
+                </div>
+                <div>
+                  <h3 className="modal-title" style={{ margin: 0, fontSize: '1.25rem' }}>{selectedCustomerDetail.name || 'Unknown Client'}</h3>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2, display: 'flex', gap: 8, alignItems: 'center' }}>
+                    {selectedCustomerDetail.interactions.length > 1 ? (
+                      <span className="badge badge-whatsapp">💜 Repeat Client</span>
+                    ) : (
+                      <span className="badge badge-new">New Client</span>
+                    )}
+                    <span>• {selectedCustomerDetail.interactions.length} Total Interaction(s)</span>
+                  </div>
+                </div>
+              </div>
+              <button className="btn-icon" onClick={() => setSelectedCustomerDetail(null)}><X size={18} /></button>
+            </div>
+
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 20, padding: 24 }}>
+              
+              {/* Contact Info Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div style={{ padding: 16, background: 'var(--gray-50)', borderRadius: 10, border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>Email Contact</div>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8, wordBreak: 'break-all' }}>
+                    <Mail size={14} color="var(--brand-600)" />
+                    {selectedCustomerDetail.email || '—'}
+                  </div>
+                </div>
+                <div style={{ padding: 16, background: 'var(--gray-50)', borderRadius: 10, border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>Phone Contact</div>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Phone size={14} color="var(--brand-600)" />
+                    {selectedCustomerDetail.phone || '—'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Vehicle Interest Banner */}
+              {getCustomerCar(selectedCustomerDetail) && (
+                <div style={{ padding: 16, background: 'rgba(59, 130, 246, 0.08)', borderRadius: 10, border: '1px solid rgba(59, 130, 246, 0.2)', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <Car size={22} color="var(--brand-700)" />
+                  <div>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand-800)', textTransform: 'uppercase' }}>Target Vehicle / Car Interest</div>
+                    <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--brand-900)', marginTop: 2 }}>{getCustomerCar(selectedCustomerDetail)}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Interaction Timeline History */}
+              <div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 12 }}>Client Interaction History</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 180, overflowY: 'auto' }}>
+                  {selectedCustomerDetail.interactions.map((inter, idx) => (
+                    <div key={idx} style={{ padding: 12, background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border)', fontSize: '0.82rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span className={`badge ${inter.type === 'Project' ? 'badge-email' : 'badge-whatsapp'}`}>{inter.type}</span>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{new Date(inter.date || Date.now()).toLocaleDateString()}</span>
+                      </div>
+                      <div style={{ color: 'var(--text-secondary)' }}>{inter.details?.subject || inter.details?.notes || inter.details?.message?.slice(0, 100) || 'Inquiry logged'}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+
+            <div className="modal-footer" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={(e) => handleDeleteCustomer(selectedCustomerDetail, e)}
+                style={{ color: '#ef4444', borderColor: '#fca5a5', gap: 6 }}
+              >
+                <Trash2 size={14} /> Delete Customer
+              </button>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button className="btn btn-secondary" onClick={() => setSelectedCustomerDetail(null)}>Close</button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    const c = selectedCustomerDetail;
+                    setSelectedCustomerDetail(null);
+                    setNewCustomerForm({
+                      name: c.name || '',
+                      email: c.email || '',
+                      phone: c.phone || '',
+                      intent: 'BUY',
+                      vehicle: getCustomerCar(c) || '',
+                      year: '',
+                      notes: ''
+                    });
+                    setIsCreateProjectOpen(true);
+                  }}
+                  style={{ gap: 6 }}
+                >
+                  <Briefcase size={15} /> Launch Project / Deal
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
