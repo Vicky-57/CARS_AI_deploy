@@ -15,14 +15,6 @@ class ApproveContractRequest(BaseModel):
     contract_filename: str = Field(..., description="Name of the generated contract PDF")
     file_path: str = Field(..., description="Absolute path of the generated PDF file")
     pipeline: str = Field("sell", description="Storage pipeline: 'buy' or 'sell' (creates buy/{client} or sell/{client})")
-    pipeline: str = Field("sell", description="Storage pipeline: 'buy' or 'sell' (creates buy/{client} or sell/{client})")
-    pipeline: str = Field("sell", description="Storage pipeline: 'buy' or 'sell' (creates buy/{client} or sell/{client})")
-    pipeline: str = Field("sell", description="Storage pipeline: 'buy' or 'sell' (creates buy/{client} or sell/{client})")
-    pipeline: str = Field("sell", description="Storage pipeline: 'buy' or 'sell' (creates buy/{client} or sell/{client})")
-    pipeline: str = Field("sell", description="Storage pipeline: 'buy' or 'sell' (creates buy/{client} or sell/{client})")
-    pipeline: str = Field("sell", description="Storage pipeline: 'buy' or 'sell' (creates buy/{client} or sell/{client})")
-    pipeline: str = Field("sell", description="Storage pipeline: 'buy' or 'sell' (creates buy/{client} or sell/{client})")
-    pipeline: str = Field("sell", description="Storage pipeline: 'buy' or 'sell' (creates buy/{client} or sell/{client})")
 
 
 @router.post("/generate-pdf", response_model=ContractGenerateResponse)
