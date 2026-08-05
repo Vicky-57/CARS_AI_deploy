@@ -131,6 +131,20 @@ export const api = {
   generateContract: (projectId, templateType) => aiPost('/api/v1/contracts/generate-pdf', { template_type: templateType, deal_id: projectId }),
   approveAndUploadContract: (customerName, contractFilename, filePath) => aiPost('/api/v1/contracts/approve-and-upload', { customer_name: customerName, contract_filename: contractFilename, file_path: filePath }),
 
+  // ── CLIENT FORM SESSIONS & DOCUMENTATION ──────────────────────────────────
+  createFormSession: (payload) => aiPost('/api/v1/forms/sessions', payload),
+  getFormSession:    (id)    => fetch(`${AI_URL}/api/v1/forms/sessions/${id}`).then(r => r.json()),
+  saveFormStage:     (id, payload) => fetch(`${AI_URL}/api/v1/forms/sessions/${id}/stage`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).then(r => r.json()),
+  lookupFormSession: (token) => aiPost('/api/v1/forms/sessions/lookup', { token }),
+  getFormSubmissions: (id) => fetch(`${AI_URL}/api/v1/forms/sessions/${id}/submissions`).then(r => r.json()),
+  renderTemplate:    (sessionId, templateType) => fetch(`${AI_URL}/api/v1/forms/sessions/${sessionId}/render/${templateType}`, { method: 'POST' }).then(r => r.json()),
+  approveTemplate:   (sessionId, templateType) => fetch(`${AI_URL}/api/v1/forms/sessions/${sessionId}/approve/${templateType}`, { method: 'POST' }).then(r => r.json()),
+  downloadPdf: (filePath) => `${AI_URL}/api/v1/forms/download?path=${encodeURIComponent(filePath)}`,
+
 
   completeMilestone: async (milestoneId) => {
     const { data, error } = await supabase

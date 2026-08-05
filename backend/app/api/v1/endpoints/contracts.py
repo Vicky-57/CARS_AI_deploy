@@ -14,6 +14,7 @@ class ApproveContractRequest(BaseModel):
     customer_name: str = Field(..., description="Full customer name for folder creation")
     contract_filename: str = Field(..., description="Name of the generated contract PDF")
     file_path: str = Field(..., description="Absolute path of the generated PDF file")
+    pipeline: str = Field("sell", description="Storage pipeline: 'buy' or 'sell' (creates buy/{client} or sell/{client})")
 
 
 @router.post("/generate-pdf", response_model=ContractGenerateResponse)
@@ -42,13 +43,14 @@ async def generate_contract_pdf(req: ContractGenerateRequest):
 async def approve_and_upload_contract(req: ApproveContractRequest):
     """
     Called ONLY AFTER client/broker explicitly approves that the generated contract template is correct.
-    Saves/uploads the PDF to Google Drive under /CAR-AGENTS/Customers/{Customer Name}/Contracts/
+    Saves/uploads the PDF to Google Drive under /CAR-AGENTS Contracts/{buy|sell}/{Customer Name}/{filename}
     """
     try:
         res = await upload_approved_contract_to_drive(
             customer_name=req.customer_name,
             contract_filename=req.contract_filename,
-            pdf_file_path=req.file_path
+            pdf_file_path=req.file_path,
+            pipeline=req.pipeline
         )
         if not res.get("success"):
             raise HTTPException(status_code=500, detail=res.get("error", "Drive upload failed"))

@@ -3,7 +3,7 @@ import os
 
 
 class Settings(BaseSettings):
-    # Supabase
+    # Supabase (team project wvzulyxzuntjnzdykstt)
     SUPABASE_URL: str = "https://wvzulyxzuntjnzdykstt.supabase.co"
     SUPABASE_SECRET_KEY: str = "sb_secret_qM2kIa6iLOXbv_JAUEXNTA_YLbxemoo"
 
@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     # Local AI services
     WHISPER_MODEL_SIZE: str = "base"
 
-    # Unified Google OAuth2 (Gmail, Drive, Calendar)
+    # Unified Google OAuth2 (Gmail, Drive, Calendar) — common dummy team account
     GOOGLE_CLIENT_ID: str = "84319482531-ucitebq3ohngvast159nrtklbu2mngq7.apps.googleusercontent.com"
     GOOGLE_CLIENT_SECRET: str = "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"
     GOOGLE_REDIRECT_URI: str = "http://localhost:9000/api/v1/auth/google/callback"

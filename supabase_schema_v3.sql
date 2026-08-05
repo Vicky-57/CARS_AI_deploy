@@ -3,10 +3,18 @@
 -- ====================================================================
 
 -- 1. ENUMS FOR PIPELINES & STATUSES
-CREATE TYPE project_type_enum AS ENUM ('BUY', 'SELL');
-CREATE TYPE project_status_enum AS ENUM ('LEAD', 'ACTIVE', 'COMPLETED', 'CANCELLED', 'PAUSED');
-CREATE TYPE expense_type_enum AS ENUM ('OIL_CHANGE', 'PAYMENT_SLIP', 'TUEV_INSPECTION', 'DETAILING', 'TRANSPORT', 'ADMIN', 'OTHER');
-CREATE TYPE location_type_enum AS ENUM ('OFFLINE_ONSITE', 'ONLINE');
+DO $$ BEGIN
+  CREATE TYPE project_type_enum AS ENUM ('BUY', 'SELL');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE TYPE project_status_enum AS ENUM ('LEAD', 'ACTIVE', 'COMPLETED', 'CANCELLED', 'PAUSED');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE TYPE expense_type_enum AS ENUM ('OIL_CHANGE', 'PAYMENT_SLIP', 'TUEV_INSPECTION', 'DETAILING', 'TRANSPORT', 'ADMIN', 'OTHER');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE TYPE location_type_enum AS ENUM ('OFFLINE_ONSITE', 'ONLINE');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- 2. PROJECTS TABLE (Dual Buy Side & Sell Side Brokerage Projects)
 CREATE TABLE IF NOT EXISTS projects (
@@ -143,6 +151,52 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;
+
+-- 12. CLIENT FORM SESSIONS (public customer-facing Buy/Sell staged forms)
+CREATE TABLE IF NOT EXISTS client_form_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
+    pipeline TEXT NOT NULL DEFAULT 'sell',           -- 'buy' | 'sell'
+    form_link_token TEXT UNIQUE,                     -- short public token for /form/sell?token=...
+    stage INT NOT NULL DEFAULT 1,                    -- 1..3 (which form step/section the client is on)
+    shared_core JSONB DEFAULT '{}'::jsonb,           -- data entered ONCE & reused across templates
+    client_name TEXT,
+    client_email TEXT,
+    client_phone TEXT,
+    status TEXT NOT NULL DEFAULT 'draft',            -- 'draft' | 'completed'
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 13. CLIENT FORM SUBMISSIONS (per-template stage field data)
+CREATE TABLE IF NOT EXISTS client_form_submissions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID REFERENCES client_form_sessions(id) ON DELETE CASCADE,
+    stage INT NOT NULL,                              -- 1..3
+    template_type TEXT NOT NULL,                     -- 'sell_b2c' | 'buy_passiv' | 'kaufvertrag' | 'handover'
+    field_data JSONB DEFAULT '{}'::jsonb,            -- canonical-key values for that template
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (session_id, stage, template_type)
+);
+
+-- 14. DOCUMENTS (rendered/approved/saved PDFs per template)
+CREATE TABLE IF NOT EXISTS documents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID REFERENCES client_form_sessions(id) ON DELETE CASCADE,
+    project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
+    pipeline TEXT,
+    template_type TEXT NOT NULL,                     -- 'sell_b2c' | 'buy_passiv' | 'kaufvertrag' | 'handover'
+    client_name TEXT,
+    status TEXT NOT NULL DEFAULT 'draft',            -- 'draft' | 'approved' | 'saved'
+    file_path TEXT,                                  -- absolute path of rendered temp PDF
+    drive_url TEXT,
+    drive_file_id TEXT,
+    approved_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (session_id, template_type)
+);
 
 -- INDEXES FOR PERFORMANCE
 CREATE INDEX IF NOT EXISTS idx_leads_channel ON leads(channel);
