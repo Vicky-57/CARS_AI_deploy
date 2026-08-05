@@ -75,65 +75,71 @@ export default function ExpenseModal({ isOpen, onClose, project, onExpensesUpdat
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: 780, display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
+    <div className="modal-overlay expense-modal-overlay" onClick={onClose}>
+      <div className="modal expense-modal-container" style={{ maxWidth: 840, display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', borderRadius: 24, padding: 0 }} onClick={e => e.stopPropagation()}>
+        <div className="modal-header" style={{ padding: '24px 32px', borderBottom: '1px solid var(--border)', background: 'white' }}>
           <div>
-            <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ background: 'var(--brand-50)', padding: 6, borderRadius: 8 }}>
-                <Calculator size={18} color="var(--brand-600)" />
+            <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '1.4rem', fontWeight: 800, color: '#09090b' }}>
+              <div style={{ background: '#09090b', padding: 8, borderRadius: 10, display: 'flex', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+                <Calculator size={20} color="white" />
               </div>
-              Financials & Net Profit Calculator
+              Financials & Net Profit
             </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4 }}>
-              Project: <strong style={{ color: 'var(--text-primary)' }}>{project.client_name}</strong> ({project.project_type})
+            <div style={{ fontSize: '0.95rem', color: '#71717a', marginTop: 8, fontWeight: 500 }}>
+              Project: <strong style={{ color: '#09090b' }}>{project.client_name}</strong> &mdash; {project.project_type}
             </div>
           </div>
-          <button className="btn-icon" onClick={onClose}><X size={18} /></button>
+          <button className="btn-icon" onClick={onClose} style={{ background: '#f4f4f5', color: '#52525b', borderRadius: '50%', padding: 8, transition: 'all 0.2s', border: 'none', cursor: 'pointer', display: 'flex' }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#e4e4e7'; e.currentTarget.style.color = '#09090b'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#f4f4f5'; e.currentTarget.style.color = '#52525b'; }}>
+            <X size={18} />
+          </button>
         </div>
 
-        <div className="modal-body" style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 24, padding: 24 }}>
+        <div className="modal-body expense-modal-body" style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 24, padding: 24 }}>
           
           {/* Formula Display Panel */}
           <div style={{
-            background: 'var(--gray-900)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '20px 24px', color: 'white',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+            background: 'var(--sidebar-bg)',
+            borderRadius: 20,
+            padding: '28px 32px', color: 'white',
+            boxShadow: '0 12px 24px -8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)'
           }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--gray-400)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <DollarSign size={14} /> Real-Time Financial Summary
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#a1a1aa', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <DollarSign size={16} color="#d4d4d8" /> Real-Time Financial Summary
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-              <div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)', marginBottom: 4 }}>Sale Price</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'white' }}>
-                  € {salePrice ? parseFloat(salePrice).toLocaleString() : '0'}
+            <div className="finance-summary-row">
+              <div className="finance-summary-items">
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: '#a1a1aa', marginBottom: 8, fontWeight: 500 }}>Sale Price</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 600, color: 'white' }}>
+                    €{salePrice ? parseFloat(salePrice).toLocaleString() : '0'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: '#a1a1aa', marginBottom: 8, fontWeight: 500 }}>Total Expenses</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 600, color: '#fca5a5' }}>
+                    €{totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: '#a1a1aa', marginBottom: 8, fontWeight: 500 }}>Labor Cost</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 600, color: '#fcd34d' }}>
+                    €{totalLaborCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </div>
                 </div>
               </div>
-              <div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)', marginBottom: 4 }}>Total Expenses</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#fca5a5' }}>
-                  € {totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)', marginBottom: 4 }}>Labor Cost</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#fcd34d' }}>
-                  € {totalLaborCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                </div>
-              </div>
-              <div style={{ borderLeft: '1px solid var(--gray-700)', paddingLeft: 16 }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--gray-400)', marginBottom: 4 }}>Net Broker Profit</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: netProfit >= 0 ? '#4ade80' : '#f87171' }}>
-                  € {netProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              <div className="finance-profit-box">
+                <div style={{ fontSize: '0.8rem', color: '#a1a1aa', marginBottom: 6, fontWeight: 600 }}>Net Broker Profit</div>
+                <div style={{ fontSize: '2rem', fontWeight: 800, color: netProfit >= 0 ? '#4ade80' : '#f87171', letterSpacing: '-0.5px', lineHeight: 1.1 }}>
+                  €{netProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </div>
               </div>
             </div>
           </div>
 
           {/* Pricing Settings */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+          <div className="expense-pricing-grid">
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label" style={{ fontWeight: 600 }}>Agreed Sale Price (€)</label>
               <input
@@ -175,7 +181,7 @@ export default function ExpenseModal({ isOpen, onClose, project, onExpensesUpdat
                 <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Total: €{totalExpenses.toFixed(2)}</span>
               </div>
               
-              <form onSubmit={handleAddExpense} style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              <form onSubmit={handleAddExpense} className="expense-add-form">
                 <select className="form-select" style={{ width: 150 }} value={newExpType} onChange={e => setNewExpType(e.target.value)}>
                   <option value="TUEV_INSPECTION">TÜV Inspection</option>
                   <option value="DETAILING">Detailing</option>
@@ -239,7 +245,7 @@ export default function ExpenseModal({ isOpen, onClose, project, onExpensesUpdat
                 <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Total: {totalLaborHours}h (€{totalLaborCost.toFixed(2)})</span>
               </div>
 
-              <form onSubmit={handleLogLabor} style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              <form onSubmit={handleLogLabor} className="expense-add-form">
                 <input
                   type="number"
                   step="0.5"

@@ -343,54 +343,60 @@ function DayPanel({ day, meetings, onEdit, onDelete, onClose }) {
     .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
 
   return (
-    <div className="day-panel" style={{
-      position: 'fixed', right: 0, top: 0, bottom: 0, width: 340,
-      background: 'var(--surface)', borderLeft: '1px solid var(--border)',
-      zIndex: 1050, display: 'flex', flexDirection: 'column',
-      boxShadow: '-4px 0 24px rgba(0,0,0,0.1)',
-    }}>
-      <div style={{ padding: '20px 20px 12px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>{format(day, 'EEEE')}</div>
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{format(day, 'MMMM d, yyyy')}</div>
-        </div>
-        <button className="btn-icon" onClick={onClose}><X size={18} /></button>
-      </div>
-      <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
-        {dayMeetings.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            <Calendar size={30} style={{ opacity: 0.3, marginBottom: 8 }} /><br />
-            No meetings this day
+    <>
+      <div className="day-panel-backdrop" onClick={onClose} />
+      <div className="day-panel">
+        <div style={{ padding: '32px 32px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: '1.6rem', color: '#09090b', letterSpacing: '-0.5px' }}>{format(day, 'EEEE')}</div>
+            <div style={{ fontSize: '0.95rem', color: '#71717a', marginTop: 4, fontWeight: 500 }}>{format(day, 'MMMM d, yyyy')}</div>
           </div>
+          <button className="btn-icon" onClick={onClose} style={{ background: '#f4f4f5', color: '#52525b', borderRadius: '50%', padding: 8, transition: 'all 0.2s', border: 'none', cursor: 'pointer', display: 'flex' }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#e4e4e7'; e.currentTarget.style.color = '#09090b'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#f4f4f5'; e.currentTarget.style.color = '#52525b'; }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 32px 32px' }}>
+          {dayMeetings.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '60px 0', color: '#a1a1aa', fontSize: '0.95rem', fontWeight: 500 }}>
+              <Calendar size={40} style={{ opacity: 0.2, marginBottom: 16 }} /><br />
+              No meetings scheduled
+            </div>
         ) : dayMeetings.map(m => {
           const isGoogle = m.source === 'google';
           const isOnsite = m.location_type === 'OFFLINE_ONSITE';
           return (
             <div key={m.id} style={{
-              background: isGoogle ? '#f0f4ff' : isOnsite ? '#fffbeb' : '#f0fdf4', borderRadius: 10,
+              background: isGoogle ? '#f0f4ff' : isOnsite ? '#fffbeb' : '#f0fdf4', 
+              borderRadius: 12,
               border: `1px solid ${isGoogle ? '#c7d7f5' : isOnsite ? '#fde68a' : '#bbf7d0'}`,
-              padding: '12px 14px', marginBottom: 10,
+              padding: '16px', 
+              marginBottom: 16,
+              position: 'relative'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ fontWeight: 700, fontSize: '0.88rem', flex: 1 }}>
-                  {isGoogle && <span style={{ fontSize: '0.7rem', background: '#e8f0fe', color: '#1a56db', borderRadius: 4, padding: '1px 5px', marginRight: 5 }}>Google</span>}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
                   {m.title}
                 </div>
                 {!isGoogle && (
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <button className="btn-icon" onClick={() => onEdit(m)} title="Edit"><Pencil size={13} /></button>
-                    <button className="btn-icon" onClick={() => onDelete(m.id)} title="Delete"><Trash2 size={13} color="var(--danger)" /></button>
+                  <div style={{ display: 'flex', gap: 4 }} className="event-actions">
+                    <button className="btn-icon" onClick={() => onEdit(m)} title="Edit" style={{ padding: 4 }}><Pencil size={14} color="var(--text-muted)" /></button>
+                    <button className="btn-icon" onClick={() => onDelete(m.id)} title="Delete" style={{ padding: 4 }}><Trash2 size={14} color="#ef4444" /></button>
                   </div>
                 )}
               </div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--brand-600)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                <Clock size={12} /> {format(new Date(m.start_time), 'HH:mm')} – {format(new Date(m.end_time), 'HH:mm')}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ fontSize: '0.85rem', color: isGoogle ? '#1d4ed8' : isOnsite ? '#b45309' : '#15803d', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Clock size={14} /> {format(new Date(m.start_time), 'HH:mm')} – {format(new Date(m.end_time), 'HH:mm')}
+                </div>
+                {m.client_name && <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}><User size={14} color="var(--text-muted)" /> {m.client_name}</div>}
+                {m.location_address && <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}><MapPin size={14} color="var(--text-muted)" /> {m.location_address}</div>}
+                {m.notes && <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 2, fontStyle: 'italic' }}>{m.notes}</div>}
               </div>
-              {m.client_name && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}><User size={12} /> {m.client_name}</div>}
-              {m.location_address && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}><MapPin size={12} /> {m.location_address}</div>}
-              {m.notes && <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 4, fontStyle: 'italic' }}>{m.notes}</div>}
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-                {isOnsite ? <MapPin size={10} /> : isGoogle ? <Calendar size={10} /> : <Video size={10} />}
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 12, display: 'flex', alignItems: 'center', gap: 4, fontWeight: 500 }}>
+                {isOnsite ? <MapPin size={12} /> : isGoogle ? <Calendar size={12} /> : <Video size={12} />}
                 {isOnsite ? 'Onsite' : isGoogle ? 'Google Calendar' : 'Online'}
               </div>
             </div>
@@ -398,6 +404,7 @@ function DayPanel({ day, meetings, onEdit, onDelete, onClose }) {
         })}
       </div>
     </div>
+    </>
   );
 }
 
@@ -602,29 +609,35 @@ export default function CalendarPage() {
                 const isOnsite = m.location_type === 'OFFLINE_ONSITE';
                 return (
                   <div key={m.id} style={{
-                    padding: '12px 14px', borderRadius: 10,
-                    border: `1px solid ${isGoogle ? '#c7d7f5' : 'var(--border)'}`,
-                    background: isGoogle ? '#f8faff' : 'var(--surface)',
+                    padding: '16px', borderRadius: 12,
+                    background: isGoogle ? '#f0f4ff' : isOnsite ? '#fffbeb' : '#f0fdf4',
+                    border: `1px solid ${isGoogle ? '#c7d7f5' : isOnsite ? '#fde68a' : '#bbf7d0'}`,
                     display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-                  }}>
+                    transition: 'all 0.2s', cursor: 'pointer', position: 'relative'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                  onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                  >
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6 }}>
-                        {isGoogle && <span style={{ fontSize: '0.65rem', background: '#e8f0fe', color: '#1a56db', borderRadius: 4, padding: '1px 5px', flexShrink: 0 }}>Google</span>}
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</span>
+                      <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        {m.title}
+                        {isGoogle && <span style={{ fontSize: '0.65rem', background: '#e8f0fe', color: '#1a56db', borderRadius: 4, padding: '2px 6px', flexShrink: 0, fontWeight: 600 }}>Google</span>}
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--brand-600)', marginTop: 3 }}>
-                        {format(new Date(m.start_time), 'EEE, MMM d · HH:mm')} – {format(new Date(m.end_time), 'HH:mm')}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <div style={{ fontSize: '0.85rem', color: isGoogle ? '#1d4ed8' : isOnsite ? '#b45309' : '#15803d', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 500 }}>
+                          <Clock size={14} /> {format(new Date(m.start_time), 'EEE, MMM d · HH:mm')} – {format(new Date(m.end_time), 'HH:mm')}
+                        </div>
+                        {m.client_name && <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}><User size={14} color="var(--text-muted)" /> {m.client_name}</div>}
                       </div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                        {isOnsite ? <MapPin size={10} /> : isGoogle ? <Calendar size={10} /> : <Video size={10} />}
-                        {isOnsite ? 'Onsite' : isGoogle ? 'Google Cal' : 'Online'}
-                        {m.client_name ? ` · ${m.client_name}` : ''}
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 12, display: 'flex', alignItems: 'center', gap: 4, fontWeight: 500 }}>
+                        {isOnsite ? <MapPin size={12} /> : isGoogle ? <Calendar size={12} /> : <Video size={12} />}
+                        {isOnsite ? 'Onsite' : isGoogle ? 'Google Calendar' : 'Online'}
                       </div>
                     </div>
                     {!isGoogle && (
                       <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                        <button className="btn-icon" onClick={() => { setEditing(m); setShowModal(true); }} title="Edit"><Pencil size={13} /></button>
-                        <button className="btn-icon" onClick={() => cancel(m.id)} title="Delete"><Trash2 size={13} color="var(--danger)" /></button>
+                        <button className="btn-icon" onClick={(e) => { e.stopPropagation(); setEditing(m); setShowModal(true); }} title="Edit" style={{ padding: 4 }}><Pencil size={14} color="var(--text-muted)" /></button>
+                        <button className="btn-icon" onClick={(e) => { e.stopPropagation(); cancel(m.id); }} title="Delete" style={{ padding: 4 }}><Trash2 size={14} color="#ef4444" /></button>
                       </div>
                     )}
                   </div>
