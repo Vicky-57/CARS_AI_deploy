@@ -107,8 +107,8 @@ export default function Projects() {
       {/* Folder Tabs */}
       <div style={{ display: 'flex', paddingLeft: 0, position: 'relative', zIndex: 10, marginBottom: 0 }}>
         {[
-          { id: 'SELL', label: 'SELL SIDE — Vermittlung', icon: Tag },
-          { id: 'BUY', label: 'BUY SIDE — Beschaffung', icon: Search }
+          { id: 'SELL', label: 'SELL SIDE — Vermittlung', mobileLabel: 'SELL SIDE', icon: Tag },
+          { id: 'BUY', label: 'BUY SIDE — Beschaffung', mobileLabel: 'BUY SIDE', icon: Search }
         ].map((t) => {
           const isActive = tab === t.id;
           const Icon = t.icon;
@@ -116,15 +116,14 @@ export default function Projects() {
             <button
               key={t.id}
               onClick={() => { setTab(t.id); setStageFilter(''); }}
+              className="customer-tab-btn"
               style={{
-                padding: '14px 28px',
                 background: isActive ? 'var(--surface)' : 'transparent',
                 border: 'none',
                 borderTopLeftRadius: 16,
                 borderTopRightRadius: 16,
                 color: isActive ? 'var(--brand-600)' : 'var(--text-secondary)',
                 fontWeight: isActive ? 700 : 600,
-                fontSize: '0.9rem',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 position: 'relative',
@@ -136,7 +135,8 @@ export default function Projects() {
               }}
             >
               <Icon size={16} />
-              {t.label}
+              <span className="hide-on-mobile">{t.label}</span>
+              <span className="show-on-mobile">{t.mobileLabel}</span>
             </button>
           )
         })}
@@ -144,20 +144,20 @@ export default function Projects() {
 
       {/* Projects Table */}
       <div className="card" style={{ border: 'none', borderTopLeftRadius: tab === 'SELL' ? 0 : 16, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)' }}>
-        <div className="card-header" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+        <div className="card-header customers-header-mobile" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
           <span className="card-title" style={{ fontSize: '1.05rem', fontWeight: 700 }}>
             Active Projects ({filtered.length})
           </span>
 
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <div className="customers-actions-mobile" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             {/* Search Bar */}
-            <div className="search-bar" style={{ display: 'flex', alignItems: 'center', padding: '4px 12px', borderRadius: 24, background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+            <div className="search-bar customers-search-mobile" style={{ display: 'flex', alignItems: 'center', padding: '4px 12px', borderRadius: 24, background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
               <Search size={14} color="var(--text-muted)" />
               <input
                 placeholder="Search projects..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                style={{ fontSize: '0.85rem', border: 'none', background: 'transparent', outline: 'none', marginLeft: 8, width: 140 }}
+                style={{ fontSize: '0.85rem', border: 'none', background: 'transparent', outline: 'none', marginLeft: 8, width: '100%', minWidth: 0 }}
               />
             </div>
 
@@ -242,6 +242,7 @@ export default function Projects() {
               <tr>
                 <th style={{ paddingLeft: 24, paddingTop: 16, paddingBottom: 16 }}>Client</th>
                 <th>Vehicle Details</th>
+                <th>VIN</th>
                 <th>Stage</th>
                 <th>Investment</th>
                 <th>Profit</th>
@@ -251,14 +252,14 @@ export default function Projects() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', padding: 60 }}>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: 60 }}>
                     <div className="spinner" style={{ margin: '0 auto 16px', width: 28, height: 28, borderWidth: 3 }} />
                     <div style={{ color: 'var(--text-muted)' }}>Loading projects...</div>
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', padding: 80 }}>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: 80 }}>
                     <div style={{ width: 64, height: 64, background: 'var(--gray-50)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
                       <FolderKanban size={32} color="var(--gray-400)" />
                     </div>
@@ -287,16 +288,20 @@ export default function Projects() {
                       </td>
                       <td>
                         {p.target_vehicle ? (
-                          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: p.vin ? 4 : 0 }}>
+                          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
                             <Car size={14} color="var(--brand-500)" /> {p.target_vehicle}
                           </div>
                         ) : (
                           <span style={{ color: 'var(--text-muted)' }}>-</span>
                         )}
-                        {p.vin && (
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
-                            VIN: {p.vin}
+                      </td>
+                      <td>
+                        {p.vin ? (
+                          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
+                            {p.vin}
                           </div>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>-</span>
                         )}
                       </td>
                       <td>

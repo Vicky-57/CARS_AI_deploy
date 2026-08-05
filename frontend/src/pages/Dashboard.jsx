@@ -130,7 +130,7 @@ export default function Dashboard() {
       </div>
 
       {/* Two-column layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 24, alignItems: 'flex-start' }}>
+      <div className="dashboard-grid">
 
         {/* Recent Leads */}
         <div className="card" style={{ border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)' }}>

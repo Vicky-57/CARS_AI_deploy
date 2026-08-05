@@ -80,15 +80,14 @@ export default function Leads() {
             <button
               key={tab.id}
               onClick={() => setIntentFilter(tab.id)}
+              className="customer-tab-btn"
               style={{
-                padding: '14px 28px',
                 background: isActive ? 'var(--surface)' : 'transparent',
                 border: 'none',
                 borderTopLeftRadius: 16,
                 borderTopRightRadius: 16,
                 color: isActive ? 'var(--brand-600)' : 'var(--text-secondary)',
                 fontWeight: isActive ? 700 : 600,
-                fontSize: '0.9rem',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 position: 'relative',
@@ -108,17 +107,17 @@ export default function Leads() {
 
       {/* Leads Table */}
       <div className="card" style={{ border: 'none', borderTopLeftRadius: intentFilter === '' ? 0 : 16, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)' }}>
-        <div className="card-header" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+        <div className="card-header customers-header-mobile" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
           <span className="card-title" style={{ fontSize: '1.05rem', fontWeight: 700 }}>Inquiries ({filtered.length})</span>
 
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <div className="search-bar" style={{ padding: '4px 12px', borderRadius: 24, background: 'var(--surface)', border: '1px solid var(--border)' }}>
+          <div className="customers-actions-mobile" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <div className="search-bar customers-search-mobile" style={{ padding: '4px 12px', borderRadius: 24, background: 'var(--surface)', border: '1px solid var(--border)' }}>
               <Search size={14} color="var(--text-muted)" />
               <input
                 placeholder="Search leads..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                style={{ fontSize: '0.85rem', border: 'none', background: 'transparent', outline: 'none', marginLeft: 8 }}
+                style={{ fontSize: '0.85rem', border: 'none', background: 'transparent', outline: 'none', marginLeft: 8, width: '100%', minWidth: 0 }}
               />
             </div>
             <button className="btn btn-secondary btn-icon" onClick={loadLeads} style={{ padding: '6px', borderRadius: '50%' }} title="Refresh leads">

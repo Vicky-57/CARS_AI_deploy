@@ -245,7 +245,8 @@ function WeekView({ meetings, weekStart, onEventClick, onDayClick }) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 10 }}>
+    <div className="calendar-scroll-wrap">
+      <div className="calendar-week-grid">
       {days.map(day => {
         const dayMeetings = meetings.filter(m => {
           try { return isSameDay(new Date(m.start_time), day); } catch { return false; }
@@ -276,6 +277,7 @@ function WeekView({ meetings, weekStart, onEventClick, onDayClick }) {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
@@ -293,7 +295,8 @@ function MonthView({ meetings, currentMonth, onEventClick, onDayClick }) {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
+    <div className="calendar-scroll-wrap">
+      <div className="calendar-month-grid">
       {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(dow => (
         <div key={dow} style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center', padding: '4px 0', textTransform: 'uppercase' }}>{dow}</div>
       ))}
@@ -328,6 +331,7 @@ function MonthView({ meetings, currentMonth, onEventClick, onDayClick }) {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
@@ -339,10 +343,10 @@ function DayPanel({ day, meetings, onEdit, onDelete, onClose }) {
     .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
 
   return (
-    <div style={{
+    <div className="day-panel" style={{
       position: 'fixed', right: 0, top: 0, bottom: 0, width: 340,
       background: 'var(--surface)', borderLeft: '1px solid var(--border)',
-      zIndex: 200, display: 'flex', flexDirection: 'column',
+      zIndex: 1050, display: 'flex', flexDirection: 'column',
       boxShadow: '-4px 0 24px rgba(0,0,0,0.1)',
     }}>
       <div style={{ padding: '20px 20px 12px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -497,12 +501,12 @@ export default function CalendarPage() {
             Portal meetings + Google Calendar events — 30-min travel conflict guard
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button className="btn btn-secondary" onClick={() => loadData(true)} disabled={refreshing} title="Refresh">
+        <div className="calendar-actions-mobile" style={{ display: 'flex', gap: 8, alignItems: 'center', paddingBottom: 4 }}>
+          <button className="btn btn-secondary hide-on-mobile" style={{ flexShrink: 0 }} onClick={() => loadData(true)} disabled={refreshing} title="Refresh">
             <RefreshCw size={14} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
           </button>
           {/* Week / Month toggle */}
-          <div style={{ display: 'inline-flex', border: '1.5px solid var(--border)', borderRadius: 10, overflow: 'hidden', background: 'var(--gray-50)' }}>
+          <div style={{ display: 'inline-flex', border: '1.5px solid var(--border)', borderRadius: 10, overflow: 'hidden', background: 'var(--gray-50)', flexShrink: 0 }}>
             {['week', 'month'].map(mode => (
               <button key={mode} onClick={() => setViewMode(mode)} style={{
                 padding: '8px 18px', fontSize: '0.875rem', fontWeight: 600,
@@ -513,11 +517,11 @@ export default function CalendarPage() {
               }}>{mode.charAt(0).toUpperCase() + mode.slice(1)}</button>
             ))}
           </div>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', background: googleConnected ? '#dcfce7' : '#fef3c7', color: googleConnected ? '#15803d' : '#92400e', borderRadius: 20, padding: '4px 10px', fontWeight: 600 }}>
-            {googleConnected ? <><CheckCircle size={14} /> Google Synced</> : <><AlertTriangle size={14} /> Not Connected</>}
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', background: googleConnected ? '#dcfce7' : '#fef3c7', color: googleConnected ? '#15803d' : '#92400e', borderRadius: 20, padding: '4px 10px', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
+            {googleConnected ? <><CheckCircle size={14} /> <span className="hide-on-mobile">Google Synced</span></> : <><AlertTriangle size={14} /> <span className="hide-on-mobile">Not Connected</span></>}
           </span>
-          <button className="btn btn-primary" onClick={() => { setEditing(null); setShowModal(true); }}>
-            <Plus size={14} /> Book Meeting
+          <button className="btn btn-primary" style={{ marginLeft: 'auto', whiteSpace: 'nowrap', flexShrink: 0 }} onClick={() => { setEditing(null); setShowModal(true); }}>
+            <Plus size={14} /> <span className="hide-on-mobile">Book Meeting</span><span className="show-on-mobile">Book</span>
           </button>
         </div>
       </div>

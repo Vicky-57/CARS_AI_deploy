@@ -78,7 +78,7 @@ export default function Profile() {
         </div>
       </div>
 
-      <div style={{ 
+      <div className="profile-tabs-mobile" style={{ 
         display: 'inline-flex', gap: 8, background: 'var(--gray-50)', padding: 8, 
         borderRadius: 'var(--radius-lg)', marginBottom: 32, border: '1px solid var(--gray-200)',
         alignItems: 'center'
@@ -113,12 +113,12 @@ export default function Profile() {
 
       {activeTab === 'PERSONAL' && (
         <form onSubmit={handleSave} className="card" style={{ border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', overflow: 'hidden' }}>
-          <div className="card-header" style={{ padding: '28px 32px', background: 'var(--gray-50)', borderBottom: '1px solid var(--gray-200)' }}>
+          <div className="card-header profile-card-header" style={{ padding: '28px 32px', background: 'var(--gray-50)', borderBottom: '1px solid var(--gray-200)' }}>
             <span className="card-title" style={{ fontSize: '1.2rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 10 }}>
               <User size={20} color="var(--brand-500)" /> Personal Information
             </span>
           </div>
-          <div className="card-body" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+          <div className="card-body profile-card-body" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: 24 }}>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label" style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Full Name</label>
               <div style={{ position: 'relative' }}>
@@ -133,7 +133,7 @@ export default function Profile() {
                 <input type="email" name="email" className="form-input" style={{ paddingLeft: 44, paddingRight: 16, height: 44 }} value={formData.email} onChange={handleChange} required />
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, alignItems: 'start' }}>
+            <div className="grid-2" style={{ gap: 24, alignItems: 'start' }}>
               <div className="form-group" style={{ margin: 0 }}>
                 <label className="form-label" style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Phone Number</label>
                 <div style={{ position: 'relative' }}>
@@ -163,12 +163,12 @@ export default function Profile() {
 
       {activeTab === 'SECURITY' && (
         <form onSubmit={handleSave} className="card" style={{ border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', overflow: 'hidden' }}>
-          <div className="card-header" style={{ padding: '28px 32px', background: 'var(--gray-50)', borderBottom: '1px solid var(--gray-200)' }}>
+          <div className="card-header profile-card-header" style={{ padding: '28px 32px', background: 'var(--gray-50)', borderBottom: '1px solid var(--gray-200)' }}>
             <span className="card-title" style={{ fontSize: '1.2rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 10 }}>
               <ShieldCheck size={20} color="var(--danger)" /> Login Credentials
             </span>
           </div>
-          <div className="card-body" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+          <div className="card-body profile-card-body" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: 24 }}>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label" style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>New Password</label>
               <div style={{ position: 'relative' }}>
@@ -274,7 +274,7 @@ function AppConnectionsTab() {
         )}
         
         <div style={{ maxWidth: 640 }}>
-          <div 
+          <div className="profile-app-card"
             style={{ 
               display: 'flex', flexDirection: 'column', padding: '28px',
               border: '1px solid #e5e7eb', borderRadius: '16px', 
@@ -282,7 +282,7 @@ function AppConnectionsTab() {
             }}
           >
             {/* Header / Brand icons */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+            <div className="profile-app-header-mobile" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f8fafc', padding: '8px 12px', borderRadius: 12, border: '1px solid #e2e8f0' }}>
                   <img src="/assets/Gmail_icon_(2020).svg.png" alt="Gmail" style={{ width: 24, height: 24, objectFit: 'contain' }} />
@@ -346,7 +346,7 @@ function AppConnectionsTab() {
             {/* Features list */}
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 12 }}>Enabled Features</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: '0.85rem' }}>
+              <div className="grid-2" style={{ gap: 12, fontSize: '0.85rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <CheckCircle2 size={15} color="#10b981" /> Primary Inbox Email Sync
                 </div>

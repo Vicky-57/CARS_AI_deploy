@@ -110,15 +110,14 @@ export default function Customers() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
+              className="customer-tab-btn"
               style={{
-                padding: '14px 28px',
                 background: isActive ? 'var(--surface)' : 'transparent',
                 border: 'none',
                 borderTopLeftRadius: 16,
                 borderTopRightRadius: 16,
                 color: isActive ? 'var(--brand-600)' : 'var(--text-secondary)',
                 fontWeight: isActive ? 700 : 600,
-                fontSize: '0.9rem',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 position: 'relative',
@@ -138,13 +137,13 @@ export default function Customers() {
 
       {/* Customers Table */}
       <div className="card" style={{ border: 'none', borderTopLeftRadius: activeTab === 'NEW' ? 0 : 16, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)' }}>
-        <div className="card-header" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+        <div className="card-header customers-header-mobile" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
           <span className="card-title" style={{ fontSize: '1.05rem', fontWeight: 700 }}>
             {activeTab === 'NEW' ? 'New Customers' : 'Repeat Customers'} ({filtered.length})
           </span>
 
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <div className="search-bar" style={{ padding: '4px 12px', borderRadius: 24, background: 'var(--surface)', border: '1px solid var(--border)' }}>
+          <div className="customers-actions-mobile" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <div className="search-bar customers-search-mobile" style={{ padding: '4px 12px', borderRadius: 24, background: 'var(--surface)', border: '1px solid var(--border)' }}>
               <Search size={14} color="var(--text-muted)" />
               <input
                 placeholder="Search customers..."
@@ -212,9 +211,6 @@ export default function Customers() {
                           <div style={{ fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 6 }}>
                             {customer.name || 'Unknown Client'}
                             {customer.interactions.length > 1 && <Star size={12} color="#fbbf24" fill="#fbbf24" />}
-                          </div>
-                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                            ID: {customer.id.length > 20 ? customer.id.substring(0, 8) + '...' : customer.id}
                           </div>
                         </div>
                       </div>
