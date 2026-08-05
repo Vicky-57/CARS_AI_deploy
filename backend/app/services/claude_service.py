@@ -64,25 +64,78 @@ Respond ONLY with this exact JSON (no markdown):
     }
 
 
+CAR_KEYWORDS = [
+    "car", "auto", "fahrzeug", "kauf", "verkauf", "vermittlung", "beschaffung",
+    "suche", "anfrage", "angebot", "bmw", "porsche", "mercedes", "audi", "vw", "volkswagen",
+    "ferrari", "lamborghini", "maserati", "bentley", "aston", "mclaren", "bugatti", "jaguar",
+    "tesla", "volvo", "toyota", "ford", "nissan", "honda", "hyundai", "kia", "peugeot", "renault",
+    "vermittlungsvertrag", "kaufvertrag", "beschaffungsvertrag", "übergabe", "fahrzeugschein",
+    "tüv", "inspection", "erstzulassung", "probefahrt", "test drive", "inspektion", "unfallfrei",
+    "besichtigung", "termin", "preis", "angebot", "preisvorstellung", "kilometerstand", "leasing"
+]
+
+IGNORE_KEYWORDS = [
+    "newsletter", "unsubscribe", "security alert", "deletion warning", "naukri", "kaggle",
+    "cloudflare", "github", "view image", "pre-prod engineer", "mock", "beehiiv"
+]
+
+
+def is_car_related_subject(subject: str) -> bool:
+    """
+    Stage 1 Pre-Filter: Fast keyword check on email subject.
+    Returns True if the subject is related to buying, selling, or car brokerage inquiries.
+    """
+    if not subject:
+        return False
+    sub_lower = subject.lower().strip()
+
+    # Fast drop for automated noise / marketing / newsletters
+    if any(ignore in sub_lower for ignore in IGNORE_KEYWORDS):
+        return False
+
+    # Check for car or brokerage keywords
+    for kw in CAR_KEYWORDS:
+        if kw in sub_lower:
+            return True
+
+    return False
+
+
 async def summarize_email(subject: str, body: str) -> dict:
-    """Summarise an inbound email, classify intent, and draft an AI response."""
-    prompt = f"""You are an assistant for CAR-AGENTS, a German automotive broker.
+    """Summarise an inbound email, validate if it's a genuine car lead, classify intent, and extract specs."""
+    prompt = f"""You are an expert AI assistant for CAR-AGENTS, a German automotive brokerage.
+Analyze this inbound email.
 
 Email Subject: {subject}
 Email Body: {body}
 
-Respond ONLY with this JSON (no markdown):
+Tasks:
+1. Determine if this email is a genuine car buying, selling, or brokerage inquiry (is_valid_lead: true/false).
+2. Classify intent: BUY_INTENT (client wants us to source a car), SELL_INTENT (client wants us to sell their car), FOLLOW_UP (client asking update/info on active lead), or GENERAL_INQUIRY.
+3. Extract any vehicle details (model, budget/price limit, year, mileage).
+4. Provide a concise 2-sentence summary IN THE EXACT SAME LANGUAGE as the incoming email (if the email is written in English, write the summary in English; if in German, write in German).
+5. Draft a short, polite suggested reply in the same language.
+
+Respond ONLY with this JSON format (no markdown codeblocks):
 {{
-  "intent": "BUY_INTENT | SELL_INTENT | UNKNOWN",
-  "summary": "2-3 sentence German summary",
+  "is_valid_lead": true,
+  "intent": "BUY_INTENT | SELL_INTENT | FOLLOW_UP | GENERAL_INQUIRY",
+  "summary": "Concise summary of email content",
+  "extracted_specs": {{
+    "vehicle": "e.g. BMW 320i",
+    "target_price": "e.g. 31500 €",
+    "mileage": "e.g. 42500 km"
+  }},
   "urgency": "high | medium | low",
-  "suggested_reply": "Short professional German reply"
+  "suggested_reply": "Short professional reply"
 }}"""
-    raw = await call_claude(prompt, max_tokens=512)
+    raw = await call_claude(prompt, max_tokens=600)
     result = _parse_json(raw)
     return {
+        "is_valid_lead": bool(result.get("is_valid_lead", True)),
         "intent": result.get("intent", "UNKNOWN"),
         "summary": result.get("summary", body[:200]),
+        "extracted_specs": result.get("extracted_specs", {}),
         "urgency": result.get("urgency", "low"),
         "suggested_reply": result.get("suggested_reply", ""),
     }

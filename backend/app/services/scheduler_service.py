@@ -89,13 +89,18 @@ async def run_inactivity_check():
 
 def start_scheduler():
     """Starts the background scheduler jobs."""
-    # 1. Poll Strato IMAP email inbox every 5 minutes
+    from app.services.gmail_api_service import auto_ingest_gmail_leads
+
+    # 1. Automated Gmail Lead Ingestion every 2 minutes (Stage 1 + Stage 2 AI Pipeline)
+    scheduler.add_job(auto_ingest_gmail_leads, 'interval', minutes=2, id="auto_gmail_ingest")
+
+    # 2. Poll Strato IMAP email inbox every 5 minutes
     scheduler.add_job(poll_inbound_emails, 'interval', minutes=5, id="poll_emails")
 
-    # 2. W5 Daily Briefing at 07:00 UTC/CET
+    # 3. W5 Daily Briefing at 07:00 UTC/CET
     scheduler.add_job(run_daily_briefing, 'cron', hour=7, minute=0, id="daily_briefing")
 
-    # 3. W6 Inactivity Check daily at 12:00 UTC/CET
+    # 4. W6 Inactivity Check daily at 12:00 UTC/CET
     scheduler.add_job(run_inactivity_check, 'cron', hour=12, minute=0, id="inactivity_check")
 
     scheduler.start()

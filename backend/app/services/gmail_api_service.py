@@ -49,6 +49,13 @@ def _extract_body(payload: dict) -> str:
     return ""
 
 
+SYSTEM_SENDERS = [
+    "no-reply", "noreply", "accounts.google.com", "notifications", "mailer-daemon",
+    "donotreply", "security@google.com", "service@paypal", "billing@", "support@google.com",
+    "kaggle", "cloudflare", "naukri", "beehiiv"
+]
+
+
 async def fetch_primary_unread_emails(limit: int = 20) -> list:
     """
     Queries Gmail REST API for Primary Inbox messages.
@@ -92,13 +99,17 @@ async def fetch_primary_unread_emails(limit: int = 20) -> list:
                     sender_name = sender
                     sender_email = sender
 
+                # Filter system / security / newsletter senders
+                if any(sys_term in sender_email.lower() for sys_term in SYSTEM_SENDERS):
+                    continue
+
                 email_list.append({
                     "message_id": m["id"],
                     "sender_name": sender_name,
                     "sender_email": sender_email,
                     "subject": subject,
                     "snippet": snippet,
-                    "body": body[:2000],
+                    "body": body,
                     "date": date,
                 })
             except Exception as e:
@@ -116,6 +127,44 @@ async def fetch_primary_unread_emails(limit: int = 20) -> list:
         return []
 
 
+async def auto_ingest_gmail_leads():
+    """
+    Automated background task running every 2 minutes:
+    Fetches unread primary emails, runs Stage 1 Subject filter & Stage 2 Claude AI validation,
+    and automatically converts valid car inquiries into Leads in Supabase.
+    """
+    token = _get_valid_access_token()
+    if not token:
+        return
+
+    try:
+        emails = await fetch_primary_unread_emails(limit=10)
+        if not emails:
+            return
+
+        from app.services.claude_service import is_car_related_subject
+        from app.services.supabase_service import get_communications
+
+        existing_comms = get_communications(limit=200)
+        logged_keys = set((c.get("sender_contact", "").lower(), c.get("subject", "").lower()) for c in existing_comms)
+
+        for em in emails:
+            s_email = em.get("sender_email", "").lower()
+            subj = em.get("subject", "")
+
+            # Check if already processed
+            if (s_email, subj.lower()) in logged_keys:
+                continue
+
+            # Stage 1 Subject Pre-filter check
+            if is_car_related_subject(subj):
+                logger.info(f"⚡ [AUTO-INGEST] Automatically processing car lead email: '{subj}' from {s_email}")
+                await convert_gmail_to_lead(em["message_id"])
+
+    except Exception as ex:
+        logger.error(f"Error in auto_ingest_gmail_leads: {ex}")
+
+
 async def convert_gmail_to_lead(message_id: str) -> dict:
     """
     Takes a Gmail message ID, fetches full content, runs Claude AI intent extraction,
@@ -126,8 +175,9 @@ async def convert_gmail_to_lead(message_id: str) -> dict:
         return {"success": False, "error": "Google not connected. Please authorize via Settings."}
 
     try:
-        from app.services.claude_service import summarize_email
-        from app.services.supabase_service import create_lead, save_communication, get_all_leads
+        from app.services.claude_service import summarize_email, is_car_related_subject
+        from app.services.supabase_service import create_lead, update_lead, save_communication, get_all_leads
+        from datetime import datetime
 
         msg = _gmail_get(f"/users/me/messages/{message_id}", {"format": "full"})
         headers = msg.get("payload", {}).get("headers", [])
@@ -145,28 +195,57 @@ async def convert_gmail_to_lead(message_id: str) -> dict:
         snippet = msg.get("snippet", "")
         body = _extract_body(msg.get("payload", {})) or snippet
 
-        # Claude AI intent classification
-        ai_res = await summarize_email(subject, body[:1000])
+        # Claude AI intent classification & lead analysis
+        ai_res = await summarize_email(subject, body[:1500])
         intent = ai_res.get("intent", "UNKNOWN")
         summary = ai_res.get("summary", "")
 
-        # Avoid duplicate leads
-        existing = get_all_leads()
-        matched = next((l for l in existing if l.get("email") == sender_email), None)
+        existing_leads = get_all_leads()
+        sender_leads = [l for l in existing_leads if l.get("email") == sender_email]
 
-        if not matched:
+        active_lead = next((l for l in sender_leads if l.get("status") in ["NEW", "CONTACTED", "QUALIFIED", "IN_PROGRESS"]), None)
+        closed_lead = next((l for l in sender_leads if l.get("status") in ["CLOSED_WON", "CLOSED_LOST", "COMPLETED", "ARCHIVED"]), None)
+
+        is_repeat = False
+        is_followup = False
+
+        if active_lead:
+            # Active lead exists — update thread note & activity flag
+            is_followup = True
+            lead_id = active_lead.get("id")
+            existing_notes = active_lead.get("notes", "") or ""
+            new_note = f"\n✨ Follow-up Message [{datetime.utcnow().strftime('%m-%d %H:%M')}]: {summary}"
+            update_lead(lead_id, {
+                "notes": (existing_notes + new_note)[:1500]
+            })
+            msg_response = f"Updated existing active Lead for {sender_name} with new follow-up message."
+        elif closed_lead:
+            # Repeat client with a past closed deal
+            is_repeat = True
             new_lead = create_lead({
                 "name": sender_name,
                 "email": sender_email,
                 "channel": "GMAIL_API",
                 "intent": "SELL" if intent == "SELL_INTENT" else "BUY" if intent == "BUY_INTENT" else "UNKNOWN",
                 "status": "NEW",
-                "message": f"Subject: {subject}\n\n{body[:500]}",
+                "message": f"Subject: {subject}\n\n{body}",
+                "notes": f"💜 REPEAT CLIENT (Past deal closed). New Inquiry: {summary}"
+            })
+            lead_id = new_lead.get("id")
+            msg_response = f"Created a REPEAT CLIENT Lead for returning customer {sender_name}!"
+        else:
+            # New lead
+            new_lead = create_lead({
+                "name": sender_name,
+                "email": sender_email,
+                "channel": "GMAIL_API",
+                "intent": "SELL" if intent == "SELL_INTENT" else "BUY" if intent == "BUY_INTENT" else "UNKNOWN",
+                "status": "NEW",
+                "message": f"Subject: {subject}\n\n{body}",
                 "notes": f"AI Summary: {summary}"
             })
             lead_id = new_lead.get("id")
-        else:
-            lead_id = matched.get("id")
+            msg_response = f"Successfully converted email from {sender_name} into a Lead!"
 
         save_communication({
             "lead_id": lead_id,
@@ -174,7 +253,7 @@ async def convert_gmail_to_lead(message_id: str) -> dict:
             "sender_name": sender_name,
             "sender_contact": sender_email,
             "subject": subject,
-            "body": snippet,
+            "body": body,
             "is_inbound": True,
             "intent": intent,
             "ai_summary": summary
@@ -185,7 +264,9 @@ async def convert_gmail_to_lead(message_id: str) -> dict:
             "lead_id": lead_id,
             "intent": intent,
             "summary": summary,
-            "message": f"Successfully converted email from {sender_name} into a Lead!"
+            "is_repeat": is_repeat,
+            "is_followup": is_followup,
+            "message": msg_response
         }
     except Exception as e:
         logger.error(f"Error converting Gmail to lead: {e}")

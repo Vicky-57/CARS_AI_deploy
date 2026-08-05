@@ -28,9 +28,15 @@ export default function Communications() {
   const loadCommunications = async () => {
     setLoading(true);
     try {
-      // 1. Fetch Supabase logged communications
-      const supabaseComms = await api.getCommunications().catch(() => []);
+      // 1. Fetch Supabase logged communications & existing leads
+      const [supabaseComms, existingLeads] = await Promise.all([
+        api.getCommunications().catch(() => []),
+        api.getLeads().catch(() => [])
+      ]);
       
+      const leadEmailSet = new Set(existingLeads.map(l => (l.email || '').toLowerCase()));
+      const initialConvertedMap = {};
+
       // 2. Fetch live Primary Inbox emails from Gmail REST API
       let gmailPrimary = [];
       try {
@@ -54,8 +60,37 @@ export default function Communications() {
         console.log('Gmail REST API not authenticated yet or empty.');
       }
 
-      const combined = [...gmailPrimary, ...supabaseComms];
-      setContacts(combined);
+      // Deduplicate contacts list so each email thread appears EXACTLY ONCE
+      const seenKeys = new Set();
+      const uniqueContacts = [];
+
+      // Priority 1: Supabase logged communications (which have AI summary & lead_id attached)
+      for (const c of supabaseComms) {
+        const key = `${(c.sender_contact || '').toLowerCase()}::${(c.subject || '').toLowerCase().trim()}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          uniqueContacts.push(c);
+          if (c.lead_id || leadEmailSet.has((c.sender_contact || '').toLowerCase())) {
+            initialConvertedMap[c.id] = true;
+          }
+        }
+      }
+
+      // Priority 2: Primary Inbox emails from Gmail API
+      for (const g of gmailPrimary) {
+        const key = `${(g.sender_contact || '').toLowerCase()}::${(g.subject || '').toLowerCase().trim()}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          const isAlreadyLead = leadEmailSet.has((g.sender_contact || '').toLowerCase());
+          if (isAlreadyLead) {
+            initialConvertedMap[g.id] = true;
+          }
+          uniqueContacts.push(g);
+        }
+      }
+
+      setConvertedMap(initialConvertedMap);
+      setContacts(uniqueContacts);
     } catch (err) {
       console.error('Error loading communications:', err);
       setContacts([]);
@@ -87,7 +122,7 @@ export default function Communications() {
     try {
       if (api.convertGmailToLead && msg.id) {
         const res = await api.convertGmailToLead(msg.id);
-        alert(res.message || 'Email successfully converted into a Lead in Supabase!');
+        alert(res.message || 'Email successfully processed into Lead database!');
       } else {
         await api.createLead({
           name: msg.sender_name,
@@ -101,6 +136,7 @@ export default function Communications() {
         alert(`Successfully converted email from ${msg.sender_name} into a Lead!`);
       }
       setConvertedMap(prev => ({ ...prev, [msg.id]: true }));
+      loadCommunications();
     } catch (err) {
       alert('Error converting email to lead: ' + err.message);
     } finally {
@@ -193,18 +229,24 @@ export default function Communications() {
                   <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{selected.sender_contact}</div>
                 </div>
                 
-                {/* 1-Click Convert to Lead Button */}
-                {selected.channel === 'EMAIL' && (
-                  <button
-                    className={`btn ${convertedMap[selected.id] ? 'btn-success' : 'btn-primary'} btn-sm`}
-                    style={{ marginLeft: 'auto' }}
-                    onClick={() => handleConvertToLead(selected)}
-                    disabled={converting || convertedMap[selected.id]}
-                  >
-                    {convertedMap[selected.id] ? <CheckCircle2 size={13} /> : <Sparkles size={13} />}
-                    {convertedMap[selected.id] ? 'Converted to Lead' : 'Convert Email to Lead (AI)'}
-                  </button>
-                )}
+                {/* Convert / Status Badge */}
+                {selected.channel === 'EMAIL' && (() => {
+                  const isSystemEmail = ['no-reply', 'noreply', 'accounts.google.com', 'notifications', 'security', 'mailer-daemon'].some(s => (selected.sender_contact || '').toLowerCase().includes(s));
+                  if (isSystemEmail) {
+                    return <span className="badge badge-secondary" style={{ marginLeft: 'auto', fontSize: '0.7rem' }}>System Email</span>;
+                  }
+                  return (
+                    <button
+                      className={`btn ${convertedMap[selected.id] ? 'btn-success' : 'btn-primary'} btn-sm`}
+                      style={{ marginLeft: 'auto' }}
+                      onClick={() => handleConvertToLead(selected)}
+                      disabled={converting || convertedMap[selected.id]}
+                    >
+                      {convertedMap[selected.id] ? <CheckCircle2 size={13} /> : <Sparkles size={13} />}
+                      {convertedMap[selected.id] ? 'Auto-Converted to Lead' : 'Convert Email to Lead (AI)'}
+                    </button>
+                  );
+                })()}
               </div>
 
               <div className={selected.channel === 'WHATSAPP' ? 'wa-chat-bg' : 'email-thread-bg'}>
@@ -241,10 +283,24 @@ export default function Communications() {
                           {format(new Date(msg.timestamp), 'MMM d, yyyy, h:mm a')}
                         </div>
                       </div>
-                      <div className="email-body-text" style={{ fontSize: '0.875rem', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{msg.body}</div>
-                      {msg.ai_summary && msg.is_inbound !== false && (
-                        <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--brand-50)', borderRadius: 8, fontSize: '0.8rem', color: 'var(--brand-700)', border: '1px solid var(--brand-100)' }}>
-                          <strong>✨ AI Intent Summary:</strong> {msg.ai_summary}
+                      <div className="email-body-text" style={{ fontSize: '0.875rem', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg.body}</div>
+                      
+                      {/* Internal AI Summary Footer inside the Email Box */}
+                      {(msg.ai_summary || selected.ai_summary || selected.summary) && msg.is_inbound !== false && (
+                        <div style={{
+                          marginTop: 16,
+                          padding: '12px 16px',
+                          background: 'rgba(59, 130, 246, 0.05)',
+                          borderRadius: 8,
+                          fontSize: '0.8rem',
+                          color: '#1e40af',
+                          border: '1px solid rgba(59, 130, 246, 0.2)',
+                          lineHeight: 1.5
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, marginBottom: 4, color: '#1e3a8a' }}>
+                            <Sparkles size={14} color="#1e3a8a" /> ✨ Internal AI Intent Summary:
+                          </div>
+                          {msg.ai_summary || selected.ai_summary || selected.summary}
                         </div>
                       )}
                     </div>

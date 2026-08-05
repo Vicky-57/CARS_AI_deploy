@@ -43,10 +43,33 @@ export default function Leads() {
     return !search || name.includes(query) || email.includes(query) || vehicle.includes(query);
   });
 
-  const intentBadge = (i) => {
-    if (i === 'BUY' || i === 'BUY_INTENT') return <span className="badge badge-buy">Buy Intent</span>;
-    if (i === 'SELL' || i === 'SELL_INTENT') return <span className="badge badge-sell">Sell Intent</span>;
-    return <span className="badge badge-new">New</span>;
+  const intentBadge = (l) => {
+    const i = l.intent || '';
+    const notes = l.notes || '';
+    const isRepeat = notes.includes('REPEAT CLIENT') || notes.includes('Repeat Client');
+    const isFollowup = notes.includes('Follow-up Message');
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+        {i === 'BUY' || i === 'BUY_INTENT' ? (
+          <span className="badge badge-buy">Buy Intent</span>
+        ) : i === 'SELL' || i === 'SELL_INTENT' ? (
+          <span className="badge badge-sell">Sell Intent</span>
+        ) : (
+          <span className="badge badge-new">New Inquiry</span>
+        )}
+        {isRepeat && (
+          <span className="badge" style={{ background: 'rgba(147, 51, 234, 0.15)', color: '#a855f7', border: '1px solid rgba(147, 51, 234, 0.3)', fontWeight: 700 }}>
+            💜 Repeat Client
+          </span>
+        )}
+        {isFollowup && (
+          <span className="badge" style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)', fontWeight: 600 }}>
+            ✨ New Activity
+          </span>
+        )}
+      </div>
+    );
   };
 
   const getInitials = (name) => {
@@ -186,7 +209,7 @@ export default function Leads() {
                         </div>
                       )}
                     </td>
-                    <td>{intentBadge(lead.intent)}</td>
+                    <td>{intentBadge(lead)}</td>
                     <td>
                       <span className={`badge ${lead.channel === 'WHATSAPP' ? 'badge-whatsapp' : lead.channel === 'EMAIL' ? 'badge-email' : 'badge-manual'}`}>
                         {lead.channel || 'Manual'}

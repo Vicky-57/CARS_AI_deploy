@@ -108,32 +108,83 @@ def _process_imap_inbox(server, user, password):
 
 
 async def _process_email_lead(sender: str, subject: str, body: str):
-    """Processes extracted email lead and updates Supabase."""
-    res = await summarize_email(subject, body)
-    intent = res.get("intent", "UNKNOWN")
-    summary = res.get("summary", "")
+    """Processes extracted email lead with 2-stage AI filtering, deduplication & repeat customer detection."""
+    from app.services.claude_service import is_car_related_subject, summarize_email
+
+    # Stage 1: Quick Subject Pre-filter check
+    is_car_subject = is_car_related_subject(subject)
+    
+    clean_sender_email = sender.split("<")[-1].replace(">", "").strip() if "<" in sender else sender
+    sender_name = sender.split("<")[0].strip().strip('"') if "<" in sender else sender
 
     existing_leads = get_all_leads()
-    clean_sender_email = sender.split("<")[-1].replace(">", "").strip() if "<" in sender else sender
-    matched_lead = next((l for l in existing_leads if l.get("email") == clean_sender_email), None)
-    lead_id = matched_lead.get("id") if matched_lead else None
+    sender_leads = [l for l in existing_leads if l.get("email") == clean_sender_email]
+    
+    # Active lead check
+    active_lead = next((l for l in sender_leads if l.get("status") in ["NEW", "CONTACTED", "QUALIFIED", "IN_PROGRESS"]), None)
+    closed_lead = next((l for l in sender_leads if l.get("status") in ["CLOSED_WON", "CLOSED_LOST", "COMPLETED", "ARCHIVED"]), None)
 
-    if not lead_id:
+    # If not a car subject AND not an existing active client follow-up, skip LLM
+    if not is_car_subject and not active_lead and not closed_lead:
+        logger.info(f"Skipping non-car email subject: '{subject}' from {sender}")
+        return
+
+    # Stage 2: Claude AI Deep Analysis
+    res = await summarize_email(subject, body)
+    if not res.get("is_valid_lead", True) and not active_lead:
+        logger.info(f"Email content classified as non-lead inquiry. Skipping lead creation for: {subject}")
+        return
+
+    intent = res.get("intent", "UNKNOWN")
+    summary = res.get("summary", "")
+    lead_id = None
+    is_repeat = False
+
+    if active_lead:
+        # CASE A: Active lead exists — DO NOT duplicate lead. Update activity & notes.
+        lead_id = active_lead.get("id")
+        existing_notes = active_lead.get("notes", "") or ""
+        new_note = f"\n✨ Follow-up Message [{datetime.utcnow().strftime('%m-%d %H:%M')}]: {summary}"
+        
+        from app.services.supabase_service import update_lead
+        update_lead(lead_id, {
+            "notes": (existing_notes + new_note)[:1500],
+            "status": active_lead.get("status", "NEW")
+        })
+        logger.info(f"Logged follow-up email to active lead ID {lead_id} for {clean_sender_email}")
+    elif closed_lead:
+        # CASE B: Closed past customer writing again — REPEAT CUSTOMER!
+        is_repeat = True
         new_lead = create_lead({
-            "name": sender.split("<")[0].strip() if "<" in sender else sender,
+            "name": sender_name,
             "email": clean_sender_email,
             "channel": "EMAIL",
             "intent": "SELL" if intent == "SELL_INTENT" else "BUY" if intent == "BUY_INTENT" else "UNKNOWN",
             "status": "NEW",
-            "message": f"Subject: {subject}\n\n{body[:500]}",
+            "message": f"Subject: {subject}\n\n{body}",
+            "notes": f"💜 REPEAT CLIENT (Past deal closed). New Inquiry: {summary}"
+        })
+        lead_id = new_lead.get("id")
+        logger.info(f"Created REPEAT CLIENT lead ID {lead_id} for {clean_sender_email}")
+    else:
+        # CASE C: Completely new client lead
+        new_lead = create_lead({
+            "name": sender_name,
+            "email": clean_sender_email,
+            "channel": "EMAIL",
+            "intent": "SELL" if intent == "SELL_INTENT" else "BUY" if intent == "BUY_INTENT" else "UNKNOWN",
+            "status": "NEW",
+            "message": f"Subject: {subject}\n\n{body}",
             "notes": f"AI Summary: {summary}"
         })
         lead_id = new_lead.get("id")
+        logger.info(f"Created NEW lead ID {lead_id} for {clean_sender_email}")
 
+    # Save to communications history
     save_communication({
         "lead_id": lead_id,
         "channel": "EMAIL",
-        "sender_name": sender.split("<")[0].strip() if "<" in sender else sender,
+        "sender_name": sender_name,
         "sender_contact": clean_sender_email,
         "subject": subject,
         "body": body,
