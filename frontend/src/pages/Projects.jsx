@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { FolderKanban, Plus, RefreshCw, Calculator, Car, CheckCircle, Clock, ChevronRight, ChevronDown, Tag, Search, Banknote, User, Filter, Edit } from 'lucide-react';
 import { api } from '../api/api';
 import ExpenseModal from '../components/ExpenseModal';
+import CreateProjectModal from '../components/CreateProjectModal';
 
 const STAGES_SELL = [
   'Onboarding & Lead Capture',
@@ -30,6 +31,7 @@ export default function Projects() {
   const [search, setSearch] = useState('');
 
   const [selectedExpenseProject, setSelectedExpenseProject] = useState(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const loadProjects = async () => {
     setLoading(true);
@@ -98,6 +100,9 @@ export default function Projects() {
           <p style={{ fontSize: '0.9rem' }}>Manage active vehicle sales and procurement projects</p>
         </div>
         <div style={{ display: 'flex', gap: 12 }}>
+          <button className="btn btn-primary" onClick={() => setIsCreateModalOpen(true)} style={{ padding: '8px 16px' }}>
+            <Plus size={14} /> New Project
+          </button>
           <button className="btn btn-secondary" onClick={loadProjects} style={{ padding: '8px 16px' }}>
             <RefreshCw size={14} /> Refresh
           </button>
@@ -358,6 +363,15 @@ export default function Projects() {
         onClose={() => setSelectedExpenseProject(null)}
         project={selectedExpenseProject}
         onExpensesUpdated={loadProjects}
+      />
+
+      {/* New Project Modal with Customer Selection Dropdown */}
+      <CreateProjectModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onCreated={() => loadProjects()}
+        defaultStatus="ACTIVE"
+        defaultType={tab}
       />
     </div>
   );

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Briefcase, Clock, DollarSign, Plus, CheckCircle, Car, Search, SearchX, ChevronLeft } from 'lucide-react';
-import LeadModal from '../components/LeadModal';
+import { Briefcase, Clock, DollarSign, Plus, CheckCircle, Car, Search, SearchX, ChevronLeft, RefreshCw } from 'lucide-react';
+import { api } from '../api/api';
+import CreateProjectModal from '../components/CreateProjectModal';
 
-// --- STATIC MOCK DATA ---
+// --- STATIC FALLBACK MOCK DATA ---
 const MOCK_DEALS = [
   {
     id: '1',
@@ -56,15 +57,24 @@ export default function Deals() {
   // Form states
   const [timeForm, setTimeForm] = useState({ hours: '', description: '' });
   const [expenseForm, setExpenseForm] = useState({ amount: '', description: '', expense_type: 'OTHER' });
-  const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
+  const [isDealModalOpen, setIsDealModalOpen] = useState(false);
+
+  const loadDeals = async () => {
+    setLoading(true);
+    try {
+      const allProjects = await api.getProjects();
+      const completedDeals = (allProjects || []).filter(p => p.status === 'COMPLETED' || (p.current_stage || '').toLowerCase().includes('handover') || (p.current_stage || '').toLowerCase().includes('close'));
+      setDeals(completedDeals.length > 0 ? completedDeals : allProjects || MOCK_DEALS);
+    } catch (err) {
+      console.error('Failed to load deals:', err);
+      setDeals(MOCK_DEALS);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Simulate loading
-    const timer = setTimeout(() => {
-      setDeals(MOCK_DEALS);
-      setLoading(false);
-    }, 400);
-    return () => clearTimeout(timer);
+    loadDeals();
   }, []);
 
   const handleLogTime = (e) => {
@@ -140,8 +150,11 @@ export default function Deals() {
           <p style={{ fontSize: '0.9rem' }}>Review completed projects, log post-sale labor, and track expenses.</p>
         </div>
         <div style={{ display: 'flex', gap: 12 }}>
-          <button className="btn btn-primary" onClick={() => setIsLeadModalOpen(true)} style={{ padding: '8px 16px' }}>
+          <button className="btn btn-primary" onClick={() => setIsDealModalOpen(true)} style={{ padding: '8px 16px' }}>
             <Plus size={16} /> New Deal
+          </button>
+          <button className="btn btn-secondary" onClick={loadDeals} style={{ padding: '8px 16px' }}>
+            <RefreshCw size={14} /> Refresh
           </button>
         </div>
       </div>
@@ -424,10 +437,12 @@ export default function Deals() {
         </div>
       )}
 
-      <LeadModal
-        isOpen={isLeadModalOpen}
-        onClose={() => setIsLeadModalOpen(false)}
-        onLeadCreated={() => setIsLeadModalOpen(false)}
+      <CreateProjectModal
+        isOpen={isDealModalOpen}
+        onClose={() => setIsDealModalOpen(false)}
+        onCreated={() => loadDeals()}
+        defaultStatus="COMPLETED"
+        defaultType="SELL"
       />
     </div>
   );
