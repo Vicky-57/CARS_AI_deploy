@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-import { FolderKanban, Plus, RefreshCw, Calculator, Car, CheckCircle, Clock, ChevronRight, Tag, Search, Banknote, User } from 'lucide-react';
+import { FolderKanban, Plus, RefreshCw, Calculator, Car, CheckCircle, Clock, ChevronRight, ChevronDown, Tag, Search, Banknote, User, Filter, Edit } from 'lucide-react';
 import { api } from '../api/api';
-import LeadModal from '../components/LeadModal';
 import ExpenseModal from '../components/ExpenseModal';
 
 const STAGES_SELL = [
@@ -26,8 +25,10 @@ export default function Projects() {
   const [tab, setTab] = useState('SELL');
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [stageFilter, setStageFilter] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [search, setSearch] = useState('');
 
-  const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [selectedExpenseProject, setSelectedExpenseProject] = useState(null);
 
   const loadProjects = async () => {
@@ -56,11 +57,27 @@ export default function Projects() {
 
   const stages = tab === 'SELL' ? STAGES_SELL : STAGES_BUY;
 
-  const byStage = (stageName) => projects.filter(p => (p.current_stage || stages[0]) === stageName);
+  const filtered = projects.filter(p => {
+    const currentStage = p.current_stage || stages[0];
+    if (stageFilter && currentStage !== stageFilter) return false;
+
+    const query = search.toLowerCase();
+    if (query) {
+      const clientName = (p.client_name || '').toLowerCase();
+      const targetVehicle = (p.target_vehicle || '').toLowerCase();
+      const vin = (p.vin || '').toLowerCase();
+      if (!clientName.includes(query) && !targetVehicle.includes(query) && !vin.includes(query)) {
+        return false;
+      }
+    }
+
+    return true;
+  });
 
   const advanceStage = async (project, e) => {
-    e.stopPropagation();
-    const currentIndex = stages.indexOf(project.current_stage);
+    if (e) e.stopPropagation();
+    const currentStage = project.current_stage || stages[0];
+    const currentIndex = stages.indexOf(currentStage);
     if (currentIndex < stages.length - 1) {
       const nextStage = stages[currentIndex + 1];
       try {
@@ -84,166 +101,256 @@ export default function Projects() {
           <button className="btn btn-secondary" onClick={loadProjects} style={{ padding: '8px 16px' }}>
             <RefreshCw size={14} /> Refresh
           </button>
-          <button className="btn btn-primary" onClick={() => setIsLeadModalOpen(true)} style={{ padding: '8px 16px' }}>
-            <Plus size={16} /> New Deal
-          </button>
         </div>
       </div>
 
-      {/* Pipeline Tabs */}
-      <div style={{ display: 'flex', gap: 16, marginBottom: 24, flexShrink: 0 }}>
-        <button
-          onClick={() => setTab('SELL')}
-          style={{
-            padding: '12px 24px', borderRadius: 'var(--radius-lg)', display: 'inline-flex', alignItems: 'center', gap: 10,
-            background: tab === 'SELL' ? 'var(--brand-50)' : 'var(--surface)',
-            border: `1px solid ${tab === 'SELL' ? 'var(--brand-500)' : 'var(--gray-200)'}`,
-            boxShadow: tab === 'SELL' ? '0 4px 12px rgba(var(--brand-500-rgb), 0.1)' : '0 1px 2px rgba(0,0,0,0.02)',
-            color: tab === 'SELL' ? 'var(--brand-700)' : 'var(--text-secondary)',
-            fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', transition: 'all 0.2s'
-          }}
-        >
-          <Tag size={16} color={tab === 'SELL' ? 'var(--brand-600)' : 'var(--text-muted)'} />
-          SELL SIDE — Vermittlung
-        </button>
-        <button
-          onClick={() => setTab('BUY')}
-          style={{
-            padding: '12px 24px', borderRadius: 'var(--radius-lg)', display: 'inline-flex', alignItems: 'center', gap: 10,
-            background: tab === 'BUY' ? 'var(--brand-50)' : 'var(--surface)',
-            border: `1px solid ${tab === 'BUY' ? 'var(--brand-500)' : 'var(--gray-200)'}`,
-            boxShadow: tab === 'BUY' ? '0 4px 12px rgba(var(--brand-500-rgb), 0.1)' : '0 1px 2px rgba(0,0,0,0.02)',
-            color: tab === 'BUY' ? 'var(--brand-700)' : 'var(--text-secondary)',
-            fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', transition: 'all 0.2s'
-          }}
-        >
-          <Search size={16} color={tab === 'BUY' ? 'var(--brand-600)' : 'var(--text-muted)'} />
-          BUY SIDE — Beschaffung
-        </button>
+      {/* Folder Tabs */}
+      <div style={{ display: 'flex', paddingLeft: 0, position: 'relative', zIndex: 10, marginBottom: 0 }}>
+        {[
+          { id: 'SELL', label: 'SELL SIDE — Vermittlung', mobileLabel: 'SELL SIDE', icon: Tag },
+          { id: 'BUY', label: 'BUY SIDE — Beschaffung', mobileLabel: 'BUY SIDE', icon: Search }
+        ].map((t) => {
+          const isActive = tab === t.id;
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.id}
+              onClick={() => { setTab(t.id); setStageFilter(''); }}
+              className="customer-tab-btn"
+              style={{
+                background: isActive ? 'var(--surface)' : 'transparent',
+                border: 'none',
+                borderTopLeftRadius: 16,
+                borderTopRightRadius: 16,
+                color: isActive ? 'var(--brand-600)' : 'var(--text-secondary)',
+                fontWeight: isActive ? 700 : 600,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                position: 'relative',
+                zIndex: isActive ? 2 : 1,
+                boxShadow: isActive ? '0 -4px 6px -4px rgba(0,0,0,0.05)' : 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8
+              }}
+            >
+              <Icon size={16} />
+              <span className="hide-on-mobile">{t.label}</span>
+              <span className="show-on-mobile">{t.mobileLabel}</span>
+            </button>
+          )
+        })}
       </div>
 
-      {/* Kanban Stages Board */}
-      {loading ? (
-        <div className="card" style={{ padding: 60, textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="spinner" style={{ margin: '0 auto 16px', width: 32, height: 32, borderWidth: 3 }} />
-          <div style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Loading projects...</div>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 16, flex: 1, alignItems: 'flex-start' }}>
-          {stages.map((stage, idx) => {
-            const list = byStage(stage);
-            return (
-              <div key={stage} style={{ 
-                minWidth: 320, flex: '0 0 320px', 
-                background: 'var(--gray-50)', 
-                borderRadius: 'var(--radius-lg)', 
-                padding: '16px',
-                display: 'flex', flexDirection: 'column',
-                maxHeight: '100%',
-                border: '1px solid var(--gray-200)'
-              }}>
-                <div style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  marginBottom: 16, paddingBottom: 12, borderBottom: '2px solid var(--gray-200)'
-                }}>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-primary)' }}>
-                    <span style={{ color: 'var(--brand-500)', marginRight: 4 }}>{idx + 1}.</span> {stage}
-                  </span>
-                  <span className="badge" style={{ background: 'var(--gray-200)', color: 'var(--text-primary)', fontWeight: 700 }}>
-                    {list.length}
-                  </span>
-                </div>
+      {/* Projects Table */}
+      <div className="card" style={{ border: 'none', borderTopLeftRadius: tab === 'SELL' ? 0 : 16, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)' }}>
+        <div className="card-header customers-header-mobile" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+          <span className="card-title" style={{ fontSize: '1.05rem', fontWeight: 700 }}>
+            Active Projects ({filtered.length})
+          </span>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', paddingRight: 4 }}>
-                  {list.length === 0 ? (
-                    <div style={{
-                      border: '2px dashed var(--gray-300)', borderRadius: 'var(--radius)',
-                      padding: '30px 20px', textAlign: 'center', fontSize: '0.8rem', color: 'var(--gray-400)',
-                      fontWeight: 600
-                    }}>
-                      Empty Stage
+          <div className="customers-actions-mobile" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            {/* Search Bar */}
+            <div className="search-bar customers-search-mobile" style={{ display: 'flex', alignItems: 'center', padding: '4px 12px', borderRadius: 24, background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+              <Search size={14} color="var(--text-muted)" />
+              <input
+                placeholder="Search projects..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{ fontSize: '0.85rem', border: 'none', background: 'transparent', outline: 'none', marginLeft: 8, width: '100%', minWidth: 0 }}
+              />
+            </div>
+
+            {/* Custom Premium Filter Dropdown */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '8px 16px', borderRadius: 24,
+                  background: stageFilter ? 'var(--brand-50)' : 'var(--surface)',
+                  border: `1px solid ${stageFilter ? 'var(--brand-200)' : 'var(--border)'}`,
+                  color: stageFilter ? 'var(--brand-700)' : 'var(--text-secondary)',
+                  fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                }}
+              >
+                <Filter size={14} color={stageFilter ? 'var(--brand-500)' : 'var(--text-muted)'} />
+                {stageFilter || 'All Stages'}
+                <ChevronDown size={14} style={{ transform: isDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+              </button>
+
+              {isDropdownOpen && (
+                <>
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 90 }} onClick={() => setIsDropdownOpen(false)} />
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+                    width: 260, background: 'var(--surface)', borderRadius: 16,
+                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
+                    border: '1px solid var(--border)', zIndex: 100, overflow: 'hidden',
+                    display: 'flex', flexDirection: 'column'
+                  }}>
+                    <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', background: 'var(--gray-50)' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Filter by Stage</span>
                     </div>
-                  ) : list.map(p => {
-                    const totalExpenses = (p.project_expenses || []).reduce((s, x) => s + (parseFloat(x.amount) || 0), 0);
-                    const totalLaborHours = (p.project_labor || []).reduce((s, x) => s + (parseFloat(x.hours_spent) || 0), 0);
-                    const laborCost = totalLaborHours * (p.hourly_rate || 20);
-                    const totalInvestment = (p.purchase_price || 0) + totalExpenses + laborCost;
-                    const netProfit = (p.agreed_sale_price || 0) - totalInvestment;
+                    <div style={{ maxHeight: 300, overflowY: 'auto', padding: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <button
+                        onClick={() => { setStageFilter(''); setIsDropdownOpen(false); }}
+                        style={{
+                          padding: '10px 12px', borderRadius: 8, border: 'none', background: stageFilter === '' ? 'var(--brand-50)' : 'transparent',
+                          color: stageFilter === '' ? 'var(--brand-700)' : 'var(--text-primary)',
+                          fontWeight: stageFilter === '' ? 600 : 500, fontSize: '0.85rem', textAlign: 'left', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'background 0.1s'
+                        }}
+                        onMouseEnter={e => { if (stageFilter !== '') e.currentTarget.style.background = 'var(--gray-50)'; }}
+                        onMouseLeave={e => { if (stageFilter !== '') e.currentTarget.style.background = 'transparent'; }}
+                      >
+                        All Stages
+                        {stageFilter === '' && <CheckCircle size={14} color="var(--brand-500)" />}
+                      </button>
+                      {stages.map(s => (
+                        <button
+                          key={s}
+                          onClick={() => { setStageFilter(s); setIsDropdownOpen(false); }}
+                          style={{
+                            padding: '10px 12px', borderRadius: 8, border: 'none', background: stageFilter === s ? 'var(--brand-50)' : 'transparent',
+                            color: stageFilter === s ? 'var(--brand-700)' : 'var(--text-primary)',
+                            fontWeight: stageFilter === s ? 600 : 500, fontSize: '0.85rem', textAlign: 'left', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'background 0.1s'
+                          }}
+                          onMouseEnter={e => { if (stageFilter !== s) e.currentTarget.style.background = 'var(--gray-50)'; }}
+                          onMouseLeave={e => { if (stageFilter !== s) e.currentTarget.style.background = 'transparent'; }}
+                        >
+                          {s}
+                          {stageFilter === s && <CheckCircle size={14} color="var(--brand-500)" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
 
-                    return (
-                      <div key={p.id} className="card" style={{ padding: 16, border: '1px solid var(--gray-200)', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', position: 'relative' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                          <div>
-                            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <User size={14} color="var(--gray-400)" /> {p.client_name}
-                            </div>
-                            {p.target_vehicle && (
-                              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <Car size={14} color="var(--brand-500)" /> {p.target_vehicle}
-                              </div>
-                            )}
-                          </div>
+
+          </div>
+        </div>
+
+        <div className="table-wrap" style={{ border: 'none', borderRadius: '0 0 var(--radius-lg) var(--radius-lg)', boxShadow: 'none' }}>
+          <table style={{ margin: 0 }}>
+            <thead>
+              <tr>
+                <th style={{ paddingLeft: 24, paddingTop: 16, paddingBottom: 16 }}>Client</th>
+                <th>Vehicle Details</th>
+                <th>VIN</th>
+                <th>Stage</th>
+                <th>Investment</th>
+                <th>Profit</th>
+                <th style={{ paddingRight: 24, textAlign: 'right' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: 60 }}>
+                    <div className="spinner" style={{ margin: '0 auto 16px', width: 28, height: 28, borderWidth: 3 }} />
+                    <div style={{ color: 'var(--text-muted)' }}>Loading projects...</div>
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: 80 }}>
+                    <div style={{ width: 64, height: 64, background: 'var(--gray-50)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                      <FolderKanban size={32} color="var(--gray-400)" />
+                    </div>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>No projects found</h3>
+                    <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', maxWidth: 300, margin: '0 auto' }}>
+                      {stageFilter ? 'Try clearing the stage filter.' : 'Wait for new projects to appear here.'}
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                filtered.map(p => {
+                  const totalExpenses = (p.project_expenses || []).reduce((s, x) => s + (parseFloat(x.amount) || 0), 0);
+                  const totalLaborHours = (p.project_labor || []).reduce((s, x) => s + (parseFloat(x.hours_spent) || 0), 0);
+                  const laborCost = totalLaborHours * (p.hourly_rate || 20);
+                  const totalInvestment = (p.purchase_price || 0) + totalExpenses + laborCost;
+                  const netProfit = (p.agreed_sale_price || 0) - totalInvestment;
+                  const currentStage = p.current_stage || stages[0];
+                  const stageIdx = stages.indexOf(currentStage);
+
+                  return (
+                    <tr key={p.id}>
+                      <td style={{ paddingLeft: 24 }}>
+                        <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <User size={14} color="var(--gray-400)" /> {p.client_name}
                         </div>
-
-                        {p.vin && (
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'monospace', marginBottom: 12, padding: '4px 8px', background: 'var(--gray-50)', borderRadius: 4, display: 'inline-block' }}>
-                            VIN: {p.vin}
+                      </td>
+                      <td>
+                        {p.target_vehicle ? (
+                          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <Car size={14} color="var(--brand-500)" /> {p.target_vehicle}
                           </div>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>-</span>
                         )}
-
-                        {/* Financial Mini Badge */}
-                        <div style={{
-                          background: netProfit >= 0 ? '#f0fdf4' : '#fef2f2',
-                          border: `1px solid ${netProfit >= 0 ? '#bbf7d0' : '#fecaca'}`,
-                          borderRadius: 'var(--radius)',
-                          padding: '8px 10px', fontSize: '0.75rem', display: 'flex',
-                          justifyContent: 'space-between', alignItems: 'center', marginBottom: 12
-                        }}>
-                          <span style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <Banknote size={14} /> Net Profit:
-                          </span>
-                          <strong style={{ color: netProfit >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: '0.8rem' }}>
-                            € {netProfit.toLocaleString(undefined, { minimumFractionDigits: 0 })}
-                          </strong>
-                        </div>
-
-                        {/* Action buttons */}
-                        <div style={{ display: 'flex', gap: 8 }}>
+                      </td>
+                      <td>
+                        {p.vin ? (
+                          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
+                            {p.vin}
+                          </div>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>-</span>
+                        )}
+                      </td>
+                      <td>
+                        <span className="badge" style={{ background: 'var(--gray-100)', color: 'var(--text-primary)' }}>
+                          <span style={{ color: 'var(--brand-500)', marginRight: 6 }}>{stageIdx + 1}.</span>
+                          {currentStage}
+                        </span>
+                      </td>
+                      <td>
+                        <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                          €{totalInvestment.toLocaleString()}
+                        </span>
+                      </td>
+                      <td>
+                        <span style={{ fontSize: '0.9rem', fontWeight: 600, color: netProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                          €{netProfit.toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                        </span>
+                      </td>
+                      <td style={{ paddingRight: 24, textAlign: 'right' }}>
+                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                           <button
                             className="btn btn-secondary btn-sm"
-                            style={{ flex: 1, justifyContent: 'center', padding: '8px' }}
                             onClick={() => setSelectedExpenseProject(p)}
+                            style={{ padding: '6px 12px' }}
+                            title="Financials"
                           >
-                            <Calculator size={14} /> Financials
+                            <Calculator size={14} />
                           </button>
-
-                          {idx < stages.length - 1 && (
+                          {stageIdx < stages.length - 1 && (
                             <button
                               className="btn btn-primary btn-sm"
-                              title="Advance to next stage"
-                              style={{ padding: '8px 12px' }}
                               onClick={(e) => advanceStage(p, e)}
+                              style={{ padding: '6px 12px' }}
+                              title="Advance to next stage"
                             >
-                              <ChevronRight size={16} />
+                              Advance <ChevronRight size={14} style={{ marginLeft: 4 }} />
                             </button>
                           )}
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
 
-      {/* Create Lead Modal */}
-      <LeadModal
-        isOpen={isLeadModalOpen}
-        onClose={() => setIsLeadModalOpen(false)}
-        onLeadCreated={loadProjects}
-      />
 
       {/* Expenses & Calculator Modal */}
       <ExpenseModal

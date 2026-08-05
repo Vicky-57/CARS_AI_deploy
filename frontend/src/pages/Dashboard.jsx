@@ -78,7 +78,7 @@ export default function Dashboard() {
   };
 
   const formatTime = (iso) => {
-    try { return format(new Date(iso), 'HH:mm'); } catch { return ''; }
+    try { return format(new Date(iso), 'h:mm a'); } catch { return ''; }
   };
 
   const timeAgo = (iso) => {
@@ -130,7 +130,7 @@ export default function Dashboard() {
       </div>
 
       {/* Two-column layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 24, alignItems: 'flex-start' }}>
+      <div className="dashboard-grid">
 
         {/* Recent Leads */}
         <div className="card" style={{ border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)' }}>
@@ -153,41 +153,45 @@ export default function Dashboard() {
               <p style={{ fontSize: '0.85rem' }}>Leads from Email & WhatsApp will appear here automatically.</p>
             </div>
           ) : (
-            <table style={{ margin: 0 }}>
-              <thead>
-                <tr>
-                  <th style={{ paddingLeft: 24 }}>Lead</th>
-                  <th>Intent</th>
-                  <th>Received</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leads.map(lead => (
-                  <tr key={lead.id}>
-                    <td style={{ paddingLeft: 24 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{ 
-                          width: 36, height: 36, borderRadius: '50%', 
-                          background: 'linear-gradient(135deg, var(--gray-100), var(--gray-200))',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '0.75rem', fontWeight: 700, color: 'var(--gray-600)'
-                        }}>
-                          {getInitials(lead.name || lead.email)}
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{lead.name || 'Unknown Lead'}</div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{lead.email || lead.phone || 'No contact info'}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td>{intentBadge(lead.intent)}</td>
-                    <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      {timeAgo(lead.created_at)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {leads.map((lead, idx) => (
+                <div key={lead.id} style={{ 
+                  display: 'flex', alignItems: 'center', padding: '16px 24px', 
+                  borderBottom: idx === leads.length - 1 ? 'none' : '1px solid var(--border)',
+                  transition: 'background-color 0.2s', cursor: 'pointer',
+                  backgroundColor: 'transparent'
+                }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--gray-50)'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  <div style={{ 
+                    width: 44, height: 44, borderRadius: '50%', 
+                    background: 'linear-gradient(135deg, var(--brand-50), var(--brand-100))',
+                    border: '1px solid var(--brand-200)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '0.9rem', fontWeight: 700, color: 'var(--brand-700)', flexShrink: 0
+                  }}>
+                    {getInitials(lead.name || lead.email)}
+                  </div>
+                  <div style={{ flex: 1, marginLeft: 16, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {lead.name || 'Unknown Lead'}
+                      </span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500, flexShrink: 0 }}>
+                        {timeAgo(lead.created_at)}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {lead.email || lead.phone || 'No contact info'}
+                      </span>
+                      {intentBadge(lead.intent)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
 
@@ -229,7 +233,7 @@ export default function Dashboard() {
                 Calendar <ChevronRight size={14} />
               </a>
             </div>
-            <div className="card-body" style={{ padding: '0 20px 20px' }}>
+            <div className="card-body" style={{ padding: '20px' }}>
               {loading ? (
                 <div style={{ padding: 20, display: 'flex', justifyContent: 'center' }}>
                   <div className="spinner" />
@@ -242,31 +246,44 @@ export default function Dashboard() {
                   <div style={{ fontSize: '0.85rem', fontWeight: 500 }}>Your day is clear!</div>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  {meetings.map(m => (
-                    <div key={m.name} style={{ display: 'flex', gap: 12 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {meetings.map((m, idx) => (
+                    <div key={m.name || idx} style={{ 
+                      display: 'flex', gap: 14, alignItems: 'center', padding: '12px 16px',
+                      background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)',
+                      transition: 'all 0.2s', cursor: 'pointer',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--brand-300)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.05)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.02)'; }}
+                    >
                       <div style={{ 
-                        width: 48, background: 'var(--gray-50)', borderRadius: 8, 
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                        padding: '6px 0', border: '1px solid var(--border)'
+                        background: 'var(--brand-50)', borderRadius: 8, 
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        border: '1px solid var(--brand-100)', flexShrink: 0, padding: '8px 12px'
                       }}>
-                        <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--gray-500)' }}>
-                          {formatTime(m.starts_on).split(':')[0]}
-                        </div>
-                        <div style={{ fontSize: '0.65rem', color: 'var(--gray-400)' }}>
-                          {formatTime(m.starts_on).split(':')[1]}
+                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--brand-700)', letterSpacing: '0.5px' }}>
+                          {formatTime(m.starts_on || m.start_time)}
                         </div>
                       </div>
                       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                        <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {m.subject}
+                        <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 4 }}>
+                          {m.subject || m.title}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                          {m.event_type === 'Private' ? (
-                            <><div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--info)' }} /> Online</>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {(m.event_type === 'Private' || m.location_type === 'ONLINE') ? (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#e0f2fe', color: '#0369a1', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#0284c7' }} /> Online
+                            </span>
                           ) : (
-                            <><div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--brand-500)' }} /> Onsite</>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#fef3c7', color: '#b45309', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#d97706' }} /> Onsite
+                            </span>
                           )}
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <Clock size={12} style={{ opacity: 0.7 }} />
+                            {formatDistanceToNow(new Date(m.starts_on || m.start_time), { addSuffix: true })}
+                          </span>
                         </div>
                       </div>
                     </div>

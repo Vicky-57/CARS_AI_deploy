@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Users, FolderKanban, MessageSquare,
   FileText, Calendar, Car, User, Briefcase,
-  ChevronsUpDown, LogOut, Settings
+  ChevronsUpDown, LogOut, Settings, Menu
 } from 'lucide-react';
 
 import Dashboard from './pages/Dashboard';
@@ -44,11 +44,11 @@ const NAV = [
   },
 ];
 
-function Sidebar({ online, onLogout, userProfile }) {
+function Sidebar({ online, onLogout, userProfile, isOpen, onClose }) {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
       <div className="sidebar-brand">
         <div className="sidebar-brand-logo">
           <div className="sidebar-brand-icon">
@@ -71,6 +71,7 @@ function Sidebar({ online, onLogout, userProfile }) {
                 to={path}
                 end={path === '/'}
                 className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+                onClick={onClose}
               >
                 <Icon size={16} className="nav-icon" />
                 {label}
@@ -144,6 +145,7 @@ function Sidebar({ online, onLogout, userProfile }) {
 
 export default function App() {
   const [online, setOnline] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return !!localStorage.getItem('car_agents_user');
   });
@@ -200,8 +202,16 @@ export default function App() {
   return (
     <BrowserRouter>
       <div className="portal-layout">
-        <Sidebar online={online} onLogout={handleLogout} userProfile={userProfile} />
+        <Sidebar online={online} onLogout={handleLogout} userProfile={userProfile} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)}></div>}
         <div className="main-content">
+          <div className="mobile-header">
+            <button className="btn-icon" onClick={() => setSidebarOpen(true)}>
+              <Menu size={24} color="var(--text-primary)" />
+            </button>
+            <div className="mobile-brand-name">CAR-AGENTS</div>
+            <div style={{ width: 36 }}></div>
+          </div>
           <div className="page-content">
             <Routes>
               <Route path="/" element={<Dashboard />} />

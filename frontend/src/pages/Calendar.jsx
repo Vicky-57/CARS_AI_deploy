@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Calendar, Plus, X, AlertTriangle, Trash2, Pencil, Clock, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { Calendar, Plus, X, AlertTriangle, Trash2, Pencil, Clock, ChevronLeft, ChevronRight, RefreshCw, MapPin, Video, User, CheckCircle } from 'lucide-react';
 import { api } from '../api/api';
 import { format, startOfWeek, addDays, isSameDay, startOfMonth, endOfMonth, addWeeks, subWeeks, addMonths, subMonths, parseISO } from 'date-fns';
 
@@ -100,10 +100,10 @@ function MeetingModal({ meeting, onClose, onSaved }) {
       };
       if (isEdit) {
         await api.updateMeeting(meeting.id, payload);
-        if (api.syncMeeting) await api.syncMeeting(meeting.id).catch(() => {});
+        if (api.syncMeeting) await api.syncMeeting(meeting.id).catch(() => { });
       } else {
         const newMeeting = await api.createMeeting(payload);
-        if (api.syncMeeting) await api.syncMeeting(newMeeting.id).catch(() => {});
+        if (api.syncMeeting) await api.syncMeeting(newMeeting.id).catch(() => { });
       }
       onSaved();
       onClose();
@@ -217,22 +217,24 @@ function EventPill({ m, onClick }) {
       onClick={() => onClick && onClick(m)}
       title={`${m.title}${m.client_name ? ' · ' + m.client_name : ''}`}
       style={{
-        background: isGoogle ? '#e8f0fe' : isOnsite ? '#fef3c7' : 'var(--brand-100)',
-        color: isGoogle ? '#1a56db' : isOnsite ? '#92400e' : 'var(--brand-700)',
-        borderLeft: `3px solid ${isGoogle ? '#4285F4' : isOnsite ? '#f59e0b' : 'var(--brand-500)'}`,
+        background: isGoogle ? '#e8f0fe' : isOnsite ? '#fef3c7' : '#dcfce7',
+        color: isGoogle ? '#1a56db' : isOnsite ? '#92400e' : '#15803d',
+        borderLeft: `3px solid ${isGoogle ? '#4285F4' : isOnsite ? '#f59e0b' : '#22c55e'}`,
         borderRadius: 4,
         padding: '3px 6px',
         fontSize: '0.68rem',
         fontWeight: 600,
         marginBottom: 3,
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
         cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 4
       }}
     >
-      {format(new Date(m.start_time), 'HH:mm')} {m.title}
-      {isGoogle && <span style={{ marginLeft: 3, opacity: 0.7 }}>📅</span>}
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+        {format(new Date(m.start_time), 'HH:mm')} {m.title}
+      </span>
+      {isGoogle && <Calendar size={10} style={{ opacity: 0.7, flexShrink: 0 }} />}
     </div>
   );
 }
@@ -243,7 +245,8 @@ function WeekView({ meetings, weekStart, onEventClick, onDayClick }) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 10 }}>
+    <div className="calendar-scroll-wrap">
+      <div className="calendar-week-grid">
       {days.map(day => {
         const dayMeetings = meetings.filter(m => {
           try { return isSameDay(new Date(m.start_time), day); } catch { return false; }
@@ -274,6 +277,7 @@ function WeekView({ meetings, weekStart, onEventClick, onDayClick }) {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
@@ -291,7 +295,8 @@ function MonthView({ meetings, currentMonth, onEventClick, onDayClick }) {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
+    <div className="calendar-scroll-wrap">
+      <div className="calendar-month-grid">
       {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(dow => (
         <div key={dow} style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center', padding: '4px 0', textTransform: 'uppercase' }}>{dow}</div>
       ))}
@@ -326,6 +331,7 @@ function MonthView({ meetings, currentMonth, onEventClick, onDayClick }) {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
@@ -337,10 +343,10 @@ function DayPanel({ day, meetings, onEdit, onDelete, onClose }) {
     .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
 
   return (
-    <div style={{
+    <div className="day-panel" style={{
       position: 'fixed', right: 0, top: 0, bottom: 0, width: 340,
       background: 'var(--surface)', borderLeft: '1px solid var(--border)',
-      zIndex: 200, display: 'flex', flexDirection: 'column',
+      zIndex: 1050, display: 'flex', flexDirection: 'column',
       boxShadow: '-4px 0 24px rgba(0,0,0,0.1)',
     }}>
       <div style={{ padding: '20px 20px 12px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -361,8 +367,8 @@ function DayPanel({ day, meetings, onEdit, onDelete, onClose }) {
           const isOnsite = m.location_type === 'OFFLINE_ONSITE';
           return (
             <div key={m.id} style={{
-              background: isGoogle ? '#f0f4ff' : 'var(--bg)', borderRadius: 10,
-              border: `1px solid ${isGoogle ? '#c7d7f5' : 'var(--border)'}`,
+              background: isGoogle ? '#f0f4ff' : isOnsite ? '#fffbeb' : '#f0fdf4', borderRadius: 10,
+              border: `1px solid ${isGoogle ? '#c7d7f5' : isOnsite ? '#fde68a' : '#bbf7d0'}`,
               padding: '12px 14px', marginBottom: 10,
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -377,14 +383,15 @@ function DayPanel({ day, meetings, onEdit, onDelete, onClose }) {
                   </div>
                 )}
               </div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--brand-600)', marginTop: 4 }}>
-                🕐 {format(new Date(m.start_time), 'HH:mm')} – {format(new Date(m.end_time), 'HH:mm')}
+              <div style={{ fontSize: '0.8rem', color: 'var(--brand-600)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Clock size={12} /> {format(new Date(m.start_time), 'HH:mm')} – {format(new Date(m.end_time), 'HH:mm')}
               </div>
-              {m.client_name && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>👤 {m.client_name}</div>}
-              {m.location_address && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>📍 {m.location_address}</div>}
+              {m.client_name && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}><User size={12} /> {m.client_name}</div>}
+              {m.location_address && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}><MapPin size={12} /> {m.location_address}</div>}
               {m.notes && <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 4, fontStyle: 'italic' }}>{m.notes}</div>}
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 6 }}>
-                {isOnsite ? '🚗 Onsite' : isGoogle ? '📅 Google Calendar' : '💻 Online'}
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                {isOnsite ? <MapPin size={10} /> : isGoogle ? <Calendar size={10} /> : <Video size={10} />}
+                {isOnsite ? 'Onsite' : isGoogle ? 'Google Calendar' : 'Online'}
               </div>
             </div>
           );
@@ -398,15 +405,15 @@ function DayPanel({ day, meetings, onEdit, onDelete, onClose }) {
 export default function CalendarPage() {
   const today = new Date();
   const [supabaseMeetings, setSupabaseMeetings] = useState([]);
-  const [googleEvents, setGoogleEvents]         = useState([]);
-  const [loading, setLoading]       = useState(true);
+  const [googleEvents, setGoogleEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [showModal, setShowModal]   = useState(false);
-  const [editing, setEditing]       = useState(null);
-  const [viewMode, setViewMode]     = useState('week');
-  const [currentWeek, setCurrentWeek]   = useState(startOfWeek(today, { weekStartsOn: 1 }));
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [viewMode, setViewMode] = useState('week');
+  const [currentWeek, setCurrentWeek] = useState(startOfWeek(today, { weekStartsOn: 1 }));
   const [currentMonth, setCurrentMonth] = useState(startOfMonth(today));
-  const [selectedDay, setSelectedDay]   = useState(null);
+  const [selectedDay, setSelectedDay] = useState(null);
   const [googleConnected, setGoogleConnected] = useState(false);
 
   // Merge Supabase + Google events (dedup by google_event_id)
@@ -448,7 +455,7 @@ export default function CalendarPage() {
 
   useEffect(() => { loadData(); }, [viewMode, currentWeek, currentMonth]);
 
-  const goTodayWeek  = () => setCurrentWeek(startOfWeek(today, { weekStartsOn: 1 }));
+  const goTodayWeek = () => setCurrentWeek(startOfWeek(today, { weekStartsOn: 1 }));
   const goTodayMonth = () => setCurrentMonth(startOfMonth(today));
 
   const prevPeriod = () => viewMode === 'week' ? setCurrentWeek(w => subWeeks(w, 1)) : setCurrentMonth(m => subMonths(m, 1));
@@ -467,7 +474,7 @@ export default function CalendarPage() {
   const cancel = async (id) => {
     if (!confirm('Cancel this meeting?')) return;
     try {
-      if (api.unsyncMeeting) await api.unsyncMeeting(id).catch(() => {});
+      if (api.unsyncMeeting) await api.unsyncMeeting(id).catch(() => { });
       await api.deleteMeeting(id);
       setSelectedDay(null);
       loadData(true);
@@ -494,12 +501,12 @@ export default function CalendarPage() {
             Portal meetings + Google Calendar events — 30-min travel conflict guard
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button className="btn btn-secondary" onClick={() => loadData(true)} disabled={refreshing} title="Refresh">
+        <div className="calendar-actions-mobile" style={{ display: 'flex', gap: 8, alignItems: 'center', paddingBottom: 4 }}>
+          <button className="btn btn-secondary hide-on-mobile" style={{ flexShrink: 0 }} onClick={() => loadData(true)} disabled={refreshing} title="Refresh">
             <RefreshCw size={14} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
           </button>
           {/* Week / Month toggle */}
-          <div style={{ display: 'inline-flex', border: '1.5px solid var(--border)', borderRadius: 10, overflow: 'hidden', background: 'var(--gray-50)' }}>
+          <div style={{ display: 'inline-flex', border: '1.5px solid var(--border)', borderRadius: 10, overflow: 'hidden', background: 'var(--gray-50)', flexShrink: 0 }}>
             {['week', 'month'].map(mode => (
               <button key={mode} onClick={() => setViewMode(mode)} style={{
                 padding: '8px 18px', fontSize: '0.875rem', fontWeight: 600,
@@ -510,31 +517,40 @@ export default function CalendarPage() {
               }}>{mode.charAt(0).toUpperCase() + mode.slice(1)}</button>
             ))}
           </div>
-          <span style={{ fontSize: '0.75rem', background: googleConnected ? '#dcfce7' : '#fef3c7', color: googleConnected ? '#15803d' : '#92400e', borderRadius: 20, padding: '4px 10px', fontWeight: 600 }}>
-            {googleConnected ? '✅ Google Synced' : '⚠ Not Connected'}
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', background: googleConnected ? '#dcfce7' : '#fef3c7', color: googleConnected ? '#15803d' : '#92400e', borderRadius: 20, padding: '4px 10px', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
+            {googleConnected ? <><CheckCircle size={14} /> <span className="hide-on-mobile">Google Synced</span></> : <><AlertTriangle size={14} /> <span className="hide-on-mobile">Not Connected</span></>}
           </span>
-          <button className="btn btn-primary" onClick={() => { setEditing(null); setShowModal(true); }}>
-            <Plus size={14} /> Book Meeting
+          <button className="btn btn-primary" style={{ marginLeft: 'auto', whiteSpace: 'nowrap', flexShrink: 0 }} onClick={() => { setEditing(null); setShowModal(true); }}>
+            <Plus size={14} /> <span className="hide-on-mobile">Book Meeting</span><span className="show-on-mobile">Book</span>
           </button>
         </div>
       </div>
 
       {/* Today's meetings strip */}
       {todayMeetings.length > 0 && (
-        <div style={{ background: 'linear-gradient(135deg, var(--brand-600), var(--brand-800))', borderRadius: 12, padding: '14px 20px', marginBottom: 16, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ color: 'white', fontWeight: 700, fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
-            📅 Today · {format(today, 'EEEE, MMMM d')}
+        <div style={{ background: 'var(--brand-50)', border: '1px solid var(--brand-200)', borderRadius: 12, padding: '14px 20px', marginBottom: 16, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ color: 'var(--brand-700)', fontWeight: 700, fontSize: '0.85rem', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Calendar size={16} /> Today · {format(today, 'EEEE, MMMM d')}
           </div>
-          {todayMeetings.map(m => (
-            <div key={m.id} onClick={() => { setSelectedDay(today); }} style={{
-              background: 'rgba(255,255,255,0.15)', color: 'white', borderRadius: 20,
-              padding: '4px 12px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
-              border: '1px solid rgba(255,255,255,0.25)',
-            }}>
-              {format(new Date(m.start_time), 'HH:mm')} {m.title}
-              {m.source === 'google' && <span style={{ marginLeft: 4, opacity: 0.8 }}>📅</span>}
-            </div>
-          ))}
+          <div style={{ width: 1, height: 20, background: 'var(--brand-200)', margin: '0 4px' }} />
+          {todayMeetings.map(m => {
+            const isGoogle = m.source === 'google';
+            const isOnsite = m.location_type === 'OFFLINE_ONSITE';
+            return (
+              <div key={m.id} onClick={() => { setSelectedDay(today); }} style={{
+                background: isGoogle ? '#e8f0fe' : isOnsite ? '#fef3c7' : '#dcfce7',
+                color: isGoogle ? '#1a56db' : isOnsite ? '#92400e' : '#15803d',
+                borderRadius: 20,
+                padding: '4px 12px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
+                border: `1px solid ${isGoogle ? '#4285F4' : isOnsite ? '#f59e0b' : '#22c55e'}`,
+                display: 'flex', alignItems: 'center', gap: 4,
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+              }}>
+                {format(new Date(m.start_time), 'HH:mm')} {m.title}
+                {isGoogle && <Calendar size={12} style={{ opacity: 0.8 }} />}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -560,7 +576,7 @@ export default function CalendarPage() {
           {/* Legend */}
           <div style={{ display: 'flex', gap: 16, marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border)', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
             <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#e8f0fe', border: '1px solid #4285F4', marginRight: 4 }} />Google Calendar</span>
-            <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: 'var(--brand-100)', border: '1px solid var(--brand-500)', marginRight: 4 }} />Portal Meeting (Online)</span>
+            <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#dcfce7', border: '1px solid #22c55e', marginRight: 4 }} />Portal Meeting (Online)</span>
             <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#fef3c7', border: '1px solid #f59e0b', marginRight: 4 }} />Portal Meeting (Onsite)</span>
           </div>
         </div>
@@ -599,8 +615,9 @@ export default function CalendarPage() {
                       <div style={{ fontSize: '0.75rem', color: 'var(--brand-600)', marginTop: 3 }}>
                         {format(new Date(m.start_time), 'EEE, MMM d · HH:mm')} – {format(new Date(m.end_time), 'HH:mm')}
                       </div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                        {isOnsite ? '📍 Onsite' : isGoogle ? '📅 Google Cal' : '💻 Online'}
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {isOnsite ? <MapPin size={10} /> : isGoogle ? <Calendar size={10} /> : <Video size={10} />}
+                        {isOnsite ? 'Onsite' : isGoogle ? 'Google Cal' : 'Online'}
                         {m.client_name ? ` · ${m.client_name}` : ''}
                       </div>
                     </div>

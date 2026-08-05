@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, MessageSquare, Search, MessageCircle, User, Sparkles, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Mail, MessageSquare, Search, MessageCircle, User, Sparkles, RefreshCw, CheckCircle2, ChevronLeft } from 'lucide-react';
 import { api } from '../api/api';
 import { format } from 'date-fns';
 
@@ -161,20 +161,20 @@ export default function Communications() {
           <h1>Communications Inbox</h1>
           <p>Live Primary Inbox emails & WhatsApp conversations with 1-Click AI Lead Conversion</p>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <div className="filters-row" style={{ margin: 0 }}>
             {['ALL', 'EMAIL', 'WHATSAPP'].map(f => (
               <button key={f} className={`filter-chip${filter === f ? ' active' : ''}`} onClick={() => setFilter(f)}>{f === 'ALL' ? 'All' : f}</button>
             ))}
           </div>
-          <button className="btn btn-secondary" onClick={loadCommunications}><RefreshCw size={14} /> Refresh</button>
+          <button className="btn btn-secondary" onClick={loadCommunications} style={{ flexShrink: 0 }}><RefreshCw size={14} /> Refresh</button>
         </div>
       </div>
 
-      <div className="split-panel">
+      <div className={`split-panel ${selected ? 'thread-active' : ''}`}>
         {/* Contact list */}
         <div className="split-left">
-          <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 10, background: 'var(--surface)' }}>
             <div className="search-bar" style={{ maxWidth: '100%' }}>
               <Search size={13} />
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search primary emails & contacts…" />
@@ -221,6 +221,9 @@ export default function Communications() {
           ) : (
             <>
               <div className="thread-header">
+                <button className="btn-icon show-on-mobile" style={{ marginRight: 8, padding: 4 }} onClick={() => setSelected(null)}>
+                  <ChevronLeft size={20} />
+                </button>
                 <div className={`contact-avatar ${getAvatar(selected).cls}`} style={{ width: 32, height: 32, fontSize: '0.72rem' }}>
                   {getAvatar(selected).icon}
                 </div>
@@ -243,7 +246,8 @@ export default function Communications() {
                       disabled={converting || convertedMap[selected.id]}
                     >
                       {convertedMap[selected.id] ? <CheckCircle2 size={13} /> : <Sparkles size={13} />}
-                      {convertedMap[selected.id] ? 'Auto-Converted to Lead' : 'Convert Email to Lead (AI)'}
+                      <span className="hide-on-mobile">{convertedMap[selected.id] ? 'Auto-Converted to Lead' : 'Convert Email to Lead (AI)'}</span>
+                      <span className="show-on-mobile">{convertedMap[selected.id] ? 'Converted' : 'Convert'}</span>
                     </button>
                   );
                 })()}
@@ -283,7 +287,7 @@ export default function Communications() {
                           {format(new Date(msg.timestamp), 'MMM d, yyyy, h:mm a')}
                         </div>
                       </div>
-                      <div className="email-body-text" style={{ fontSize: '0.875rem', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg.body}</div>
+                      <div className="email-body-text" style={{ fontSize: '0.875rem', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{msg.body}</div>
                       
                       {/* Internal AI Summary Footer inside the Email Box */}
                       {(msg.ai_summary || selected.ai_summary || selected.summary) && msg.is_inbound !== false && (

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Briefcase, Clock, DollarSign, Plus, CheckCircle, Car, Search, SearchX } from 'lucide-react';
+import { Briefcase, Clock, DollarSign, Plus, CheckCircle, Car, Search, SearchX, ChevronLeft } from 'lucide-react';
+import LeadModal from '../components/LeadModal';
 
 // --- STATIC MOCK DATA ---
 const MOCK_DEALS = [
@@ -55,6 +56,7 @@ export default function Deals() {
   // Form states
   const [timeForm, setTimeForm] = useState({ hours: '', description: '' });
   const [expenseForm, setExpenseForm] = useState({ amount: '', description: '', expense_type: 'OTHER' });
+  const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
 
   useEffect(() => {
     // Simulate loading
@@ -137,9 +139,14 @@ export default function Deals() {
           <h1 style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '-0.5px' }}>Deals</h1>
           <p style={{ fontSize: '0.9rem' }}>Review completed projects, log post-sale labor, and track expenses.</p>
         </div>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button className="btn btn-primary" onClick={() => setIsLeadModalOpen(true)} style={{ padding: '8px 16px' }}>
+            <Plus size={16} /> New Deal
+          </button>
+        </div>
       </div>
 
-      <div className="split-panel" style={{ flex: 1 }}>
+      <div className={`split-panel deals-split-panel ${selectedDeal ? 'thread-active' : ''}`} style={{ flex: 1 }}>
         
         {/* LEFT: Deals List */}
         <div className="split-left" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -204,9 +211,12 @@ export default function Deals() {
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               
               {/* Header */}
-              <div className="thread-header" style={{ justifyContent: 'space-between', padding: '20px 28px', background: 'var(--surface)', borderBottom: '1px solid var(--gray-200)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                  <div style={{ 
+              <div className="thread-header deals-header-mobile" style={{ justifyContent: 'space-between', padding: '20px 28px', background: 'var(--surface)', borderBottom: '1px solid var(--gray-200)', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                  <button className="btn-icon show-on-mobile" style={{ marginRight: -4, padding: 4 }} onClick={() => setSelectedDeal(null)}>
+                    <ChevronLeft size={20} />
+                  </button>
+                  <div className="deals-avatar-mobile" style={{ 
                     width: 52, height: 52, borderRadius: '50%', 
                     background: 'linear-gradient(135deg, var(--brand-100), var(--brand-200))',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -215,23 +225,24 @@ export default function Deals() {
                   }}>
                     {getInitials(selectedDeal.client_name)}
                   </div>
-                  <div>
-                    <h3 style={{ margin: '0 0 4px', fontSize: '1.25rem', fontWeight: 700 }}>{selectedDeal.client_name}</h3>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 500 }}>
-                      <Car size={14} /> {selectedDeal.target_vehicle || 'Vehicle details missing'}
+                  <div style={{ minWidth: 0 }}>
+                    <h3 className="deals-name-mobile" style={{ margin: '0 0 4px', fontSize: '1.25rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedDeal.client_name}</h3>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'flex-start', gap: 6, fontWeight: 500 }}>
+                      <Car size={14} style={{ flexShrink: 0, marginTop: 2 }} /> 
+                      <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{selectedDeal.target_vehicle || 'Vehicle details missing'}</span>
                     </div>
                   </div>
                 </div>
-                <div className={`badge ${selectedDeal.project_type === 'BUY' ? 'badge-buy' : 'badge-sell'}`} style={{ padding: '6px 12px', fontSize: '0.75rem' }}>
+                <div className={`badge ${selectedDeal.project_type === 'BUY' ? 'badge-buy' : 'badge-sell'}`} style={{ padding: '6px 12px', fontSize: '0.75rem', whiteSpace: 'nowrap', flexShrink: 0 }}>
                   {selectedDeal.project_type} DEAL
                 </div>
               </div>
 
               {/* Details Body */}
-              <div style={{ flex: 1, padding: '32px 28px', overflowY: 'auto', background: 'var(--gray-50)' }}>
+              <div className="deals-body-mobile" style={{ flex: 1, padding: '32px 28px', overflowY: 'auto', background: 'var(--gray-50)' }}>
                 
                 {/* Financials Overview */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 32 }}>
+                <div className="grid-2" style={{ gap: 20, marginBottom: 32 }}>
                   <div className="stat-card" style={{ background: 'var(--surface)', border: 'none', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
                     <div className="stat-card-header">
                       <span className="stat-label" style={{ fontWeight: 600 }}>Total Labor Logged</span>
@@ -249,7 +260,7 @@ export default function Deals() {
                 </div>
 
                 {/* Details Lists */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+                <div className="grid-2" style={{ gap: 24 }}>
                   
                   {/* Labor Logs */}
                   <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-lg)', padding: 24, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
@@ -412,6 +423,12 @@ export default function Deals() {
           </div>
         </div>
       )}
+
+      <LeadModal
+        isOpen={isLeadModalOpen}
+        onClose={() => setIsLeadModalOpen(false)}
+        onLeadCreated={() => setIsLeadModalOpen(false)}
+      />
     </div>
   );
 }
