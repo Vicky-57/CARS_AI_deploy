@@ -3,6 +3,20 @@ import { Users, Plus, Search, RefreshCw, Mail, Phone, Car, Tag, ShoppingCart } f
 import { api } from '../api/api';
 import LeadModal from '../components/LeadModal';
 
+function getLeadVehicleDisplay(lead) {
+  if (lead.vehicle) return lead.vehicle;
+  if (lead.manufacturer || lead.model) return `${lead.manufacturer || ''} ${lead.model || ''}`.trim();
+
+  // Smart extraction from subject, message, or notes
+  const text = `${lead.subject || ''} ${lead.message || ''} ${lead.notes || ''}`;
+  const carMatch = text.match(/(Porsche\s+[\w\d\.\s\(\)\-]+|BMW\s+[\w\d\.\s\-]+|Audi\s+[\w\d\.\s\-]+|Mercedes-?Benz?\s+[\w\d\.\s\-]+|VW\s+[\w\d\.\s\-]+|Volkswagen\s+[\w\d\.\s\-]+)/i);
+  if (carMatch) {
+    return carMatch[0].split('\n')[0].split('-')[0].trim().slice(0, 35);
+  }
+
+  return null;
+}
+
 export default function Leads() {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -207,14 +221,17 @@ export default function Leads() {
                       </div>
                     </td>
                     <td>
-                      {lead.manufacturer || lead.model ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 500 }}>
-                          <Car size={14} color="var(--brand-600)" />
-                          <span>{lead.manufacturer} {lead.model}</span>
-                        </div>
-                      ) : (
-                        <span style={{ color: 'var(--text-muted)' }}>—</span>
-                      )}
+                      {(() => {
+                        const vDisplay = getLeadVehicleDisplay(lead);
+                        return vDisplay ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: 'var(--brand-700)' }}>
+                            <Car size={14} color="var(--brand-600)" />
+                            <span>{vDisplay}</span>
+                          </div>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        );
+                      })()}
                       {lead.vin && (
                         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'monospace', marginTop: 4 }}>
                           VIN: {lead.vin}

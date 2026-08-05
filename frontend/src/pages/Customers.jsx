@@ -1,12 +1,25 @@
 import { useState, useEffect } from 'react';
-import { Users, Search, RefreshCw, Mail, Phone, Clock, Star, UserPlus, Repeat } from 'lucide-react';
+import { Users, Search, RefreshCw, Mail, Phone, Clock, Star, UserPlus, Repeat, Plus, X, Briefcase } from 'lucide-react';
 import { api } from '../api/api';
+import CreateProjectModal from '../components/CreateProjectModal';
 
 export default function Customers() {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('NEW');
+
+  // Add customer modal & project creation state
+  const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
+  const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
+  const [newCustomerForm, setNewCustomerForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    intent: 'BUY',
+    notes: ''
+  });
+  const [savingCustomer, setSavingCustomer] = useState(false);
 
   const loadCustomers = async () => {
     setLoading(true);
@@ -88,6 +101,34 @@ export default function Customers() {
     return val.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
   };
 
+  const handleAddCustomerSubmit = async (e, andCreateProject = false) => {
+    if (e) e.preventDefault();
+    setSavingCustomer(true);
+    try {
+      await api.createLead({
+        name: newCustomerForm.name,
+        email: newCustomerForm.email || null,
+        phone: newCustomerForm.phone || null,
+        intent: newCustomerForm.intent,
+        channel: 'DIRECT_CALL',
+        status: 'NEW',
+        notes: newCustomerForm.notes || 'Added directly from Customers Directory'
+      });
+
+      alert(`Customer ${newCustomerForm.name} successfully created!`);
+      setIsAddCustomerOpen(false);
+      loadCustomers();
+
+      if (andCreateProject) {
+        setIsCreateProjectOpen(true);
+      }
+    } catch (err) {
+      alert('Error creating customer: ' + err.message);
+    } finally {
+      setSavingCustomer(false);
+    }
+  };
+
   return (
     <div style={{ paddingBottom: 40 }}>
       {/* Header */}
@@ -95,6 +136,11 @@ export default function Customers() {
         <div className="page-header-left">
           <h1 style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '-0.5px' }}>Customers</h1>
           <p style={{ fontSize: '0.9rem' }}>Manage your client relationships, categorizing New vs Repeat customers.</p>
+        </div>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button className="btn btn-primary" onClick={() => setIsAddCustomerOpen(true)} style={{ padding: '8px 16px' }}>
+            <Plus size={16} /> Add Customer
+          </button>
         </div>
       </div>
 
@@ -267,6 +313,108 @@ export default function Customers() {
           </div>
         )}
       </div>
+
+      {/* Add Customer Modal */}
+      {isAddCustomerOpen && (
+        <div className="modal-overlay" onClick={() => setIsAddCustomerOpen(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
+            <div className="modal-header">
+              <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <UserPlus size={20} color="var(--brand-600)" /> Add New Customer / Client
+              </h3>
+              <button className="btn-icon" onClick={() => setIsAddCustomerOpen(false)}><X size={18} /></button>
+            </div>
+            <form onSubmit={handleAddCustomerSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+              <div className="modal-body" style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Client Full Name *</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g. Dr. Thomas Lindner"
+                    value={newCustomerForm.name}
+                    onChange={e => setNewCustomerForm({ ...newCustomerForm, name: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Email Address</label>
+                    <input
+                      type="email"
+                      className="form-input"
+                      placeholder="client@example.de"
+                      value={newCustomerForm.email}
+                      onChange={e => setNewCustomerForm({ ...newCustomerForm, email: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Phone Number</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="+49 152 3456789"
+                      value={newCustomerForm.phone}
+                      onChange={e => setNewCustomerForm({ ...newCustomerForm, phone: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Customer Intent</label>
+                  <select
+                    className="form-select"
+                    value={newCustomerForm.intent}
+                    onChange={e => setNewCustomerForm({ ...newCustomerForm, intent: e.target.value })}
+                  >
+                    <option value="BUY">Buy Side (Wants to acquire/search a vehicle)</option>
+                    <option value="SELL">Sell Side (Wants to sell/consign a vehicle)</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Notes & Initial Inquiry</label>
+                  <textarea
+                    className="form-textarea"
+                    rows={2}
+                    placeholder="Direct phone call inquiry, car specs, or consultation notes..."
+                    value={newCustomerForm.notes}
+                    onChange={e => setNewCustomerForm({ ...newCustomerForm, notes: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="modal-footer" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setIsAddCustomerOpen(false)} disabled={savingCustomer}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-secondary" disabled={savingCustomer}>
+                  Save Customer Only
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={(e) => handleAddCustomerSubmit(e, true)}
+                  disabled={savingCustomer || !newCustomerForm.name}
+                  style={{ gap: 6 }}
+                >
+                  <Briefcase size={15} /> Save & Create Project / Deal
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Create Project / Deal Modal */}
+      <CreateProjectModal
+        isOpen={isCreateProjectOpen}
+        onClose={() => setIsCreateProjectOpen(false)}
+        onCreated={() => loadCustomers()}
+        defaultStatus="ACTIVE"
+        defaultType={newCustomerForm.intent}
+      />
     </div>
   );
 }

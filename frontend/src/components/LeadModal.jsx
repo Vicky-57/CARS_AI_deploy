@@ -3,9 +3,6 @@ import { X, Upload, Sparkles, User, Mail, Phone, Car, FileText, CheckCircle2, Lo
 import { api } from '../api/api';
 
 export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
-  const [activeTab, setActiveTab] = useState('ocr'); // 'ocr' or 'manual'
-  const [ocrFile, setOcrFile] = useState(null);
-  const [ocrLoading, setOcrLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const [form, setForm] = useState({
@@ -26,54 +23,13 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
 
   if (!isOpen) return null;
 
-  const handleFileDrop = async (file) => {
-    if (!file) return;
-    setOcrFile(file);
-    setOcrLoading(true);
-
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      // Call FastAPI backend for client & vehicle details OCR
-      const isVehicleDoc = file.name.match(/\.(jpg|jpeg|png)$/i) || file.name.includes('Fahrzeug');
-      
-      let ocrRes;
-      if (isVehicleDoc) {
-        ocrRes = await api.extractVehicleSpecs(formData);
-        setForm(prev => ({
-          ...prev,
-          manufacturer: ocrRes.manufacturer || prev.manufacturer,
-          model: ocrRes.model || prev.model,
-          vin: ocrRes.vin || prev.vin,
-          license_plate: ocrRes.licence_plate || prev.license_plate,
-          initial_registration: ocrRes.initial_registration || prev.initial_registration,
-          mileage: ocrRes.mileage ? String(ocrRes.mileage) : prev.mileage,
-          notes: `OCR Auto-extracted from ${file.name}`
-        }));
-      } else {
-        ocrRes = await api.extractClientDetails(formData);
-        setForm(prev => ({
-          ...prev,
-          name: `${ocrRes.first_name || ''} ${ocrRes.last_name || ''}`.trim() || prev.name,
-          email: ocrRes.email || prev.email,
-          phone: ocrRes.phone || prev.phone,
-          notes: `Client details extracted from ${file.name}`
-        }));
-      }
-    } catch (err) {
-      alert('OCR Extraction note: Could not parse document automatically. You can fill the details manually below.');
-    } finally {
-      setOcrLoading(false);
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     try {
       const payload = {
         ...form,
+        vehicle: (form.manufacturer || form.model) ? `${form.manufacturer} ${form.model}`.trim() : null,
         price_limit: form.price_limit ? parseFloat(form.price_limit) : null,
       };
       await api.createLead(payload);
@@ -88,7 +44,7 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
 
   return (
     <div className="modal-overlay">
-      <div className="modal" style={{ maxWidth: 800 }}>
+      <div className="modal" style={{ maxWidth: 640 }}>
         <div className="modal-header" style={{ padding: '24px 28px 20px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{
@@ -102,70 +58,15 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
             <div>
               <div className="modal-title" style={{ fontSize: '1.1rem', fontWeight: 700, letterSpacing: '-0.3px' }}>Create New Lead</div>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                Add client details or upload a document to auto-fill
+                Enter client contact info and vehicle criteria
               </div>
             </div>
           </div>
           <button className="btn-icon" onClick={onClose} style={{ padding: 8 }}><X size={18} /></button>
         </div>
 
-        {/* OCR / Manual Tab Switch */}
-        <div style={{ padding: '16px 28px 0', display: 'flex', gap: 8 }}>
-          <button
-            type="button"
-            className={`filter-chip ${activeTab === 'ocr' ? 'active' : ''}`}
-            onClick={() => setActiveTab('ocr')}
-            style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem' }}
-          >
-            <Sparkles size={14} /> OCR Upload & Pre-fill
-          </button>
-          <button
-            type="button"
-            className={`filter-chip ${activeTab === 'manual' ? 'active' : ''}`}
-            onClick={() => setActiveTab('manual')}
-            style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem' }}
-          >
-            <FileText size={14} /> Manual Entry
-          </button>
-        </div>
-
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
           <div className="modal-body" style={{ overflowY: 'auto', padding: '20px 28px 28px' }}>
-            {activeTab === 'ocr' && (
-              <div style={{
-                border: '2px dashed var(--gray-300)', borderRadius: 'var(--radius-lg)',
-                padding: '32px 20px', textAlign: 'center', background: 'var(--gray-50)',
-                marginBottom: 24, position: 'relative', transition: 'all 0.2s ease',
-                cursor: 'pointer'
-              }}
-              onMouseOver={(e) => { e.currentTarget.style.borderColor = 'var(--brand-400)'; e.currentTarget.style.background = 'var(--brand-50)'; }}
-              onMouseOut={(e) => { e.currentTarget.style.borderColor = 'var(--gray-300)'; e.currentTarget.style.background = 'var(--gray-50)'; }}
-              >
-                {ocrLoading ? (
-                  <div>
-                    <Loader2 size={28} className="spin" color="var(--brand-600)" style={{ margin: '0 auto 12px' }} />
-                    <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Extracting details using Claude & OCR...</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>Parsing Fahrzeugdatenträger / Client document</div>
-                  </div>
-                ) : (
-                  <div>
-                    <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--white)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-                      <Upload size={20} color="var(--brand-600)" />
-                    </div>
-                    <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Drop Document or Click to Upload</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
-                      Upload Fahrzeugschein, Fahrzeugdatenträger, or Client Followup PDF
-                    </div>
-                    <input
-                      type="file"
-                      accept=".pdf,.png,.jpg,.jpeg"
-                      style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
-                      onChange={(e) => handleFileDrop(e.target.files[0])}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* Client Info Grid */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
