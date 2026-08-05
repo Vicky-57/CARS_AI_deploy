@@ -70,6 +70,12 @@ logs/
 # ─── Supabase local dev ───────────────────────────────────────────────────────
 .supabase/
 
+# ─── Google OAuth secrets & tokens ─────────────────────────────────────────────
+backend/client_secrets.json
+backend/*service_account*.json
+backend/google_tokens.json
+**/client_secrets.json
+
 # ─── Misc ─────────────────────────────────────────────────────────────────────
 *.bak
 *.tmp

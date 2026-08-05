@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Users, FolderKanban, MessageSquare,
@@ -16,6 +16,8 @@ import Contracts from './pages/Contracts';
 import CalendarPage from './pages/Calendar';
 import Auth from './pages/Auth';
 import Profile from './pages/Profile';
+import SellForm from './pages/SellForm';
+import BuyForm from './pages/BuyForm';
 import { api, supabase } from './api/api';
 
 const NAV = [
@@ -193,30 +195,49 @@ export default function App() {
     setIsAuthenticated(false);
   };
 
+  return (
+    <BrowserRouter>
+      <AppRoutes
+        isAuthenticated={isAuthenticated}
+        online={online}
+        userProfile={userProfile}
+        onLogin={handleLogin}
+        onLogout={handleLogout}
+      />
+    </BrowserRouter>
+  );
+}
+
+function AppRoutes({ isAuthenticated, online, userProfile, onLogin, onLogout }) {
+  const { pathname } = useLocation();
+
+  // Public customer forms — accessible without portal login
+  if (pathname.startsWith('/form/')) {
+    return pathname === '/form/buy' ? <BuyForm /> : <SellForm />;
+  }
+
   if (!isAuthenticated) {
-    return <Auth onLogin={handleLogin} />;
+    return <Auth onLogin={onLogin} />;
   }
 
   return (
-    <BrowserRouter>
-      <div className="portal-layout">
-        <Sidebar online={online} onLogout={handleLogout} userProfile={userProfile} />
-        <div className="main-content">
-          <div className="page-content">
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/leads" element={<Leads />} />
-              <Route path="/customers" element={<Customers />} />
-              <Route path="/communications" element={<Communications />} />
-              <Route path="/projects" element={<Projects />} />
-              <Route path="/deals" element={<Deals />} />
-              <Route path="/contracts" element={<Contracts />} />
-              <Route path="/calendar" element={<CalendarPage />} />
-              <Route path="/profile" element={<Profile />} />
-            </Routes>
-          </div>
+    <div className="portal-layout">
+      <Sidebar online={online} onLogout={onLogout} userProfile={userProfile} />
+      <div className="main-content">
+        <div className="page-content">
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/leads" element={<Leads />} />
+            <Route path="/customers" element={<Customers />} />
+            <Route path="/communications" element={<Communications />} />
+            <Route path="/projects" element={<Projects />} />
+            <Route path="/deals" element={<Deals />} />
+            <Route path="/contracts" element={<Contracts />} />
+            <Route path="/calendar" element={<CalendarPage />} />
+            <Route path="/profile" element={<Profile />} />
+          </Routes>
         </div>
       </div>
-    </BrowserRouter>
+    </div>
   );
 }
