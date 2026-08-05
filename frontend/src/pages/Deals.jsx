@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Briefcase, Clock, DollarSign, Plus, CheckCircle, Car, Search, SearchX } from 'lucide-react';
+import LeadModal from '../components/LeadModal';
 
 // --- STATIC MOCK DATA ---
 const MOCK_DEALS = [
@@ -55,6 +56,7 @@ export default function Deals() {
   // Form states
   const [timeForm, setTimeForm] = useState({ hours: '', description: '' });
   const [expenseForm, setExpenseForm] = useState({ amount: '', description: '', expense_type: 'OTHER' });
+  const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
 
   useEffect(() => {
     // Simulate loading
@@ -136,6 +138,11 @@ export default function Deals() {
         <div className="page-header-left">
           <h1 style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '-0.5px' }}>Deals</h1>
           <p style={{ fontSize: '0.9rem' }}>Review completed projects, log post-sale labor, and track expenses.</p>
+        </div>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button className="btn btn-primary" onClick={() => setIsLeadModalOpen(true)} style={{ padding: '8px 16px' }}>
+            <Plus size={16} /> New Deal
+          </button>
         </div>
       </div>
 
@@ -412,6 +419,12 @@ export default function Deals() {
           </div>
         </div>
       )}
+
+      <LeadModal
+        isOpen={isLeadModalOpen}
+        onClose={() => setIsLeadModalOpen(false)}
+        onLeadCreated={() => setIsLeadModalOpen(false)}
+      />
     </div>
   );
 }

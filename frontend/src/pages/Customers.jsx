@@ -98,46 +98,65 @@ export default function Customers() {
         </div>
       </div>
 
-      {/* Filters & Search Bar */}
-      <div className="filters-row" style={{ gap: 16, marginBottom: 24 }}>
-        <div className="search-bar" style={{ maxWidth: 280, padding: '6px 12px', borderRadius: 9999 }}>
-          <Search size={14} />
-          <input
-            placeholder="Search customers..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{ fontSize: '0.8rem' }}
-          />
-        </div>
-
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            className={`filter-chip ${activeTab === 'NEW' ? 'active' : ''}`}
-            onClick={() => setActiveTab('NEW')}
-            style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 }}
-          >
-            <UserPlus size={14} /> New Customers
-          </button>
-          <button
-            className={`filter-chip ${activeTab === 'REPEAT' ? 'active' : ''}`}
-            onClick={() => setActiveTab('REPEAT')}
-            style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 }}
-          >
-            <Repeat size={14} /> Repeat Customers
-          </button>
-        </div>
-
-        <button className="btn btn-secondary btn-icon" onClick={loadCustomers} style={{ marginLeft: 'auto', padding: '10px' }} title="Refresh customers">
-          <RefreshCw size={16} />
-        </button>
+      {/* Folder Tabs */}
+      <div style={{ display: 'flex', paddingLeft: 0, position: 'relative', zIndex: 10, marginBottom: 0 }}>
+        {[
+          { id: 'NEW', label: 'New Customers', icon: UserPlus },
+          { id: 'REPEAT', label: 'Repeat Customers', icon: Repeat }
+        ].map((tab) => {
+          const isActive = activeTab === tab.id;
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '14px 28px',
+                background: isActive ? 'var(--surface)' : 'transparent',
+                border: 'none',
+                borderTopLeftRadius: 16,
+                borderTopRightRadius: 16,
+                color: isActive ? 'var(--brand-600)' : 'var(--text-secondary)',
+                fontWeight: isActive ? 700 : 600,
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                position: 'relative',
+                zIndex: isActive ? 2 : 1,
+                boxShadow: isActive ? '0 -4px 6px -4px rgba(0,0,0,0.05)' : 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8
+              }}
+            >
+              <Icon size={16} />
+              {tab.label}
+            </button>
+          )
+        })}
       </div>
 
       {/* Customers Table */}
-      <div className="card" style={{ border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)' }}>
-        <div className="card-header" style={{ padding: '20px 24px' }}>
+      <div className="card" style={{ border: 'none', borderTopLeftRadius: activeTab === 'NEW' ? 0 : 16, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)' }}>
+        <div className="card-header" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
           <span className="card-title" style={{ fontSize: '1.05rem', fontWeight: 700 }}>
             {activeTab === 'NEW' ? 'New Customers' : 'Repeat Customers'} ({filtered.length})
           </span>
+
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <div className="search-bar" style={{ padding: '4px 12px', borderRadius: 24, background: 'var(--surface)', border: '1px solid var(--border)' }}>
+              <Search size={14} color="var(--text-muted)" />
+              <input
+                placeholder="Search customers..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{ fontSize: '0.85rem', border: 'none', background: 'transparent', outline: 'none', marginLeft: 8 }}
+              />
+            </div>
+            <button className="btn btn-secondary btn-icon" onClick={loadCustomers} style={{ padding: '6px', borderRadius: '50%' }} title="Refresh customers">
+              <RefreshCw size={14} />
+            </button>
+          </div>
         </div>
 
         {loading ? (
