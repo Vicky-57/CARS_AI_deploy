@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Users, FolderKanban, MessageSquare,
   FileText, Calendar, Car, User, Briefcase,
-  ChevronsUpDown, LogOut, Settings, Menu
+  ChevronsUpDown, LogOut, Settings, Menu, PanelLeftClose, PanelLeft
 } from 'lucide-react';
 
 import Dashboard from './pages/Dashboard';
@@ -44,21 +44,26 @@ const NAV = [
   },
 ];
 
-function Sidebar({ online, onLogout, userProfile, isOpen, onClose }) {
+function Sidebar({ online, onLogout, userProfile, isOpen, onClose, isCollapsed, onToggleCollapse, onExpand }) {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   return (
-    <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
+    <aside className={`sidebar ${isOpen ? 'open' : ''} ${isCollapsed ? 'collapsed' : ''}`}>
       <div className="sidebar-brand">
-        <div className="sidebar-brand-logo">
-          <div className="sidebar-brand-icon">
-            <Car size={18} />
+        <div className="sidebar-brand-logo" onClick={onToggleCollapse} style={{ cursor: 'pointer' }} title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}>
+          <div className="sidebar-brand-icon" style={{ background: 'transparent', width: 36, height: 36 }}>
+            <img src="/assets/car.png" alt="CAR-AGENTS Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
           </div>
-          <div>
+          <div className="brand-text">
             <div className="sidebar-brand-name">CAR-AGENTS</div>
             <div className="sidebar-brand-sub">Operations Portal</div>
           </div>
         </div>
+        {!isCollapsed && (
+          <button className="collapse-toggle" onClick={onToggleCollapse} title="Collapse Sidebar">
+            <PanelLeftClose size={18} />
+          </button>
+        )}
       </div>
 
       <nav className="sidebar-nav">
@@ -71,10 +76,14 @@ function Sidebar({ online, onLogout, userProfile, isOpen, onClose }) {
                 to={path}
                 end={path === '/'}
                 className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
-                onClick={onClose}
+                onClick={() => {
+                  onClose();
+                  if (isCollapsed && onExpand) onExpand();
+                }}
+                title={isCollapsed ? label : undefined}
               >
                 <Icon size={16} className="nav-icon" />
-                {label}
+                <span className="nav-item-text">{label}</span>
               </NavLink>
             ))}
           </div>
@@ -83,8 +92,8 @@ function Sidebar({ online, onLogout, userProfile, isOpen, onClose }) {
 
       <div className="sidebar-footer" style={{ position: 'relative' }}>
         <button
-          className="nav-item"
-          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', height: 'auto', background: showProfileMenu ? 'var(--sidebar-hover)' : 'transparent', borderRadius: 'var(--radius)' }}
+          className="nav-item user-profile-btn"
+          style={{ background: showProfileMenu ? 'var(--sidebar-hover)' : 'transparent' }}
           onClick={() => setShowProfileMenu(!showProfileMenu)}
         >
           <div style={{ width: 32, height: 32, borderRadius: 6, background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -94,7 +103,7 @@ function Sidebar({ online, onLogout, userProfile, isOpen, onClose }) {
               <User size={18} color="#f1f5f9" />
             )}
           </div>
-          <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
+          <div className="user-info-text" style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
             <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
               {userProfile?.name || (userProfile?.email ? userProfile.email.split('@')[0] : 'Vikas Broker')}
             </div>
@@ -102,7 +111,7 @@ function Sidebar({ online, onLogout, userProfile, isOpen, onClose }) {
               {userProfile?.email || 'vikaspurohit105@gmail.com'}
             </div>
           </div>
-          <ChevronsUpDown size={16} color="#94a3b8" />
+          <ChevronsUpDown size={16} color="#94a3b8" className="user-dropdown-icon" />
         </button>
 
         {showProfileMenu && (
@@ -146,6 +155,9 @@ function Sidebar({ online, onLogout, userProfile, isOpen, onClose }) {
 export default function App() {
   const [online, setOnline] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    return localStorage.getItem('sidebar_collapsed') === 'true';
+  });
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return !!localStorage.getItem('car_agents_user');
   });
@@ -202,7 +214,23 @@ export default function App() {
   return (
     <BrowserRouter>
       <div className="portal-layout">
-        <Sidebar online={online} onLogout={handleLogout} userProfile={userProfile} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <Sidebar 
+          online={online} 
+          onLogout={handleLogout} 
+          userProfile={userProfile} 
+          isOpen={sidebarOpen} 
+          onClose={() => setSidebarOpen(false)}
+          isCollapsed={sidebarCollapsed}
+          onToggleCollapse={() => {
+            const newVal = !sidebarCollapsed;
+            setSidebarCollapsed(newVal);
+            localStorage.setItem('sidebar_collapsed', newVal);
+          }}
+          onExpand={() => {
+            setSidebarCollapsed(false);
+            localStorage.setItem('sidebar_collapsed', 'false');
+          }}
+        />
         {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)}></div>}
         <div className="main-content">
           <div className="mobile-header">

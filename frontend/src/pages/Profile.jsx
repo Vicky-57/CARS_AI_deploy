@@ -96,12 +96,12 @@ export default function Profile() {
               gap: 10,
               fontSize: '0.95rem',
               fontWeight: 600,
-              color: activeTab === tab.id ? 'white' : 'var(--text-secondary)',
-              background: activeTab === tab.id ? 'var(--brand-500)' : 'transparent',
-              boxShadow: activeTab === tab.id ? '0 2px 8px rgba(var(--brand-rgb, 59,130,246),0.3)' : 'none',
+              color: activeTab === tab.id ? '#fafafa' : 'var(--text-secondary)',
+              background: activeTab === tab.id ? '#09090b' : 'transparent',
+              boxShadow: activeTab === tab.id ? '0 1px 2px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1)' : 'none',
               border: 'none',
               cursor: 'pointer',
-              transition: 'all 0.2s',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
               flexShrink: 0
             }}
           >
