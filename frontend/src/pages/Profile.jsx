@@ -253,25 +253,14 @@ function AppConnectionsTab() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 32, animation: 'fadeIn 0.3s ease-in-out' }}>
       
-      {/* Single Unified Google Workspace Suite Card */}
+      {/* Google Drive Integration Card */}
       <div>
         <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Plug size={20} color="var(--brand-500)" /> Google Workspace Integration
+          <Plug size={20} color="var(--brand-500)" /> Google Drive Cloud Storage Integration
         </h2>
         <p style={{ color: 'var(--text-muted)', marginBottom: 24, fontSize: '0.9rem' }}>
-          Connect your Google Account once to enable Gmail, Google Drive, and Google Calendar.
+          Connect your Google Account once to enable Google Drive storage for customer vehicle documents & 1-click contract PDFs.
         </p>
-        
-        {/* Re-auth required banner */}
-        {googleStatus.connected && !googleStatus.email && (
-          <div style={{ background: '#fffbeb', border: '1px solid #fbbf24', borderRadius: 10, padding: '12px 16px', marginBottom: 20, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-            <span style={{ fontSize: '1.1rem' }}>⚠️</span>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#92400e' }}>Re-authorization Required</div>
-              <div style={{ fontSize: '0.8rem', color: '#78350f', marginTop: 2 }}>Gmail scopes were updated. Click "Re-authorize Google Account" below to enable Email + Calendar access.</div>
-            </div>
-          </div>
-        )}
         
         <div style={{ maxWidth: 640 }}>
           <div className="profile-app-card"
@@ -281,17 +270,15 @@ function AppConnectionsTab() {
               background: 'white', boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
             }}
           >
-            {/* Header / Brand icons */}
+            {/* Header / Brand icon */}
             <div className="profile-app-header-mobile" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f8fafc', padding: '8px 12px', borderRadius: 12, border: '1px solid #e2e8f0' }}>
-                  <img src="/assets/Gmail_icon_(2020).svg.png" alt="Gmail" style={{ width: 24, height: 24, objectFit: 'contain' }} />
-                  <img src="/assets/google-drive (1).png" alt="Drive" style={{ width: 24, height: 24, objectFit: 'contain' }} />
-                  <img src="/assets/google-calendar.png" alt="Calendar" style={{ width: 24, height: 24, objectFit: 'contain' }} />
+                  <img src="/assets/google-drive (1).png" alt="Drive" style={{ width: 28, height: 28, objectFit: 'contain' }} />
                 </div>
                 <div>
-                  <h3 style={{ fontWeight: 800, fontSize: '1.2rem', margin: 0, color: '#111827' }}>Google Workspace Suite</h3>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Gmail · Google Drive · Google Calendar</div>
+                  <h3 style={{ fontWeight: 800, fontSize: '1.2rem', margin: 0, color: '#111827' }}>Google Drive Cloud Storage</h3>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Automated Customer & Vehicle Document Archiving</div>
                 </div>
               </div>
 
@@ -316,9 +303,9 @@ function AppConnectionsTab() {
 
             {/* Account Status Info */}
             <div style={{ background: '#f8fafc', borderRadius: 12, padding: '16px 20px', marginBottom: 24, border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>Connected Account</div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>Connected Admin Account</div>
               {googleStatus.loading ? (
-                <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Checking Google auth status...</div>
+                <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Checking Google Drive connection status...</div>
               ) : googleStatus.connected ? (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -327,7 +314,7 @@ function AppConnectionsTab() {
                     </div>
                     <div>
                       <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#111827' }}>
-                        {googleStatus.email || '— Re-authorization needed —'}
+                        {googleStatus.email || 'Admin Account Connected'}
                       </div>
                       {googleStatus.name && <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{googleStatus.name}</div>}
                     </div>
@@ -338,7 +325,7 @@ function AppConnectionsTab() {
                 </div>
               ) : (
                 <div style={{ fontSize: '0.88rem', color: '#64748b' }}>
-                  No Google account linked. Click below to grant 1-click permission.
+                  No Google account linked. Click below to grant Google Drive storage access.
                 </div>
               )}
             </div>
@@ -348,16 +335,16 @@ function AppConnectionsTab() {
               <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 12 }}>Enabled Features</div>
               <div className="grid-2" style={{ gap: 12, fontSize: '0.85rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <CheckCircle2 size={15} color="#10b981" /> Primary Inbox Email Sync
+                  <CheckCircle2 size={15} color="#10b981" /> Auto Contract PDF Backup to Drive
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <CheckCircle2 size={15} color="#10b981" /> 1-Click AI Lead Conversion
+                  <CheckCircle2 size={15} color="#10b981" /> Auto Vehicle Document Folder Structure
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <CheckCircle2 size={15} color="#10b981" /> Auto Contract Storage to Drive
+                  <CheckCircle2 size={15} color="#10b981" /> Shareable Drive Links for Vehicle Listings
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <CheckCircle2 size={15} color="#10b981" /> 30-Min Travel Conflict Guard
+                  <CheckCircle2 size={15} color="#10b981" /> Cloud Backup for Client Intake Form Attachments
                 </div>
               </div>
             </div>
@@ -372,7 +359,7 @@ function AppConnectionsTab() {
                   style={{ flex: 1, justifyContent: 'center' }}
                   disabled={isConnecting}
                 >
-                  <RefreshCw size={16} /> Re-authorize Google Account
+                  <RefreshCw size={16} /> Re-authorize Google Drive Access
                 </button>
               </div>
             ) : (
@@ -383,7 +370,7 @@ function AppConnectionsTab() {
                 style={{ width: '100%', padding: '12px', justifyContent: 'center', fontSize: '0.95rem' }}
                 disabled={isConnecting}
               >
-                {isConnecting ? 'Connecting...' : 'Connect Google Workspace Account'}
+                {isConnecting ? 'Connecting...' : 'Connect Google Drive Account'}
               </button>
             )}
           </div>
@@ -398,10 +385,10 @@ function AppConnectionsTab() {
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '24px 32px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '0.9rem' }}>
-              <CheckCircle2 size={16} color="#10b981" /> <span>Google OAuth2 Unified Connector active</span>
+              <CheckCircle2 size={16} color="#10b981" /> <span>Google Drive Cloud Storage Connector active</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '0.9rem' }}>
-              <CheckCircle2 size={16} color="#10b981" /> <span>Primary Inbox emails query initialized via Gmail REST API</span>
+              <CheckCircle2 size={16} color="#10b981" /> <span>Automated Vehicle & Customer Cloud Storage initialized</span>
             </div>
           </div>
         </div>

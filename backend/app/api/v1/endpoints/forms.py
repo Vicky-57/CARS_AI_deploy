@@ -168,6 +168,30 @@ async def create_session(req: CreateSessionRequest):
     pipeline = req.pipeline if req.pipeline in ("buy", "sell") else "sell"
     sb = get_supabase()
 
+    initial_core = {}
+    if req.project_id:
+        try:
+            proj = sb.table("projects").select("*").eq("id", req.project_id).execute()
+            if proj.data:
+                p = proj.data[0]
+                v_name = p.get("target_vehicle") or ""
+                parts = v_name.split(" ", 1)
+                mfr = parts[0] if parts else ""
+                mdl = parts[1] if len(parts) > 1 else ""
+
+                initial_core = {
+                    "full_name": p.get("client_name") or req.client_name or "",
+                    "phone": p.get("client_phone") or "",
+                    "email": p.get("client_email") or "",
+                    "manufacturer": mfr,
+                    "model": mdl,
+                    "vin": p.get("vin") or "",
+                    "price": str(p.get("agreed_sale_price") or p.get("purchase_price") or ""),
+                    "min_price": str(p.get("purchase_price") or ""),
+                }
+        except Exception as e:
+            logger.warning(f"Could not prefill session from project {req.project_id}: {e}")
+
     row = {
         "pipeline": pipeline,
         "project_id": req.project_id,
@@ -175,7 +199,7 @@ async def create_session(req: CreateSessionRequest):
         "form_link_token": uuid.uuid4().hex[:12],
         "stage": 1,
         "status": "draft",
-        "shared_core": {},
+        "shared_core": initial_core,
     }
     res = sb.table("client_form_sessions").insert(row).execute()
     session = res.data[0]
@@ -308,11 +332,13 @@ async def approve_and_upload(session_id: str, template_type: str):
     pipeline = session["pipeline"]
     filename = os.path.basename(file_path)
 
+    project_id = session.get("project_id") or "general"
     res = await upload_approved_contract_to_drive(
         customer_name=client_name,
         contract_filename=filename,
         pdf_file_path=file_path,
-        pipeline=pipeline,
+        project_id=str(project_id),
+        target_subfolder="3. Signed Docs"
     )
     if not res.get("success"):
         raise HTTPException(status_code=500, detail=res.get("error", "Drive upload failed"))
@@ -335,4 +361,8 @@ async def download_pdf(path: str = Query(..., description="Absolute path of the 
         raise HTTPException(status_code=404, detail="File not found")
     if not path.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files can be downloaded")
-    return FileResponse(path, media_type="application/pdf", filename=os.path.basename(path))
+    return FileResponse(
+        path,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{os.path.basename(path)}"'}
+    )

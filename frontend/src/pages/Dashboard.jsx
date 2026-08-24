@@ -102,7 +102,7 @@ export default function Dashboard() {
           <p style={{ fontSize: '0.9rem' }}>Here's what's happening in your brokerage today.</p>
         </div>
         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-          {format(new Date(), 'EEEE, MMMM do, yyyy')}
+          {format(new Date(), 'EEEE, dd/MM/yyyy')}
         </div>
       </div>
 

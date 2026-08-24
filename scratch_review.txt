@@ -1,0 +1,38 @@
+REQUIREMENTS PROFILE &SPECIFICATIONS
+AI-Supported Backoffice Operating System forCAR-AGENTS
+This document summarizes the operational requirements for the development of an automated, cloud-based backoffice solution. The objective is to maximally relieve the owner of day-to-day operations and establish "franchise readiness" for the subsequent multiplication of the business model.
+1. Current Situation & Process Gaps (Status Quo)
+Calendar fragmentation: No synchronisation between the main occupation and the brokerage business, resulting in a high susceptibility to scheduling conflicts.
+Missing central system: No CRM infrastructure; customer data, vehicle data, and project status are fragmented and not interconnected. (current development)
+High filtering effort: Initial inquiries (WhatsApp/website) must be completely pre-sorted and qualified manually.
+Recurring routine questions: Prospects repeatedly ask for vehicle details that are already fully contained in the listing text.
+Media chaos & storage overload: Photo and video shoots (500–600 MB per vehicle) are sent manually via WhatsApp, making chat histories difficult to manage and consuming smartphone storage.
+Analogue administration: Manual, time-consuming creation of contracts, quotations, search profiles, and handover protocols.
+Isolated listing: Manual and redundant entry of vehicles on Kleinanzeigen, mobile.de, and AutoScout24.
+Interface restriction (accounting): The tax advisor works exclusively with DATEV Unternehmen online. Cloud accounting systems (e.g., Lexoffice/Sevdesk) are not compatible from the tax advisor's side, resulting in a lack of an integrated real-time overview of margins and annual figures during operations.
+Manual payment monitoring: Monitoring of order fees, commissions, and advance payments for third-party services is performed incompletely through manual account checks.
+2. Future Vision & Scaling Objective
+(Franchise Readiness)
+Process standardization: Creation of a seamless, deterministic workflow without exceptions.
+KPI & deadline tracking: Automated recording of processing times and idle times for each project phase (e.g., duration of a listing until a necessary market adjustment).
+Multi-tenant structure: The entire software architecture must be designed so that after a 12-month test phase, it can be handed over as a turnkey white-label system for franchise or partner models and cloned for new users.
+3. Functional Requirements (Target State)
+Intelligent Inquiry & Time Management
+Two-way calendar sync: Automatic blocking of time slots in the CAR-AGENTS calendar when appointments are entered in the main-occupation calendar, without disclosing confidential content. (a)
+Lead qualification & bot filter: Automated pre-classification of incoming inquiries. The system autonomously distinguishes among search mandates, sales mandates, and existing prospects and directly assigns leads to the service packages (Essential, Advanced, Concierge). (c)
+Autonomous FAQ answering: The bot independently answers detailed questions about listed vehicles based on the stored vehicle database. (Future scope- after new website development) (User-specific chatbot for FAQ) (d)
+3.2 Cloud-Based Media & Listing Management
+Centralised media self-service: Automated storage of photo/video material in vehicle-specific cloud folders (e.g., Google Drive). (Future scope: via WA bot, and actions need to be performed by Maxim) (e)
+Link-based provision: Automatic integration of the specific folder link into the listing text, as well as autonomous provision of the link in response to WhatsApp media inquiries, to completely relieve the phone's storage. (will be done using Google Drive and WA chat) (to be developed while we develop the above feature) (e)
+Automated multiposting: AI-supported generation of sales-oriented listing texts via VIN/FIN query and automated creation of listing drafts on the core platforms for final approval. (We will create a new workflow for this in the next phase) (g)
+3.3 Document Automation & Legal Compliance
+OCR capture & variable queries: Automated document generation by click or chat input (e.g., reading the vehicle registration document via OCR). Missing parameters are actively requested by the system (e.g., selected storage option A, B, or C for the vehicle handover protocol, or individual agreements pursuant to § 1 para. 7 of the GTC). (we are building this to detect missing fields in pdf) (f)
+Link-based e-signature: No need to send PDF attachments. Contracts (e.g., brokerage mandates based on the CAR-AGENTS GTC) are issued as a secure web link for a legally binding digital signature (in compliance with § 9 para. 2a GTC). (doable but requires an additional tool subscription) (so we should opt for it after a certain scale) (f)
+3.4 Controlling, Cash Flow & Dunning
+Independent controlling dashboard: Creation of a visual dashboard (e.g., Gantt chart / Kanban pipeline) on a dashboard (b) or Excel basis to provide a live view of the net margin per project (income from fees/commissions less 1:1 pass-through external third-party costs). The solution operates independently of the tax advisor's DATEV restriction. (to be built in future phases with a custom portal) (h) (2.2)
+Bank API & automated dunning: Account monitoring via PSD2 interface. Automatic project start upon posting of the order fee; scheduled, automated sending of reminders via messenger/email in the event of overdue receivables (taking § 3 para. 5 GTC – suspension of activities – into account). (this is an advanced requirement, to be developed at the end) (i) (2.2)
+4. System Operation: The “Master-Agent” Principle (Voice & Updates)
+Central interface (single entry point): In day-to-day operations, the user primarily operates the system through a single AI instance via text or voice command (e.g., through a dedicated WhatsApp chat). (2.1) (Chatbot for Maxim to get info)
+Background orchestration: This overarching AI assistant processes the input, interprets the context, and autonomously controls the underlying sub-systems (CRM, cloud storage, document configurator, Bank API), without requiring the user to operate the individual software applications manually. (2.3) (Chatbot for Maxim to perform autonomous actions)
+5. Scale- Building complete white-label systems
+Phase 1 – Green ColorPhase 2 – Yellow ColorPhase 3 – Blue ColorPhase 4 – Red ColorPhase 5 – Grey Color

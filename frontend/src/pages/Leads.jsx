@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus, Search, RefreshCw, Mail, Phone, Car, Tag, ShoppingCart } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Users, Plus, Search, RefreshCw, Mail, Phone, Car, Tag, ShoppingCart, Sparkles } from 'lucide-react';
 import { api } from '../api/api';
 import LeadModal from '../components/LeadModal';
 
 function getLeadVehicleDisplay(lead) {
+  if (lead.vehicle_interest) return lead.vehicle_interest;
   if (lead.vehicle) return lead.vehicle;
   if (lead.manufacturer || lead.model) return `${lead.manufacturer || ''} ${lead.model || ''}`.trim();
 
@@ -18,11 +20,13 @@ function getLeadVehicleDisplay(lead) {
 }
 
 export default function Leads() {
+  const navigate = useNavigate();
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [intentFilter, setIntentFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [convertingId, setConvertingId] = useState(null);
 
   const loadLeads = async () => {
     setLoading(true);
@@ -34,6 +38,37 @@ export default function Leads() {
       console.error('Failed to load leads:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleConvertLeadToProject = async (lead) => {
+    setConvertingId(lead.id);
+    try {
+      const vehicleName = getLeadVehicleDisplay(lead) || 'Vehicle TBD';
+      const pType = (lead.intent || '').toUpperCase().includes('SELL') ? 'SELL' : 'BUY';
+      
+      // 1. Create project in projects table
+      await api.createProject({
+        client_name: lead.name || 'Client Lead',
+        client_email: lead.email,
+        client_phone: lead.phone,
+        project_type: pType,
+        target_vehicle: vehicleName,
+        vin: lead.vin,
+        status: 'ACTIVE',
+        current_stage: 'Intake & Onboarding',
+        notes: lead.notes || lead.message || `Converted from Lead ID ${lead.id}`
+      });
+
+      // 2. Remove converted lead from leads table so client officially moves to Customers & Projects
+      await api.deleteLead(lead.id).catch(() => {});
+
+      alert(`Successfully converted ${lead.name || 'Lead'} into an official Client & active Project!`);
+      navigate('/projects');
+    } catch (err) {
+      alert('Failed to convert lead to project: ' + err.message);
+    } finally {
+      setConvertingId(null);
     }
   };
 
@@ -190,6 +225,7 @@ export default function Leads() {
                   <th>Pipeline Intent</th>
                   <th>Channel</th>
                   <th>Created</th>
+                  <th style={{ textAlign: 'right', paddingRight: 24 }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -245,7 +281,22 @@ export default function Leads() {
                       </span>
                     </td>
                     <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      {lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '—'}
+                      {lead.created_at ? (() => {
+                        const d = new Date(lead.created_at);
+                        const day = String(d.getDate()).padStart(2, '0');
+                        const month = String(d.getMonth() + 1).padStart(2, '0');
+                        return `${day}/${month}/${d.getFullYear()}`;
+                      })() : '—'}
+                    </td>
+                    <td style={{ textAlign: 'right', paddingRight: 24 }}>
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => handleConvertLeadToProject(lead)}
+                        disabled={convertingId === lead.id}
+                        style={{ padding: '6px 12px', fontSize: '0.78rem', gap: 6 }}
+                      >
+                        <Sparkles size={13} /> Convert to Project
+                      </button>
                     </td>
                   </tr>
                 ))}

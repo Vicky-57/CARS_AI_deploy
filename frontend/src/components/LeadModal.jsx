@@ -29,9 +29,9 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
     try {
       const payload = {
         ...form,
-        vehicle: (form.manufacturer || form.model) ? `${form.manufacturer} ${form.model}`.trim() : null,
         price_limit: form.price_limit ? parseFloat(form.price_limit) : null,
       };
+      delete payload.vehicle;
       await api.createLead(payload);
       if (onLeadCreated) onLeadCreated();
       onClose();

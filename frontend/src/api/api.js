@@ -92,6 +92,12 @@ export const api = {
     return data;
   },
 
+  deleteLead: async (id) => {
+    const { data, error } = await supabase.from('leads').delete().eq('id', id);
+    if (error) throw error;
+    return data;
+  },
+
   // ── PROJECTS (Buy & Sell Pipelines) ─────────────────────────────────────────
   getProjects: async (projectType = null) => {
     let q = supabase
@@ -130,6 +136,11 @@ export const api = {
 
   generateContract: (projectId, templateType) => aiPost('/api/v1/contracts/generate-pdf', { template_type: templateType, deal_id: projectId }),
   approveAndUploadContract: (customerName, contractFilename, filePath) => aiPost('/api/v1/contracts/approve-and-upload', { customer_name: customerName, contract_filename: contractFilename, file_path: filePath }),
+  getProjectDriveFolders: (projectId, clientName) => fetch(`${AI_URL}/api/v1/projects/${projectId}/drive-folders?client_name=${encodeURIComponent(clientName || 'Customer')}`).then(r => r.json()),
+  uploadFileToProjectDrive: (projectId, formData) => fetch(`${AI_URL}/api/v1/projects/${projectId}/upload-drive-file`, {
+    method: 'POST',
+    body: formData
+  }).then(r => r.json()),
 
   // ── CLIENT FORM SESSIONS & DOCUMENTATION ──────────────────────────────────
   createFormSession: (payload) => aiPost('/api/v1/forms/sessions', payload),
@@ -280,34 +291,39 @@ export const api = {
   extractVehicleSpecs:  (formData) => aiUpload('/api/ocr/vehicle-specs', formData),
   classifyIntent:       (message)  => aiPost('/classify-intent', { message }),
 
-  // ── GMAIL REST API & GOOGLE OAUTH2 ─────────────────────────────────────────
+  // ── GOOGLE DRIVE OAUTH2 ───────────────────────────────────────────────────
   googleAuthUrl: () => fetch(`${AI_URL}/api/v1/auth/google/url`).then(r => r.json()),
-  getPrimaryEmails: () => fetch(`${AI_URL}/api/v1/gmail/primary-emails`).then(r => r.json()),
-  convertGmailToLead: (messageId) => aiPost('/api/v1/gmail/convert-lead', { message_id: messageId }),
+  googleAuthStatus: () => fetch(`${AI_URL}/api/v1/auth/google/status`).then(r => r.json()),
 
-  // ── GOOGLE CALENDAR SYNC (FastAPI) ───────────────────────────────────────────
-  googleAuthStatus:() => fetch(`${AI_URL}/api/v1/auth/google/status`).then(r => r.json()),
-  syncMeeting:     (id) => fetch(`${AI_URL}/api/v1/meetings/${id}/sync`, { method: 'POST' }).then(r => r.json()),
-  unsyncMeeting:   (id) => fetch(`${AI_URL}/api/v1/meetings/${id}/sync`, { method: 'DELETE' }).then(r => r.json()),
-  checkGoogleFreeBusy: (startTime, endTime) => aiPost('/api/v1/meetings/free-busy', { start_time: startTime, end_time: endTime }),
-
-  getGoogleCalendarEvents: (timeMin, timeMax) => {
+  getOutlookCalendarEvents: (timeMin, timeMax) => {
     const params = new URLSearchParams();
     if (timeMin) params.append('time_min', timeMin);
     if (timeMax) params.append('time_max', timeMax);
-    return fetch(`${AI_URL}/api/v1/meetings/google-events?${params}`).then(r => r.json());
+    return fetch(`${AI_URL}/api/v1/outlook/events?${params}`).then(r => r.json());
   },
 
-  // Alias so Calendar.jsx can call api.checkConflict()
+  // Conflict engine: checks Supabase meetings + Outlook calendar
   checkConflict: async (startIso, endIso, isOnsite) => {
     const AI_URL_local = import.meta.env.VITE_AI_URL || 'http://localhost:9000';
-    const res = await fetch(`${AI_URL_local}/api/v1/meetings/free-busy`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ start_time: startIso, end_time: endIso }),
-    });
-    const google = res.ok ? await res.json() : null;
-    // Also check Supabase meetings for overlap
+    
+    // Check Outlook conflict
+    let outlookResult = null;
+    try {
+      const res = await fetch(`${AI_URL_local}/api/v1/outlook/check-conflict`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          proposed_datetime: startIso,
+          duration_minutes: Math.max(15, Math.round((new Date(endIso) - new Date(startIso)) / 60000)),
+          travel_buffer_minutes: isOnsite ? 30 : 0
+        }),
+      });
+      if (res.ok) outlookResult = await res.json();
+    } catch (e) {
+      console.warn('Outlook conflict check warning:', e);
+    }
+
+    // Check Supabase meetings for overlap
     const buffer = isOnsite ? 30 * 60 * 1000 : 0;
     const start = new Date(startIso);
     const end = new Date(endIso);
@@ -318,13 +334,17 @@ export const api = {
       .select('id, title, client_name, start_time, end_time, location_type')
       .lt('start_time', checkEnd)
       .gt('end_time', checkStart);
+    
     const overlaps = (data || []).filter(m => new Date(m.start_time) < end && new Date(m.end_time) > start);
+    const hasOutlookConflict = outlookResult?.conflict || false;
+
     return {
-      has_conflict: overlaps.length > 0,
-      has_overlap: overlaps.length > 0,
+      has_conflict: overlaps.length > 0 || hasOutlookConflict,
+      has_overlap: overlaps.length > 0 || hasOutlookConflict,
       overlapping_meetings: overlaps,
       has_buffer_clash: isOnsite && (data || []).length > overlaps.length,
       buffer_clash_meetings: [],
+      outlook_conflict: outlookResult
     };
   },
 

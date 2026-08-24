@@ -209,7 +209,12 @@ export default function Deals() {
                       <div className="contact-preview" style={{ fontSize: '0.8rem' }}>{deal.target_vehicle || 'No vehicle specified'}</div>
                     </div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500, flexShrink: 0 }}>
-                      {new Date(deal.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                      {(() => {
+                        const d = new Date(deal.updated_at);
+                        const day = String(d.getDate()).padStart(2, '0');
+                        const month = String(d.getMonth() + 1).padStart(2, '0');
+                        return `${day}/${month}/${d.getFullYear()}`;
+                      })()}
                     </div>
                   </div>
                 );
@@ -291,7 +296,12 @@ export default function Deals() {
                           <div key={labor.id} style={{ padding: 16, background: 'var(--gray-50)', borderRadius: 8 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
                               <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--brand-700)' }}>{labor.hours_spent} hours</span>
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>{new Date(labor.logged_at).toLocaleDateString()}</span>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>{(() => {
+                                const d = new Date(labor.logged_at);
+                                const day = String(d.getDate()).padStart(2, '0');
+                                const month = String(d.getMonth() + 1).padStart(2, '0');
+                                return `${day}/${month}/${d.getFullYear()}`;
+                              })()}</span>
                             </div>
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{labor.activity_description}</div>
                           </div>
@@ -319,7 +329,12 @@ export default function Deals() {
                               <span className="badge" style={{ fontSize: '0.65rem' }}>{expense.expense_type}</span>
                             </div>
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{expense.description}</div>
-                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 8, fontWeight: 500 }}>{new Date(expense.logged_at).toLocaleDateString()}</div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 8, fontWeight: 500 }}>{(() => {
+                              const d = new Date(expense.logged_at);
+                              const day = String(d.getDate()).padStart(2, '0');
+                              const month = String(d.getMonth() + 1).padStart(2, '0');
+                              return `${day}/${month}/${d.getFullYear()}`;
+                            })()}</div>
                           </div>
                         ))}
                       </div>

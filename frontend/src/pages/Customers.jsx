@@ -358,7 +358,12 @@ export default function Customers() {
                     <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <Clock size={12} />
-                        {customer.last_interaction ? new Date(customer.last_interaction).toLocaleDateString() : '—'}
+                        {customer.last_interaction ? (() => {
+                          const d = new Date(customer.last_interaction);
+                          const day = String(d.getDate()).padStart(2, '0');
+                          const month = String(d.getMonth() + 1).padStart(2, '0');
+                          return `${day}/${month}/${d.getFullYear()}`;
+                        })() : '—'}
                       </div>
                     </td>
                     <td style={{ textAlign: 'right', paddingRight: 24 }}>
@@ -582,7 +587,12 @@ export default function Customers() {
                     <div key={idx} style={{ padding: 12, background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border)', fontSize: '0.82rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                         <span className={`badge ${inter.type === 'Project' ? 'badge-email' : 'badge-whatsapp'}`}>{inter.type}</span>
-                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{new Date(inter.date || Date.now()).toLocaleDateString()}</span>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{(() => {
+                          const d = new Date(inter.date || Date.now());
+                          const day = String(d.getDate()).padStart(2, '0');
+                          const month = String(d.getMonth() + 1).padStart(2, '0');
+                          return `${day}/${month}/${d.getFullYear()}`;
+                        })()}</span>
                       </div>
                       <div style={{ color: 'var(--text-secondary)' }}>{inter.details?.subject || inter.details?.notes || inter.details?.message?.slice(0, 100) || 'Inquiry logged'}</div>
                     </div>

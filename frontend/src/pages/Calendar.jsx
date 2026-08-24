@@ -211,15 +211,16 @@ function MeetingModal({ meeting, onClose, onSaved }) {
 // ─── Event pill ───────────────────────────────────────────────────────────────
 function EventPill({ m, onClick }) {
   const isGoogle = m.source === 'google';
+  const isOutlook = m.source === 'outlook';
   const isOnsite = m.location_type === 'OFFLINE_ONSITE';
   return (
     <div
       onClick={() => onClick && onClick(m)}
       title={`${m.title}${m.client_name ? ' · ' + m.client_name : ''}`}
       style={{
-        background: isGoogle ? '#e8f0fe' : isOnsite ? '#fef3c7' : '#dcfce7',
-        color: isGoogle ? '#1a56db' : isOnsite ? '#92400e' : '#15803d',
-        borderLeft: `3px solid ${isGoogle ? '#4285F4' : isOnsite ? '#f59e0b' : '#22c55e'}`,
+        background: isGoogle ? '#e8f0fe' : isOutlook ? '#e0f2fe' : isOnsite ? '#fef3c7' : '#dcfce7',
+        color: isGoogle ? '#1a56db' : isOutlook ? '#0369a1' : isOnsite ? '#92400e' : '#15803d',
+        borderLeft: `3px solid ${isGoogle ? '#4285F4' : isOutlook ? '#0284c7' : isOnsite ? '#f59e0b' : '#22c55e'}`,
         borderRadius: 4,
         padding: '3px 6px',
         fontSize: '0.68rem',
@@ -234,7 +235,7 @@ function EventPill({ m, onClick }) {
       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
         {format(new Date(m.start_time), 'HH:mm')} {m.title}
       </span>
-      {isGoogle && <Calendar size={10} style={{ opacity: 0.7, flexShrink: 0 }} />}
+      {(isGoogle || isOutlook) && <Calendar size={10} style={{ opacity: 0.7, flexShrink: 0 }} />}
     </div>
   );
 }
@@ -349,7 +350,7 @@ function DayPanel({ day, meetings, onEdit, onDelete, onClose }) {
         <div style={{ padding: '32px 32px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <div style={{ fontWeight: 800, fontSize: '1.6rem', color: '#09090b', letterSpacing: '-0.5px' }}>{format(day, 'EEEE')}</div>
-            <div style={{ fontSize: '0.95rem', color: '#71717a', marginTop: 4, fontWeight: 500 }}>{format(day, 'MMMM d, yyyy')}</div>
+            <div style={{ fontSize: '0.95rem', color: '#71717a', marginTop: 4, fontWeight: 500 }}>{format(day, 'dd/MM/yyyy')}</div>
           </div>
           <button className="btn-icon" onClick={onClose} style={{ background: '#f4f4f5', color: '#52525b', borderRadius: '50%', padding: 8, transition: 'all 0.2s', border: 'none', cursor: 'pointer', display: 'flex' }}
             onMouseEnter={e => { e.currentTarget.style.background = '#e4e4e7'; e.currentTarget.style.color = '#09090b'; }}
@@ -412,7 +413,7 @@ function DayPanel({ day, meetings, onEdit, onDelete, onClose }) {
 export default function CalendarPage() {
   const today = new Date();
   const [supabaseMeetings, setSupabaseMeetings] = useState([]);
-  const [googleEvents, setGoogleEvents] = useState([]);
+  const [outlookEvents, setOutlookEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -421,14 +422,10 @@ export default function CalendarPage() {
   const [currentWeek, setCurrentWeek] = useState(startOfWeek(today, { weekStartsOn: 1 }));
   const [currentMonth, setCurrentMonth] = useState(startOfMonth(today));
   const [selectedDay, setSelectedDay] = useState(null);
-  const [googleConnected, setGoogleConnected] = useState(false);
+  const [outlookConnected, setOutlookConnected] = useState(false);
 
-  // Merge Supabase + Google events (dedup by google_event_id)
-  const allMeetings = (() => {
-    const supabaseGoogleIds = new Set(supabaseMeetings.map(m => m.google_event_id).filter(Boolean));
-    const filteredGoogle = googleEvents.filter(e => !supabaseGoogleIds.has(e.google_event_id));
-    return [...supabaseMeetings, ...filteredGoogle];
-  })();
+  // Merge Supabase Portal meetings + Outlook events
+  const allMeetings = [...supabaseMeetings, ...outlookEvents];
 
   const loadData = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -438,19 +435,14 @@ export default function CalendarPage() {
       const sbData = await api.getMeetings();
       setSupabaseMeetings(sbData || []);
 
-      // Load Google Calendar events for current visible range
-      if (viewMode === 'week') {
-        const timeMin = currentWeek.toISOString();
-        const timeMax = addDays(currentWeek, 7).toISOString();
-        const res = await api.getGoogleCalendarEvents(timeMin, timeMax).catch(() => ({ events: [] }));
-        setGoogleEvents(res.events || []);
-        setGoogleConnected(!!res.connected);
-      } else {
-        const timeMin = startOfMonth(currentMonth).toISOString();
-        const timeMax = endOfMonth(currentMonth).toISOString();
-        const res = await api.getGoogleCalendarEvents(timeMin, timeMax).catch(() => ({ events: [] }));
-        setGoogleEvents(res.events || []);
-        setGoogleConnected(!!res.connected);
+      const timeMin = viewMode === 'week' ? currentWeek.toISOString() : startOfMonth(currentMonth).toISOString();
+      const timeMax = viewMode === 'week' ? addDays(currentWeek, 7).toISOString() : endOfMonth(currentMonth).toISOString();
+
+      // Load Outlook events
+      if (api.getOutlookCalendarEvents) {
+        const oRes = await api.getOutlookCalendarEvents(timeMin, timeMax).catch(() => ({ events: [], connected: false }));
+        setOutlookEvents(oRes.events || []);
+        setOutlookConnected(!!oRes.connected);
       }
     } catch (e) {
       console.error('Calendar load error:', e);
@@ -469,7 +461,7 @@ export default function CalendarPage() {
   const nextPeriod = () => viewMode === 'week' ? setCurrentWeek(w => addWeeks(w, 1)) : setCurrentMonth(m => addMonths(m, 1));
 
   const periodLabel = viewMode === 'week'
-    ? `${format(currentWeek, 'MMM d')} – ${format(addDays(currentWeek, 6), 'MMM d, yyyy')}`
+    ? `${format(currentWeek, 'dd/MM')} – ${format(addDays(currentWeek, 6), 'dd/MM/yyyy')}`
     : format(currentMonth, 'MMMM yyyy');
 
   const handleDayClick = (day) => setSelectedDay(day);
@@ -505,7 +497,7 @@ export default function CalendarPage() {
         <div className="page-header-left">
           <h1 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Calendar & Appointments</h1>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            Portal meetings + Google Calendar events — 30-min travel conflict guard
+            Portal meetings + Outlook Calendar events — 30-min travel conflict guard
           </p>
         </div>
         <div className="calendar-actions-mobile" style={{ display: 'flex', gap: 8, alignItems: 'center', paddingBottom: 4 }}>
@@ -524,8 +516,8 @@ export default function CalendarPage() {
               }}>{mode.charAt(0).toUpperCase() + mode.slice(1)}</button>
             ))}
           </div>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', background: googleConnected ? '#dcfce7' : '#fef3c7', color: googleConnected ? '#15803d' : '#92400e', borderRadius: 20, padding: '4px 10px', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
-            {googleConnected ? <><CheckCircle size={14} /> <span className="hide-on-mobile">Google Synced</span></> : <><AlertTriangle size={14} /> <span className="hide-on-mobile">Not Connected</span></>}
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', background: outlookConnected ? '#e0f2fe' : '#fef3c7', color: outlookConnected ? '#0369a1' : '#92400e', borderRadius: 20, padding: '4px 10px', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
+            {outlookConnected ? <><CheckCircle size={14} /> <span className="hide-on-mobile">Outlook Synced</span></> : <><AlertTriangle size={14} /> <span className="hide-on-mobile">Outlook Offline</span></>}
           </span>
           <button className="btn btn-primary" style={{ marginLeft: 'auto', whiteSpace: 'nowrap', flexShrink: 0 }} onClick={() => { setEditing(null); setShowModal(true); }}>
             <Plus size={14} /> <span className="hide-on-mobile">Book Meeting</span><span className="show-on-mobile">Book</span>
@@ -537,24 +529,24 @@ export default function CalendarPage() {
       {todayMeetings.length > 0 && (
         <div style={{ background: 'var(--brand-50)', border: '1px solid var(--brand-200)', borderRadius: 12, padding: '14px 20px', marginBottom: 16, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ color: 'var(--brand-700)', fontWeight: 700, fontSize: '0.85rem', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Calendar size={16} /> Today · {format(today, 'EEEE, MMMM d')}
+            <Calendar size={16} /> Today · {format(today, 'EEEE, dd/MM/yyyy')}
           </div>
           <div style={{ width: 1, height: 20, background: 'var(--brand-200)', margin: '0 4px' }} />
           {todayMeetings.map(m => {
-            const isGoogle = m.source === 'google';
+            const isOutlook = m.source === 'outlook';
             const isOnsite = m.location_type === 'OFFLINE_ONSITE';
             return (
               <div key={m.id} onClick={() => { setSelectedDay(today); }} style={{
-                background: isGoogle ? '#e8f0fe' : isOnsite ? '#fef3c7' : '#dcfce7',
-                color: isGoogle ? '#1a56db' : isOnsite ? '#92400e' : '#15803d',
+                background: isOutlook ? '#e0f2fe' : isOnsite ? '#fef3c7' : '#dcfce7',
+                color: isOutlook ? '#0369a1' : isOnsite ? '#92400e' : '#15803d',
                 borderRadius: 20,
                 padding: '4px 12px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
-                border: `1px solid ${isGoogle ? '#4285F4' : isOnsite ? '#f59e0b' : '#22c55e'}`,
+                border: `1px solid ${isOutlook ? '#0284c7' : isOnsite ? '#f59e0b' : '#22c55e'}`,
                 display: 'flex', alignItems: 'center', gap: 4,
                 boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
               }}>
                 {format(new Date(m.start_time), 'HH:mm')} {m.title}
-                {isGoogle && <Calendar size={12} style={{ opacity: 0.8 }} />}
+                {isOutlook && <Calendar size={12} style={{ opacity: 0.8 }} />}
               </div>
             );
           })}
@@ -582,7 +574,7 @@ export default function CalendarPage() {
           )}
           {/* Legend */}
           <div style={{ display: 'flex', gap: 16, marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border)', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-            <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#e8f0fe', border: '1px solid #4285F4', marginRight: 4 }} />Google Calendar</span>
+            <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#e0f2fe', border: '1px solid #0284c7', marginRight: 4 }} />Outlook Calendar</span>
             <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#dcfce7', border: '1px solid #22c55e', marginRight: 4 }} />Portal Meeting (Online)</span>
             <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#fef3c7', border: '1px solid #f59e0b', marginRight: 4 }} />Portal Meeting (Onsite)</span>
           </div>

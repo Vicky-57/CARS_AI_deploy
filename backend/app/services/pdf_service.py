@@ -100,6 +100,8 @@ SELL_B2C_TOKEN_KEY = {
     "Fahrzeug_ZB2_Nr": "zb2",
     "Fahrzeug_Gaspruefung": "gas_until",
     "Anzahl_Schluessel": "keys",
+    "Anzahl_Schlüssel": "keys",
+    "Anzahl_Schl\ufffdssel": "keys",
     "Sonstiges": "misc",
     "Tausch_KM": "engine_mileage",
     "Tausch_Datum": "engine_date",
@@ -289,13 +291,13 @@ def _draw_fitted(page, x0: float, y0: float, x1: float, y1: float, value: str,
         for i, line in enumerate(lines):
             w = fitz.get_text_length(line, SAFE_FONT, fs)
             xx = x0 + max(0, (box_w - w) / 2)
-            page.insert_text((xx, y0 + (i + 1) * fs), line, fontname=SAFE_FONT, fontsize=fs)
+            page.insert_text((xx, y0 + (i + 1) * fs), line, fontname=SAFE_FONT, fontsize=fs, color=(0, 0, 0))
     else:
         for i, line in enumerate(lines):
             y = y0 + (i + 1) * fs
             if y > y1 + 6:
                 break
-            page.insert_text((x0, y), line, fontname=SAFE_FONT, fontsize=fs)
+            page.insert_text((x0, y), line, fontname=SAFE_FONT, fontsize=fs, color=(0, 0, 0))
 
 
 _LEGACY_TOKEN_KEYS = ({**SELL_B2C_TOKEN_KEY, **PRICE_TOKEN_KEYS})
@@ -311,9 +313,9 @@ def _fill_token_document(doc, data: dict) -> None:
             for line in block["lines"]:
                 for span in line["spans"]:
                     st = span["text"].strip()
-                    if not (st.startswith("[") and "]" in st):
+                    if not st.startswith("["):
                         continue
-                    token = st.strip("[]").strip()
+                    token = st.replace("[", "").replace("]", "").strip()
                     key = SELL_B2C_TOKEN_KEY.get(token) or PRICE_TOKEN_KEYS.get(token)
                     if not key:
                         continue
@@ -322,10 +324,10 @@ def _fill_token_document(doc, data: dict) -> None:
                         continue
                     x0, y0, x1, y1 = span["bbox"]
                     size = span.get("size", 9.0)
-                    # cover the placeholder before drawing (white fill)
-                    page.add_redact_annot(fitz.Rect(x0, y0, x1, y1), fill=(1, 1, 1))
+                    box_w = max(x1 - x0, 120.0)
+                    page.add_redact_annot(fitz.Rect(x0, y0, x0 + box_w, y1), fill=(1, 1, 1))
                     page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
-                    _draw_fitted(page, x0, y0 + size * 0.15, x1, y1, str(val), fontsize=size - 1.0)
+                    _draw_fitted(page, x0, y0 + size * 0.15, x0 + box_w, y1, str(val), fontsize=size - 1.0)
 
 
 def _fill_manual_document(doc, template_type: str, data: dict) -> None:

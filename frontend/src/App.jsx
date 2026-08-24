@@ -33,8 +33,7 @@ const NAV = [
       { path: '/leads', icon: Users, label: 'Leads' },
       { path: '/customers', icon: Users, label: 'Customers' },
       { path: '/communications', icon: MessageSquare, label: 'Communications' },
-      { path: '/projects', icon: FolderKanban, label: 'Projects' },
-      { path: '/deals', icon: Briefcase, label: 'Deals' },
+      { path: '/projects', icon: FolderKanban, label: 'Deals & Projects' },
     ],
   },
   {
@@ -273,7 +272,7 @@ function AppRoutes({ isAuthenticated, online, userProfile, onLogin, onLogout }) 
             <Route path="/customers" element={<Customers />} />
             <Route path="/communications" element={<Communications />} />
             <Route path="/projects" element={<Projects />} />
-            <Route path="/deals" element={<Deals />} />
+            <Route path="/deals" element={<Projects />} />
             <Route path="/contracts" element={<Contracts />} />
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/profile" element={<Profile />} />

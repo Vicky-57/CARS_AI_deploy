@@ -111,15 +111,17 @@ export default function Contracts() {
 
   const handleCreateSession = async () => {
     if (!selectedProject) return;
+    const projObj = (projects || []).find(p => p.id === selectedProject);
+    if (!projObj) return;
+
     setCreating(true);
     try {
-      const session = await api.createFormSession({
-        pipeline: selectedProject.project_type?.toLowerCase(),
-        project_id: selectedProject.id,
-        client_name: selectedProject.client_name,
+      await api.createFormSession({
+        pipeline: (projObj.project_type || pipeline).toLowerCase(),
+        project_id: projObj.id,
+        client_name: projObj.client_name || 'Client',
       });
       await loadAll();
-      setSelectedProject(selectedProject.id);
     } catch (e) {
       alert('Could not create session: ' + e.message);
     } finally {
@@ -139,12 +141,17 @@ export default function Contracts() {
 
   const handleOpenEditor = (session, templateType) => {
     const doc = docFor(session.id, templateType);
+    const sub = (session.submissions || []).find(s => s.template_type === templateType);
+    const mergedData = {
+      ...(session.shared_core || {}),
+      ...(sub?.field_data || {})
+    };
     setEditor({
       sessionId: session.id,
       templateType,
       pipeline: session.pipeline,
       clientName: session.client_name,
-      fieldData: { ...(session.shared_core || {}) },
+      fieldData: mergedData,
       status: doc?.status || 'not rendered',
       drive_url: doc?.drive_url || '',
     });
