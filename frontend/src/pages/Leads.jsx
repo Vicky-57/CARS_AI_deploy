@@ -108,8 +108,8 @@ export default function Leads() {
           <span className="badge badge-new">New Inquiry</span>
         )}
         {isRepeat && (
-          <span className="badge" style={{ background: 'rgba(147, 51, 234, 0.15)', color: '#a855f7', border: '1px solid rgba(147, 51, 234, 0.3)', fontWeight: 700 }}>
-            💜 Repeat Client
+          <span className="badge" style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', fontWeight: 700 }}>
+            ⭐ Repeat Client
           </span>
         )}
         {isFollowup && (
@@ -219,9 +219,8 @@ export default function Leads() {
               <thead>
                 <tr>
                   <th style={{ paddingLeft: 24, paddingTop: 16, paddingBottom: 16 }}>Client</th>
-                  <th>Email</th>
-                  <th>Phone</th>
-                  <th>Vehicle Requested / Owned</th>
+                  <th>Contact Info</th>
+                  <th>Vehicle</th>
                   <th>Pipeline Intent</th>
                   <th>Channel</th>
                   <th>Created</th>
@@ -230,38 +229,44 @@ export default function Leads() {
               </thead>
               <tbody>
                 {filtered.map(lead => (
-                  <tr key={lead.id}>
-                    <td style={{ paddingLeft: 24 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <tr key={lead.id} style={{ transition: 'background-color 0.2s', cursor: 'pointer' }}>
+                    <td style={{ paddingLeft: 24, paddingVertical: 16 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                         <div style={{
-                          width: 40, height: 40, borderRadius: '50%',
-                          background: 'linear-gradient(135deg, var(--gray-100), var(--gray-200))',
+                          width: 44, height: 44, borderRadius: '50%',
+                          background: 'linear-gradient(135deg, #fff3ec, #ffe4d6)',
+                          border: '1px solid #fed7aa',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '0.85rem', fontWeight: 700, color: 'var(--gray-600)'
+                          fontSize: '0.9rem', fontWeight: 800, color: '#ea580c',
+                          boxShadow: '0 2px 8px rgba(234, 88, 12, 0.1)', flexShrink: 0
                         }}>
                           {getInitials(lead.name || lead.email)}
                         </div>
-                        <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{lead.name || 'Unknown Lead'}</div>
+                        <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>{lead.name || 'Unknown Lead'}</div>
                       </div>
                     </td>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem' }}>
-                        <Mail size={12} color="var(--text-muted)" />
-                        {lead.email || <span style={{ color: 'var(--text-muted)' }}>—</span>}
-                      </div>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem' }}>
-                        <Phone size={12} color="var(--text-muted)" />
-                        {lead.phone || <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem' }}>
+                          <Mail size={14} color="#f47c3c" flexShrink={0} />
+                          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200 }}>
+                            {lead.email || <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem' }}>
+                          <Phone size={14} color="#f47c3c" flexShrink={0} />
+                          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200 }}>
+                            {lead.phone || <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                          </span>
+                        </div>
                       </div>
                     </td>
                     <td>
                       {(() => {
                         const vDisplay = getLeadVehicleDisplay(lead);
                         return vDisplay ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: 'var(--brand-700)' }}>
-                            <Car size={14} color="var(--brand-600)" />
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, color: '#1a1a1a' }}>
+                            <Car size={16} color="#f47c3c" />
                             <span>{vDisplay}</span>
                           </div>
                         ) : (
@@ -269,7 +274,7 @@ export default function Leads() {
                         );
                       })()}
                       {lead.vin && (
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'monospace', marginTop: 4 }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace', marginTop: 6, fontWeight: 500 }}>
                           VIN: {lead.vin}
                         </div>
                       )}
