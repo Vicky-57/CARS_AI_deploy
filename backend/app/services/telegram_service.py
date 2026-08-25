@@ -71,6 +71,10 @@ async def send_telegram_message(text: str, chat_id: str = None, parse_mode: str 
     try:
         with urllib.request.urlopen(req, timeout=15) as r:
             return json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode('utf-8', errors='ignore') if hasattr(e, 'read') else str(e)
+        logger.error(f"Telegram send HTTP error {e.code}: {err_body}")
+        return {}
     except Exception as e:
         logger.error(f"Telegram send error: {e}")
         return {}
@@ -245,8 +249,8 @@ async def _handle_create_lead(text: str, chat_id: str) -> str:
         lead_id = result.data[0].get("id", "N/A") if result.data else "N/A"
 
         phone_button = (
-            {"text": f"📞 Call {phone}", "url": f"tel:{phone}"}
-            if phone and phone.startswith("+")
+            {"text": f"📞 {phone}", "callback_data": f"/customer {full_name}"}
+            if phone
             else {"text": "👤 View Customer", "callback_data": f"/customer {full_name}"}
         )
         inline_buttons = {
