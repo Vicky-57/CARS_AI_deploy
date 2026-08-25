@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   FolderKanban, LayoutGrid, List, Plus, Search, RefreshCw, User, Car,
   ChevronRight, Calculator, Clock, Receipt, Folder, Sparkles, CheckCircle2,
-  X, ExternalLink, Tag, FileText, Phone, Mail, ShieldCheck
+  X, ExternalLink, Tag, FileText, Phone, Mail, ShieldCheck, UploadCloud
 } from 'lucide-react';
 import { api } from '../api/api';
 import { format } from 'date-fns';
@@ -582,13 +582,20 @@ export default function Projects() {
                   <h2 style={{ fontSize: '1.3rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
                     {selectedProject.client_name}
                   </h2>
-                  <span className={`badge ${selectedProject.project_type === 'BUY' ? 'badge-email' : 'badge-whatsapp'}`}>
+                  <span className="badge" style={{ 
+                    background: 'var(--brand-100)', color: 'var(--brand-700)', 
+                    padding: '4px 10px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700, 
+                    textTransform: 'uppercase', letterSpacing: '0.5px', border: 'none'
+                  }}>
                     {selectedProject.project_type === 'BUY' ? 'Buy Side (Beschaffung)' : 'Sell Side (Vermittlung)'}
                   </span>
                 </div>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                  <span>🚗 {selectedProject.target_vehicle || 'No vehicle specified'}</span>
-                  {selectedProject.vin && <span>VIN: <code>{selectedProject.vin}</code></span>}
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', marginTop: 4 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Car size={14} style={{ color: 'var(--brand-500)' }} /> 
+                    <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{selectedProject.target_vehicle || 'No vehicle specified'}</span>
+                  </span>
+                  {selectedProject.vin && <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Tag size={14} style={{ color: 'var(--brand-500)' }} /> VIN: <code>{selectedProject.vin}</code></span>}
                   <span>Updated: {formatDateDDMMYYYY(selectedProject.updated_at)}</span>
                 </div>
               </div>
@@ -599,24 +606,24 @@ export default function Projects() {
             <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', background: 'var(--gray-50)', padding: '0 28px' }}>
               <button
                 className={`tab-item ${activeTab === 'overview' ? 'active' : ''}`}
-                style={{ padding: '12px 18px', fontSize: '0.85rem', fontWeight: 600, borderBottom: activeTab === 'overview' ? '2px solid var(--brand-600)' : 'none', color: activeTab === 'overview' ? 'var(--brand-700)' : 'var(--text-muted)' }}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, padding: '12px 18px', fontSize: '0.85rem', fontWeight: 600, borderBottom: activeTab === 'overview' ? '2px solid var(--brand-600)' : '2px solid transparent', color: activeTab === 'overview' ? 'var(--brand-700)' : 'var(--text-muted)' }}
                 onClick={() => setActiveTab('overview')}
               >
-                📋 Stage & Overview
+                <FileText size={16} /> Stage & Overview
               </button>
               <button
                 className={`tab-item ${activeTab === 'financials' ? 'active' : ''}`}
-                style={{ padding: '12px 18px', fontSize: '0.85rem', fontWeight: 600, borderBottom: activeTab === 'financials' ? '2px solid var(--brand-600)' : 'none', color: activeTab === 'financials' ? 'var(--brand-700)' : 'var(--text-muted)' }}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, padding: '12px 18px', fontSize: '0.85rem', fontWeight: 600, borderBottom: activeTab === 'financials' ? '2px solid var(--brand-600)' : '2px solid transparent', color: activeTab === 'financials' ? 'var(--brand-700)' : 'var(--text-muted)' }}
                 onClick={() => setActiveTab('financials')}
               >
-                💰 Financials & Profit Ledger
+                <Receipt size={16} /> Financials & Profit Ledger
               </button>
               <button
                 className={`tab-item ${activeTab === 'drive' ? 'active' : ''}`}
-                style={{ padding: '12px 18px', fontSize: '0.85rem', fontWeight: 600, borderBottom: activeTab === 'drive' ? '2px solid var(--brand-600)' : 'none', color: activeTab === 'drive' ? 'var(--brand-700)' : 'var(--text-muted)' }}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, padding: '12px 18px', fontSize: '0.85rem', fontWeight: 600, borderBottom: activeTab === 'drive' ? '2px solid var(--brand-600)' : '2px solid transparent', color: activeTab === 'drive' ? 'var(--brand-700)' : 'var(--text-muted)' }}
                 onClick={() => setActiveTab('drive')}
               >
-                📂 Drive Cloud Storage
+                <img src="/assets/google-drive (1).png" alt="Drive" style={{ width: 16, height: 16, objectFit: 'contain' }} /> Drive Cloud Storage
               </button>
             </div>
 
@@ -625,19 +632,19 @@ export default function Projects() {
               {activeTab === 'overview' && (
                 <div>
                   {/* Current Stage Card */}
-                  <div style={{ background: 'var(--brand-50)', border: '1px solid var(--brand-200)', borderRadius: 12, padding: 20, marginBottom: 24 }}>
+                  <div style={{ background: 'var(--brand-50)', border: '1px solid var(--brand-200)', borderRadius: 12, padding: 20, marginBottom: 24, boxShadow: 'var(--shadow-sm)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand-700)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-                          Current Sales Stage
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand-700)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                          <ShieldCheck size={14} /> Current Sales Stage
                         </div>
-                        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--brand-900)', marginTop: 2 }}>
+                        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--brand-900)', marginTop: 4 }}>
                           {selectedProject.current_stage || STAGES[0]}
                         </div>
                       </div>
 
                       {STAGES.indexOf(selectedProject.current_stage || STAGES[0]) < STAGES.length - 1 && (
-                        <button className="btn btn-primary" onClick={(e) => handleAdvanceStage(selectedProject, e)}>
+                        <button className="btn btn-primary" onClick={(e) => handleAdvanceStage(selectedProject, e)} style={{ padding: '8px 16px', boxShadow: 'var(--shadow)' }}>
                           Advance Stage <ChevronRight size={16} />
                         </button>
                       )}
@@ -663,9 +670,11 @@ export default function Projects() {
 
                   {/* Internal Notes */}
                   {selectedProject.notes && (
-                    <div style={{ background: 'white', border: '1px solid var(--border)', padding: 16, borderRadius: 10 }}>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6 }}>Internal Deal Notes:</div>
-                      <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                    <div style={{ background: 'var(--brand-50)', border: '1px solid var(--brand-200)', padding: 16, borderRadius: 10, boxShadow: 'var(--shadow-sm)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', fontWeight: 700, color: 'var(--brand-700)', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.5px' }}>
+                        <FileText size={14} /> Internal Deal Notes
+                      </div>
+                      <div style={{ fontSize: '0.9rem', color: 'var(--gray-900)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
                         {selectedProject.notes}
                       </div>
                     </div>
@@ -757,7 +766,7 @@ export default function Projects() {
                 <div style={{ padding: '16px 8px' }}>
                   <div style={{ textAlign: 'center', marginBottom: 24 }}>
                     <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--brand-50)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-                      <Folder size={28} color="var(--brand-600)" />
+                      <img src="/assets/google-drive (1).png" alt="Drive" style={{ width: 32, height: 32, objectFit: 'contain' }} />
                     </div>
                     <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: 6 }}>Google Drive Customer Storage</h3>
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', maxWidth: 480, margin: '0 auto', lineHeight: 1.5 }}>
@@ -767,10 +776,10 @@ export default function Projects() {
 
                   {/* Direct Folder Links */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 520, margin: '0 auto 32px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: 'var(--gray-50)', border: '1px solid var(--border)', borderRadius: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: 'var(--gray-50)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: 'var(--shadow-sm)' }}>
                       <div>
                         <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                          📁 1. OCR & Media Scans Folder
+                          <Folder size={16} color="var(--brand-500)" style={{ flexShrink: 0 }} /> 1. OCR & Media Scans Folder
                         </div>
                         <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>Vehicle photos, walkaround videos, vehicle specs</div>
                       </div>
@@ -785,10 +794,10 @@ export default function Projects() {
                       </a>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: 'var(--gray-50)', border: '1px solid var(--border)', borderRadius: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: 'var(--gray-50)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: 'var(--shadow-sm)' }}>
                       <div>
                         <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                          📁 2. Legal Contracts Folder
+                          <Folder size={16} color="var(--brand-500)" style={{ flexShrink: 0 }} /> 2. Legal Contracts Folder
                         </div>
                         <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>Power of Attorney, CAR-AGENTS GTC, disclaimers</div>
                       </div>
@@ -803,10 +812,10 @@ export default function Projects() {
                       </a>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: 'var(--gray-50)', border: '1px solid var(--border)', borderRadius: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: 'var(--gray-50)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: 'var(--shadow-sm)' }}>
                       <div>
                         <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                          📁 3. Signed PDF Contracts
+                          <Folder size={16} color="var(--brand-500)" style={{ flexShrink: 0 }} /> 3. Signed PDF Contracts
                         </div>
                         <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>Final signed brokerage & sale contracts</div>
                       </div>
@@ -823,9 +832,9 @@ export default function Projects() {
                   </div>
 
                   {/* Upload Media / Videos / Documents Box */}
-                  <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 14, padding: 24, maxWidth: 520, margin: '0 auto', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                  <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 14, padding: 24, maxWidth: 520, margin: '0 auto', boxShadow: 'var(--shadow-sm)' }}>
                     <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-primary)' }}>
-                      <Sparkles size={16} color="var(--brand-600)" /> Upload Media or Documents to Drive
+                      <UploadCloud size={16} color="var(--brand-600)" /> Upload Media or Documents to Drive
                     </div>
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 16 }}>
                       Select a vehicle walkaround video, photo, or PDF scan to upload directly to customer's Google Drive.

@@ -516,7 +516,7 @@ export default function CalendarPage() {
               }}>{mode.charAt(0).toUpperCase() + mode.slice(1)}</button>
             ))}
           </div>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', background: outlookConnected ? '#e0f2fe' : '#fef3c7', color: outlookConnected ? '#0369a1' : '#92400e', borderRadius: 20, padding: '4px 10px', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', background: outlookConnected ? 'var(--brand-100)' : '#fef3c7', color: outlookConnected ? 'var(--brand-600)' : '#92400e', borderRadius: 20, padding: '4px 10px', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
             {outlookConnected ? <><CheckCircle size={14} /> <span className="hide-on-mobile">Outlook Synced</span></> : <><AlertTriangle size={14} /> <span className="hide-on-mobile">Outlook Offline</span></>}
           </span>
           <button className="btn btn-primary" style={{ marginLeft: 'auto', whiteSpace: 'nowrap', flexShrink: 0 }} onClick={() => { setEditing(null); setShowModal(true); }}>

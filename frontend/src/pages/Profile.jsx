@@ -284,7 +284,7 @@ function AppConnectionsTab() {
 
               {googleStatus.connected ? (
                 <span style={{ 
-                  background: '#dcfce7', color: '#15803d', 
+                  background: 'var(--brand-100)', color: 'var(--brand-600)', 
                   padding: '4px 12px', borderRadius: 20, 
                   fontSize: '0.78rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6
                 }}>
@@ -309,7 +309,7 @@ function AppConnectionsTab() {
               ) : googleStatus.connected ? (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg, #4285F4, #34a853)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '0.9rem', flexShrink: 0 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg, var(--brand-500), var(--brand-700))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '0.9rem', flexShrink: 0 }}>
                       {googleStatus.email ? googleStatus.email[0].toUpperCase() : 'G'}
                     </div>
                     <div>
@@ -335,16 +335,16 @@ function AppConnectionsTab() {
               <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 12 }}>Enabled Features</div>
               <div className="grid-2" style={{ gap: 12, fontSize: '0.85rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <CheckCircle2 size={15} color="#10b981" /> Auto Contract PDF Backup to Drive
+                  <CheckCircle2 size={15} color="var(--brand-500)" /> Auto Contract PDF Backup to Drive
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <CheckCircle2 size={15} color="#10b981" /> Auto Vehicle Document Folder Structure
+                  <CheckCircle2 size={15} color="var(--brand-500)" /> Auto Vehicle Document Folder Structure
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <CheckCircle2 size={15} color="#10b981" /> Shareable Drive Links for Vehicle Listings
+                  <CheckCircle2 size={15} color="var(--brand-500)" /> Shareable Drive Links for Vehicle Listings
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <CheckCircle2 size={15} color="#10b981" /> Cloud Backup for Client Intake Form Attachments
+                  <CheckCircle2 size={15} color="var(--brand-500)" /> Cloud Backup for Client Intake Form Attachments
                 </div>
               </div>
             </div>

@@ -6,25 +6,25 @@
 
 /* ─── CSS TOKENS ──────────────────────────────────────────────────────────── */
 :root {
-  /* Brand palette - Cosmic Blue */
-  --brand-50:  #f0f3ff;
-  --brand-100: #e0e8fa;
-  --brand-200: #c2d3f3;
-  --brand-500: #3b6cd0;
-  --brand-600: #254db1;
-  --brand-700: #1a3a8f;
+  /* Brand palette - Orange/Coral */
+  --brand-50:  #fff4ed;
+  --brand-100: #ffe6d5;
+  --brand-200: #ffd1b3;
+  --brand-500: #f47c3c;
+  --brand-600: #e26a2c;
+  --brand-700: #cc5a1e;
 
   /* Neutrals */
-  --gray-50:  #f9fafb;
-  --gray-100: #f3f4f6;
+  --gray-50:  #faf9f8;
+  --gray-100: #f3ece2; /* Warm cream */
   --gray-200: #e5e7eb;
   --gray-300: #d1d5db;
   --gray-400: #9ca3af;
-  --gray-500: #6b7280;
-  --gray-600: #4b5563;
-  --gray-700: #374151;
-  --gray-800: #1f2937;
-  --gray-900: #111827;
+  --gray-500: #8a8a8a; /* Gray body text */
+  --gray-600: #6b6b6b; /* Gray secondary info */
+  --gray-700: #4a4a4a;
+  --gray-800: #222222; /* Near black */
+  --gray-900: #1a1a1a; /* Near black */
 
   /* Status */
   --success:  #10b981;
@@ -33,20 +33,20 @@
   --info:     #06b6d4;
 
   /* Surfaces */
-  --bg:            #eaedf1;
-  --surface:       #ffffff;
-  --surface-hover: #f3f4f6;
+  --bg:            #f5efe6; /* Warm Cream/Beige page background */
+  --surface:       #ffffff; /* White card backgrounds */
+  --surface-hover: #fcfbfa;
   --border:        #e5e7eb;
-  --border-focus:  #3b82f6;
+  --border-focus:  #f47c3c;
 
   /* Text */
-  --text-primary:   #111827;
-  --text-secondary: #6b7280;
-  --text-muted:     #9ca3af;
+  --text-primary:   #1a1a1a; /* Near-Black headlines */
+  --text-secondary: #6b6b6b; /* Gray body text */
+  --text-muted:     #8a8a8a;
 
   /* Sidebar */
-  --sidebar-bg: radial-gradient(circle at top left, rgba(37, 77, 177, 0.35) 0%, transparent 40%), radial-gradient(circle at bottom right, rgba(37, 77, 177, 0.28) 0%, transparent 40%), #0a0b0e;
-  --sidebar-text:  #f8fafc;
+  --sidebar-bg:    #1a1a1a;
+  --sidebar-text:  #ffffff;
   --sidebar-hover: rgba(255, 255, 255, 0.1);
   --sidebar-active:rgba(255, 255, 255, 0.2);
   --sidebar-width: 240px;
@@ -257,8 +257,8 @@ input, textarea, select {
 }
 .nav-item:hover { background: var(--sidebar-hover); color: #f1f5f9; }
 .nav-item.active {
-  background: rgba(59,130,246,.15);
-  color: #93c5fd;
+  background: rgba(244,124,60,.15);
+  color: #f47c3c;
 }
 .nav-item .nav-icon { flex-shrink: 0; }
 .nav-badge {
@@ -402,7 +402,7 @@ input, textarea, select {
   align-items: center;
   justify-content: center;
 }
-.stat-icon.blue   { background: #e0f2fe; color: #0284c7; }
+.stat-icon.orange { background: var(--brand-100); color: var(--brand-600); }
 .stat-icon.green  { background: #dcfce7; color: #16a34a; }
 .stat-icon.amber  { background: #fef3c7; color: #d97706; }
 .stat-icon.purple { background: #f3e8ff; color: #9333ea; }
@@ -559,7 +559,7 @@ tbody tr:last-child td { border-bottom: none; }
 }
 .form-input:focus {
   border-color: var(--brand-500);
-  box-shadow: 0 0 0 3px rgba(59,130,246,.1);
+  box-shadow: 0 0 0 3px rgba(244,124,60,.1);
 }
 .form-select {
   width: 100%;
@@ -573,7 +573,7 @@ tbody tr:last-child td { border-bottom: none; }
 }
 .form-select:focus {
   border-color: var(--brand-500);
-  box-shadow: 0 0 0 3px rgba(59,130,246,.1);
+  box-shadow: 0 0 0 3px rgba(244,124,60,.1);
 }
 .form-textarea {
   width: 100%;
@@ -964,7 +964,7 @@ tbody tr:last-child td { border-bottom: none; }
 .milestone-dot.current {
   background: var(--brand-500);
   border-color: var(--brand-500);
-  box-shadow: 0 0 0 3px rgba(59,130,246,.2);
+  box-shadow: 0 0 0 3px rgba(244,124,60,.2);
 }
 .milestone-label.done { color: var(--text-muted); text-decoration: line-through; }
 .milestone-label.current { color: var(--brand-600); font-weight: 500; }

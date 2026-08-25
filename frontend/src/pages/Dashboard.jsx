@@ -36,7 +36,7 @@ export default function Dashboard() {
       label: 'New Leads',
       value: summary.new_leads_24h,
       icon: Users,
-      color: 'blue',
+      color: 'orange',
       trendValue: '12%',
       trendText: 'last 24h',
       trend: 'up'
@@ -69,7 +69,7 @@ export default function Dashboard() {
       trend: 'up'
     },
   ] : [
-    { label: 'New Leads', value: '—', icon: Users, color: 'blue', trendValue: '', trendText: '', trend: 'neutral' },
+    { label: 'New Leads', value: '—', icon: Users, color: 'orange', trendValue: '', trendText: '', trend: 'neutral' },
     { label: 'Active SELL Deals', value: '—', icon: TrendingUp, color: 'green', trendValue: '', trendText: '', trend: 'neutral' },
     { label: 'Active BUY Deals', value: '—', icon: FolderKanban, color: 'purple', trendValue: '', trendText: '', trend: 'neutral' },
     { label: 'Total Active Projects', value: '—', icon: FileText, color: 'amber', trendValue: '', trendText: '', trend: 'neutral' },

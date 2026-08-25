@@ -51,7 +51,7 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
               width: 36, height: 36, borderRadius: 10,
               background: 'linear-gradient(135deg, var(--brand-500), var(--brand-700))',
               display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white',
-              boxShadow: '0 2px 4px rgba(59,130,246,0.2)'
+              boxShadow: '0 2px 4px rgba(244,124,60,0.2)'
             }}>
               <User size={18} />
             </div>

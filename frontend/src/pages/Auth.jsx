@@ -34,9 +34,9 @@ export default function Auth({ onLogin }) {
     }}>
       {/* Same radial glow as sidebar */}
       <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0 }}>
-        <div style={{ position: 'absolute', top: '-15%', left: '-10%', width: 700, height: 700, borderRadius: '50%', background: 'radial-gradient(circle, rgba(37,77,177,0.35) 0%, transparent 65%)' }} />
-        <div style={{ position: 'absolute', bottom: '-15%', right: '-10%', width: 700, height: 700, borderRadius: '50%', background: 'radial-gradient(circle, rgba(37,77,177,0.28) 0%, transparent 65%)' }} />
-        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(37,77,177,0.08) 0%, transparent 70%)' }} />
+        <div style={{ position: 'absolute', top: '-15%', left: '-10%', width: 700, height: 700, borderRadius: '50%', background: 'radial-gradient(circle, rgba(244,124,60,0.35) 0%, transparent 65%)' }} />
+        <div style={{ position: 'absolute', bottom: '-15%', right: '-10%', width: 700, height: 700, borderRadius: '50%', background: 'radial-gradient(circle, rgba(244,124,60,0.28) 0%, transparent 65%)' }} />
+        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(244,124,60,0.08) 0%, transparent 70%)' }} />
       </div>
 
       {/* Left branding panel — hidden on mobile */}
@@ -61,7 +61,7 @@ export default function Auth({ onLogin }) {
 
           <h1 style={{ fontSize: '3rem', fontWeight: 800, color: 'white', lineHeight: 1.1, letterSpacing: '-1.5px', marginBottom: 20 }}>
             Your operations,<br />
-            <span style={{ background: 'linear-gradient(90deg, #3b6cd0, #6ea0ff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+            <span style={{ background: 'linear-gradient(90deg, #e26a2c, #f47c3c)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               streamlined.
             </span>
           </h1>
@@ -154,7 +154,7 @@ export default function Auth({ onLogin }) {
                       color: 'white', outline: 'none', boxSizing: 'border-box',
                       transition: 'border-color 0.2s, background 0.2s',
                     }}
-                    onFocus={e => { e.target.style.borderColor = 'rgba(59,108,208,0.7)'; e.target.style.background = 'rgba(59,108,208,0.08)'; }}
+                    onFocus={e => { e.target.style.borderColor = 'rgba(244,124,60,0.7)'; e.target.style.background = 'rgba(244,124,60,0.08)'; }}
                     onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.background = 'rgba(255,255,255,0.06)'; }}
                     required
                   />
@@ -181,7 +181,7 @@ export default function Auth({ onLogin }) {
                       color: 'white', outline: 'none', boxSizing: 'border-box',
                       transition: 'border-color 0.2s, background 0.2s',
                     }}
-                    onFocus={e => { e.target.style.borderColor = 'rgba(59,108,208,0.7)'; e.target.style.background = 'rgba(59,108,208,0.08)'; }}
+                    onFocus={e => { e.target.style.borderColor = 'rgba(244,124,60,0.7)'; e.target.style.background = 'rgba(244,124,60,0.08)'; }}
                     onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.background = 'rgba(255,255,255,0.06)'; }}
                     required
                   />
@@ -203,15 +203,15 @@ export default function Auth({ onLogin }) {
                   marginTop: 8, height: 50, borderRadius: 12, border: 'none',
                   background: loading
                     ? 'rgba(255,255,255,0.06)'
-                    : 'linear-gradient(135deg, #254db1 0%, #3b6cd0 100%)',
+                    : 'linear-gradient(135deg, #e26a2c 0%, #f47c3c 100%)',
                   color: 'white', fontSize: '0.95rem', fontWeight: 700,
                   cursor: loading ? 'default' : 'pointer',
-                  boxShadow: loading ? 'none' : '0 8px 24px rgba(37,77,177,0.4)',
+                  boxShadow: loading ? 'none' : '0 8px 24px rgba(244,124,60,0.4)',
                   transition: 'all 0.2s',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
                 }}
-                onMouseEnter={e => { if (!loading) e.currentTarget.style.boxShadow = '0 12px 28px rgba(37,77,177,0.55)'; }}
-                onMouseLeave={e => { if (!loading) e.currentTarget.style.boxShadow = '0 8px 24px rgba(37,77,177,0.4)'; }}
+                onMouseEnter={e => { if (!loading) e.currentTarget.style.boxShadow = '0 12px 28px rgba(244,124,60,0.55)'; }}
+                onMouseLeave={e => { if (!loading) e.currentTarget.style.boxShadow = '0 8px 24px rgba(244,124,60,0.4)'; }}
               >
                 {loading ? (
                   <>
@@ -225,8 +225,8 @@ export default function Auth({ onLogin }) {
             </form>
 
             {/* Hint */}
-            <div style={{ marginTop: 24, textAlign: 'center', fontSize: '0.78rem', color: '#334155', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 20 }}>
-              Default: <span style={{ color: '#475569', fontFamily: 'monospace' }}>car01</span> / <span style={{ color: '#475569', fontFamily: 'monospace' }}>12345678</span>
+            <div style={{ marginTop: 24, textAlign: 'center', fontSize: '0.78rem', color: '#64748b', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 20 }}>
+              Default: <span style={{ color: '#94a3b8', fontFamily: 'monospace' }}>car01</span> / <span style={{ color: '#94a3b8', fontFamily: 'monospace' }}>12345678</span>
             </div>
           </div>
         </div>
@@ -234,7 +234,19 @@ export default function Auth({ onLogin }) {
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
-        input::placeholder { color: #334155; }
+        input::placeholder { color: #64748b; }
+        
+        /* Override Chrome Autofill styling for dark mode */
+        input:-webkit-autofill,
+        input:-webkit-autofill:hover, 
+        input:-webkit-autofill:focus, 
+        input:-webkit-autofill:active{
+            -webkit-box-shadow: 0 0 0 30px #1a1a1a inset !important;
+            -webkit-text-fill-color: white !important;
+            border: 1px solid rgba(244,124,60,0.3) !important;
+            transition: background-color 5000s ease-in-out 0s;
+        }
+
         @media (max-width: 768px) {
           .auth-left-panel { display: none !important; }
           .auth-mobile-logo { display: block !important; }
