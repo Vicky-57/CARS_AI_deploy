@@ -35,7 +35,7 @@ export default function Dashboard() {
     {
       label: 'New Leads',
       value: summary.new_leads_24h,
-      icon: Users,
+      icon: '/assets/customer.png',
       color: 'orange',
       trendValue: '12%',
       trendText: 'last 24h',
@@ -44,7 +44,7 @@ export default function Dashboard() {
     {
       label: 'Active SELL Deals',
       value: summary.active_sell_deals,
-      icon: TrendingUp,
+      icon: '/assets/price-tag.png',
       color: 'green',
       trendValue: '4.5%',
       trendText: 'this month',
@@ -53,7 +53,7 @@ export default function Dashboard() {
     {
       label: 'Active BUY Deals',
       value: summary.active_buy_deals,
-      icon: FolderKanban,
+      icon: '/assets/buy-button.png',
       color: 'purple',
       trendValue: '2.1%',
       trendText: 'this month',
@@ -62,17 +62,17 @@ export default function Dashboard() {
     {
       label: 'Total Active Projects',
       value: (summary.active_sell_deals || 0) + (summary.active_buy_deals || 0),
-      icon: FileText,
+      icon: '/assets/briefing.png',
       color: 'amber',
       trendValue: '8.4%',
       trendText: 'this year',
       trend: 'up'
     },
   ] : [
-    { label: 'New Leads', value: '—', icon: Users, color: 'orange', trendValue: '', trendText: '', trend: 'neutral' },
-    { label: 'Active SELL Deals', value: '—', icon: TrendingUp, color: 'green', trendValue: '', trendText: '', trend: 'neutral' },
-    { label: 'Active BUY Deals', value: '—', icon: FolderKanban, color: 'purple', trendValue: '', trendText: '', trend: 'neutral' },
-    { label: 'Total Active Projects', value: '—', icon: FileText, color: 'amber', trendValue: '', trendText: '', trend: 'neutral' },
+    { label: 'New Leads', value: '—', icon: '/assets/customer.png', color: 'orange', trendValue: '', trendText: '', trend: 'neutral' },
+    { label: 'Active SELL Deals', value: '—', icon: '/assets/price-tag.png', color: 'green', trendValue: '', trendText: '', trend: 'neutral' },
+    { label: 'Active BUY Deals', value: '—', icon: '/assets/buy-button.png', color: 'purple', trendValue: '', trendText: '', trend: 'neutral' },
+    { label: 'Total Active Projects', value: '—', icon: '/assets/briefing.png', color: 'amber', trendValue: '', trendText: '', trend: 'neutral' },
   ];
 
   const intentBadge = (intent) => {
@@ -107,35 +107,37 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="stats-grid" style={{ gap: 20, marginBottom: 32 }}>
+      <div className="stats-grid" style={{ gap: 24, marginBottom: 40 }}>
         {stats.map(({ label, value, icon: Icon, color, trendValue, trendText, trend }) => (
-          <div key={label} className="stat-card" style={{ padding: '16px 20px' }}>
+          <div key={label} className="stat-card">
             {/* Top row: Label and Icon */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>{label}</span>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+              <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: 4 }}>{label}</span>
               <span className={`stat-icon ${color}`}>
-                <Icon size={16} />
+                {typeof Icon === 'string' ? <img src={Icon} alt="" /> : <Icon size={20} />}
               </span>
             </div>
 
             {/* Middle row: Value */}
-            <div className="stat-value" style={{ fontSize: '2rem', fontWeight: 700, letterSpacing: '-0.5px', marginBottom: 12, color: 'var(--text-primary)' }}>
+            <div className="stat-value">
               {loading
-                ? <span className="spinner" style={{ width: 24, height: 24, borderWidth: 3 }} />
+                ? <span className="spinner" style={{ width: 28, height: 28, borderWidth: 3, marginTop: 4 }} />
                 : value}
             </div>
 
             {/* Bottom row: Trend and Arrow button */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 {trendValue && (
                   <span style={{
-                    display: 'flex', alignItems: 'center', gap: 2,
+                    display: 'flex', alignItems: 'center', gap: 4,
                     background: trend === 'up' ? '#d1fae5' : '#f3f4f6',
-                    color: trend === 'up' ? '#059669' : '#6b7280',
-                    padding: '2px 8px', borderRadius: '16px', fontSize: '0.75rem', fontWeight: 600
+                    color: trend === 'up' ? '#047857' : '#4b5563',
+                    padding: '6px 12px', borderRadius: '24px', fontSize: '0.85rem', fontWeight: 800,
+                    boxShadow: trend === 'up' ? '0 2px 8px rgba(16, 185, 129, 0.15)' : 'none',
+                    border: trend === 'up' ? '1px solid #a7f3d0' : '1px solid #e5e7eb'
                   }}>
-                    {trend === 'up' && <ArrowUpRight size={12} />}
+                    {trend === 'up' && <ArrowUpRight size={14} strokeWidth={3} />}
                     {trendValue}
                   </span>
                 )}
@@ -183,10 +185,11 @@ export default function Dashboard() {
                 >
                   <div style={{
                     width: 44, height: 44, borderRadius: '50%',
-                    background: 'linear-gradient(135deg, var(--brand-50), var(--brand-100))',
-                    border: '1px solid var(--brand-200)',
+                    background: 'linear-gradient(135deg, #fff3ec, #ffe4d6)',
+                    border: '1px solid #fed7aa',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '0.9rem', fontWeight: 700, color: 'var(--brand-700)', flexShrink: 0
+                    fontSize: '0.9rem', fontWeight: 800, color: '#ea580c', flexShrink: 0,
+                    boxShadow: '0 2px 8px rgba(234, 88, 12, 0.1)'
                   }}>
                     {getInitials(lead.name || lead.email)}
                   </div>
@@ -266,20 +269,21 @@ export default function Dashboard() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {meetings.map((m, idx) => (
                     <div key={m.name || idx} style={{
-                      display: 'flex', gap: 14, alignItems: 'center', padding: '12px 16px',
-                      background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)',
-                      transition: 'all 0.2s', cursor: 'pointer',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                      display: 'flex', gap: 14, alignItems: 'center', padding: '14px 18px',
+                      background: '#ffffff', borderRadius: 12, border: '1px solid #e5e7eb',
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
                     }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--brand-300)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.05)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.02)'; }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = '#fed7aa'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(249,115,22,0.08)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02)'; e.currentTarget.style.transform = 'translateY(0)'; }}
                     >
                       <div style={{
-                        background: 'var(--brand-50)', borderRadius: 8,
+                        background: 'linear-gradient(135deg, #fff3ec, #ffe4d6)', borderRadius: 8,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        border: '1px solid var(--brand-100)', flexShrink: 0, padding: '8px 12px'
+                        border: '1px solid #fed7aa', flexShrink: 0, padding: '8px 14px',
+                        boxShadow: '0 2px 4px rgba(234, 88, 12, 0.05)'
                       }}>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--brand-700)', letterSpacing: '0.5px' }}>
+                        <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#ea580c', letterSpacing: '0.5px' }}>
                           {formatTime(m.starts_on || m.start_time)}
                         </div>
                       </div>

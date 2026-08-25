@@ -265,16 +265,12 @@ export default function Customers() {
               <thead>
                 <tr>
                   <th style={{ paddingLeft: 24, paddingTop: 16, paddingBottom: 16 }}>Client</th>
-                  <th>Email</th>
-                  <th>Phone</th>
-                  <th>Vehicle / Car Interest</th>
+                  <th>Contact Info</th>
+                  <th>Vehicle</th>
                   {activeTab === 'NEW' ? (
                     <th>Total Leads</th>
                   ) : (
-                    <>
-                      <th>Previous Projects</th>
-                      <th>New Leads</th>
-                    </>
+                    <th>Activity</th>
                   )}
                   <th>Type</th>
                   <th>Last Active</th>
@@ -283,44 +279,50 @@ export default function Customers() {
               </thead>
               <tbody>
                 {filtered.map(customer => (
-                  <tr key={customer.id}>
-                    <td style={{ paddingLeft: 24 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <tr key={customer.id} style={{ transition: 'background-color 0.2s', cursor: 'pointer' }}>
+                    <td style={{ paddingLeft: 24, paddingVertical: 16 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                         <div style={{ 
-                          width: 40, height: 40, borderRadius: '50%', 
-                          background: customer.interactions.length > 1 ? 'linear-gradient(135deg, var(--brand-100), var(--brand-200))' : 'linear-gradient(135deg, var(--gray-100), var(--gray-200))',
+                          width: 44, height: 44, borderRadius: '50%', 
+                          background: customer.interactions.length > 1 ? 'linear-gradient(135deg, #fef3c7, #fde68a)' : 'linear-gradient(135deg, #fff3ec, #ffe4d6)',
+                          border: customer.interactions.length > 1 ? '1px solid #fcd34d' : '1px solid #fed7aa',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '0.85rem', fontWeight: 700, 
-                          color: customer.interactions.length > 1 ? 'var(--brand-700)' : 'var(--gray-600)'
+                          fontSize: '0.9rem', fontWeight: 800, 
+                          color: customer.interactions.length > 1 ? '#b45309' : '#ea580c',
+                          boxShadow: customer.interactions.length > 1 ? '0 2px 8px rgba(180, 83, 9, 0.1)' : '0 2px 8px rgba(234, 88, 12, 0.1)', flexShrink: 0
                         }}>
                           {getInitials(customer.name, customer.email)}
                         </div>
                         <div>
-                          <div style={{ fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
                             {customer.name || 'Unknown Client'}
-                            {customer.interactions.length > 1 && <Star size={12} color="#fbbf24" fill="#fbbf24" />}
+                            {customer.interactions.length > 1 && <Star size={12} color="#f59e0b" fill="#f59e0b" />}
                           </div>
                         </div>
                       </div>
                     </td>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem' }}>
-                        <Mail size={12} color="var(--text-muted)" />
-                        {customer.email || <span style={{ color: 'var(--text-muted)' }}>—</span>}
-                      </div>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem' }}>
-                        <Phone size={12} color="var(--text-muted)" />
-                        {customer.phone || <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem' }}>
+                          <Mail size={14} color="#f47c3c" flexShrink={0} />
+                          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 180 }}>
+                            {customer.email || <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem' }}>
+                          <Phone size={14} color="#f47c3c" flexShrink={0} />
+                          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 180 }}>
+                            {customer.phone || <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                          </span>
+                        </div>
                       </div>
                     </td>
                     <td>
                       {(() => {
                         const car = getCustomerCar(customer);
                         return car ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', fontWeight: 600, color: 'var(--brand-700)' }}>
-                            <Car size={13} color="var(--brand-600)" />
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', fontWeight: 700, color: '#1a1a1a' }}>
+                            <Car size={16} color="#f47c3c" />
                             <span>{car}</span>
                           </div>
                         ) : (
@@ -330,27 +332,25 @@ export default function Customers() {
                     </td>
                     {activeTab === 'NEW' ? (
                       <td>
-                        <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>
-                          {customer.interactions.filter(i => i.type === 'Lead').length}
+                        <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>
+                          {customer.interactions.filter(i => i.type === 'Lead').length} Leads
                         </div>
                       </td>
                     ) : (
-                      <>
-                        <td>
-                          <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>
-                            {customer.interactions.filter(i => i.type === 'Project').length}
+                      <td>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#1e293b' }}>
+                            {customer.interactions.filter(i => i.type === 'Project').length} Projects
                           </div>
-                        </td>
-                        <td>
-                          <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>
-                            {customer.interactions.filter(i => i.type === 'Lead').length}
+                          <div style={{ fontWeight: 600, fontSize: '0.75rem', color: '#64748b' }}>
+                            {customer.interactions.filter(i => i.type === 'Lead').length} Leads
                           </div>
-                        </td>
-                      </>
+                        </div>
+                      </td>
                     )}
                     <td>
                       {customer.interactions.length > 1 ? (
-                        <span className="badge badge-whatsapp">Repeat</span>
+                        <span className="badge" style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a' }}>Repeat</span>
                       ) : (
                         <span className="badge badge-new">New</span>
                       )}
@@ -526,10 +526,12 @@ export default function Customers() {
             <div className="modal-header" style={{ borderBottom: '1px solid var(--border)', paddingBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                 <div style={{
-                  width: 48, height: 48, borderRadius: '50%',
-                  background: selectedCustomerDetail.interactions.length > 1 ? 'linear-gradient(135deg, var(--brand-500), var(--brand-700))' : 'linear-gradient(135deg, var(--gray-200), var(--gray-400))',
+                  width: 56, height: 56, borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #fff3ec, #ffe4d6)',
+                  border: '1px solid #fed7aa',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '1.1rem', fontWeight: 800, color: 'white'
+                  fontSize: '1.2rem', fontWeight: 800, color: '#ea580c',
+                  boxShadow: '0 4px 12px rgba(234, 88, 12, 0.15)', flexShrink: 0
                 }}>
                   {getInitials(selectedCustomerDetail.name, selectedCustomerDetail.email)}
                 </div>
@@ -537,9 +539,13 @@ export default function Customers() {
                   <h3 className="modal-title" style={{ margin: 0, fontSize: '1.25rem' }}>{selectedCustomerDetail.name || 'Unknown Client'}</h3>
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2, display: 'flex', gap: 8, alignItems: 'center' }}>
                     {selectedCustomerDetail.interactions.length > 1 ? (
-                      <span className="badge badge-whatsapp">💜 Repeat Client</span>
+                      <span className="badge" style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', boxShadow: '0 2px 4px rgba(180, 83, 9, 0.05)' }}>
+                        <Star size={12} fill="currentColor" /> REPEAT CLIENT
+                      </span>
                     ) : (
-                      <span className="badge badge-new">New Client</span>
+                      <span className="badge badge-new" style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                        <UserPlus size={12} /> NEW CLIENT
+                      </span>
                     )}
                     <span>• {selectedCustomerDetail.interactions.length} Total Interaction(s)</span>
                   </div>
@@ -551,18 +557,18 @@ export default function Customers() {
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 20, padding: 24 }}>
               
               {/* Contact Info Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div style={{ padding: 16, background: 'var(--gray-50)', borderRadius: 10, border: '1px solid var(--border)' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>Email Contact</div>
-                  <div style={{ fontSize: '0.9rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8, wordBreak: 'break-all' }}>
-                    <Mail size={14} color="var(--brand-600)" />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div style={{ padding: '16px 20px', background: '#ffffff', borderRadius: 12, border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.5px' }}>Email Contact</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 10, wordBreak: 'break-all', color: '#0f172a' }}>
+                    <Mail size={16} color="#f47c3c" flexShrink={0} />
                     {selectedCustomerDetail.email || '—'}
                   </div>
                 </div>
-                <div style={{ padding: 16, background: 'var(--gray-50)', borderRadius: 10, border: '1px solid var(--border)' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>Phone Contact</div>
-                  <div style={{ fontSize: '0.9rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Phone size={14} color="var(--brand-600)" />
+                <div style={{ padding: '16px 20px', background: '#ffffff', borderRadius: 12, border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.5px' }}>Phone Contact</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 10, color: '#0f172a' }}>
+                    <Phone size={16} color="#f47c3c" flexShrink={0} />
                     {selectedCustomerDetail.phone || '—'}
                   </div>
                 </div>
@@ -570,11 +576,13 @@ export default function Customers() {
 
               {/* Vehicle Interest Banner */}
               {getCustomerCar(selectedCustomerDetail) && (
-                <div style={{ padding: 16, background: 'rgba(59, 130, 246, 0.08)', borderRadius: 10, border: '1px solid rgba(59, 130, 246, 0.2)', display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <Car size={22} color="var(--brand-700)" />
+                <div style={{ padding: '20px', background: 'linear-gradient(to right, #fff7ed, #ffffff)', borderRadius: 12, border: '1px solid #ffedd5', display: 'flex', alignItems: 'center', gap: 16, boxShadow: '0 2px 8px rgba(249, 115, 22, 0.05)' }}>
+                  <div style={{ padding: 12, background: '#ffedd5', borderRadius: 12 }}>
+                    <Car size={24} color="#ea580c" />
+                  </div>
                   <div>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand-800)', textTransform: 'uppercase' }}>Target Vehicle / Car Interest</div>
-                    <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--brand-900)', marginTop: 2 }}>{getCustomerCar(selectedCustomerDetail)}</div>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#ea580c', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Target Vehicle / Car Interest</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1a1a1a', marginTop: 4 }}>{getCustomerCar(selectedCustomerDetail)}</div>
                   </div>
                 </div>
               )}
@@ -582,21 +590,27 @@ export default function Customers() {
               {/* Interaction Timeline History */}
               <div>
                 <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 12 }}>Client Interaction History</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 180, overflowY: 'auto' }}>
-                  {selectedCustomerDetail.interactions.map((inter, idx) => (
-                    <div key={idx} style={{ padding: 12, background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border)', fontSize: '0.82rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <span className={`badge ${inter.type === 'Project' ? 'badge-email' : 'badge-whatsapp'}`}>{inter.type}</span>
-                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{(() => {
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 220, overflowY: 'auto', paddingRight: 4 }}>
+                  {selectedCustomerDetail.interactions.map((inter, idx) => {
+                    const isProject = inter.type === 'Project' || inter.type === 'PROJECT';
+                    const Icon = isProject ? Briefcase : UserPlus;
+                    const badgeClass = isProject ? 'badge-email' : 'badge-whatsapp';
+                    return (
+                      <div key={idx} style={{ padding: '14px 16px', background: '#ffffff', borderRadius: 12, border: '1px solid #e5e7eb', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
+                          <span className={`badge ${badgeClass}`} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <Icon size={12} /> {inter.type}
+                          </span>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8' }}>{(() => {
                           const d = new Date(inter.date || Date.now());
                           const day = String(d.getDate()).padStart(2, '0');
                           const month = String(d.getMonth() + 1).padStart(2, '0');
                           return `${day}/${month}/${d.getFullYear()}`;
                         })()}</span>
                       </div>
-                      <div style={{ color: 'var(--text-secondary)' }}>{inter.details?.subject || inter.details?.notes || inter.details?.message?.slice(0, 100) || 'Inquiry logged'}</div>
+                      <div style={{ color: '#334155', fontSize: '0.85rem', fontWeight: 500, lineHeight: 1.5 }}>{inter.details?.subject || inter.details?.notes || inter.details?.message?.slice(0, 100) || 'Inquiry logged'}</div>
                     </div>
-                  ))}
+                  )})}
                 </div>
               </div>
 
