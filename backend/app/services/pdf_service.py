@@ -124,6 +124,71 @@ PRICE_TOKEN_KEYS = {
     "XP_Kosten_1": "repair_price", "XP_Kosten_2": "maintenance_price", "XP_Kosten_3": "care_price",
 }
 
+# ─── AcroForm widget name → canonical key map (sell_b2c template) ─────────────
+# The sell_b2c PDF uses interactive AcroForm text fields whose names differ from
+# the [Token] placeholder text. This map fills each widget by canonical key.
+# Widget names with special characters (ü, ß, ö …) are stored as-is from the PDF.
+SELL_B2C_WIDGET_KEY: dict = {
+    # Page 1 — client info
+    "Kunde_Vorname_Name":          "full_name",
+    "Kunde_Stra\u00dfe_Hausnummer":    "street",   # ß
+    "Kunde_Stra\ufffd\ufffd_Hausnummer": "street",  # mojibake variant
+    "Kunde_Stra\ufffd_Hausnummer":     "street",   # single-char mojibake
+    "Kunde_PLZ_Ort":               "zip_city",
+    "Kunde_Telefonnummer":         "phone",
+    "Kunde_E-Mail-Adresse":        "email",
+    "Kunde_Ausweis-Art_Nummer":    "id_card",
+    # Page 1 — vehicle info
+    "Fahrzeug_Hersteller":         "manufacturer",
+    "Fahrzeug_Modell_Typ":         "model",
+    "Fahrzeug_FIN":                "vin",
+    "Fahrzeug_Kennzeichen":        "license",
+    "Fahrzeug_Erstzulassung":      "first_date",
+    "Fahrzeug_Kilometerstand":     "mileage",
+    "Fahrzeug_Leistung":           "power",
+    "Fahrzeug_Hubraum":            "displacement",
+    "Fahrzeug_HU_AU":              "tuev_until",
+    "Fahrzeug_Anzahl_Halter":      "owners",
+    "Fahrzeug_Farbe_Lackart":      "color",
+    "Fahrzeug_ZSBII_Nr":           "zb2",
+    "Fahrzeug_Gaspr\u00fcfung":       "gas_until",   # ü
+    "Fahrzeug_Gaspr\ufffd\ufffdung":   "gas_until",  # mojibake
+    "Fahrzeug_Gaspr\ufffdung":        "gas_until",
+    "Fahrzeug_Anzahl_Schl\u00fcssel": "keys",        # ü
+    "Fahrzeug_Anzahl_Schl\ufffd\ufffdssel": "keys",
+    "Fahrzeug_Anzahl_Schl\ufffdssel": "keys",
+    "Sonstiges":                   "misc",
+    # Page 2 — condition / history
+    "ATM_Kilometerstand":          "engine_mileage",
+    "Textfeld1":                   "engine_date",
+    "Textfeld2":                   "reimport",
+    "Unfallbeschreibung":          "accident_details",
+    "Bekannte_M\u00e4ngel":            "accident_details",   # ä
+    "Bekannte_M\ufffd\ufffdngel":       "accident_details",
+    "Bekannte_M\ufffdngel":            "accident_details",
+    "Sonderausstattung_Zubeh\u00f6r": "special_equipment",  # ö
+    "Sonderausstattung_Zubeh\ufffd\uffdfr": "special_equipment",
+    "Textfeld3":                   "min_price",
+    # Page 3 — Sondervereinbarungen
+    "Sondervereinbarungen & Nebenabreden": "special_agreements",
+    "Fahrzeug_SB_TK":              "tuev_until",
+    "Fahrzeug_SB_VK":              "gas_until",
+    "Fahrzeug_Anzahl_Schl\u00fcssel": "keys",
+    # Page 5 — Anlage A price slots (Textfeld4..14 = XA_Kosten, Textfeld15..17 = XP)
+    "Freitext":                    "repair_service",
+    "Textfeld4":  "price_1",  "Textfeld5":  "price_2",  "Textfeld6":  "price_3",
+    "Textfeld7":  "price_4",  "Textfeld8":  "price_5",  "Textfeld9":  "price_6",
+    "Textfeld10": "price_7",  "Textfeld11": "price_8",  "Textfeld12": "price_9",
+    "Textfeld13": "price_10", "Textfeld14": "price_11",
+    "Textfeld15": "repair_service",  "Textfeld16": "maintenance_service",
+    "Textfeld17": "care_service",
+    "Textfeld18": "repair_price", "Textfeld19": "maintenance_price",
+    "Textfeld20": "care_price",
+    "Textfeld21": "price_1",  "Textfeld22": "price_2",
+    # Page 7 — Vollmacht / Appendix (mirror of p1 fields)
+    "Vollmacht_Sonstiges":         "reimport",
+}
+
 
 # ── Manual field maps for token-less templates ───────────────────────────────
 # box = [page, x0, y0, x1, y1]  (page is 1-based). fontsize per field.
@@ -228,23 +293,43 @@ FIELD_MAP = {
         {"key": "date", "box": [4, 120, 640, 250, 660]},
     ],
     "handover": [
-        # p1 people
-        {"key": "giving_person", "box": [1, 28, 266, 566, 284]},
-        {"key": "receiving_person", "box": [1, 28, 319, 566, 336]},
-        # p1 vehicle data
-        {"key": "manufacturer", "box": [1, 83, 383, 272, 400]},
-        {"key": "model", "box": [1, 319, 383, 566, 400]},
-        {"key": "license", "box": [1, 130, 402, 270, 418]},
-        {"key": "vin", "box": [1, 360, 402, 566, 418]},
-        {"key": "mileage", "box": [1, 180, 421, 100 + 175, 437]},
-        {"key": "tuev_until", "box": [1, 374, 421, 566, 437]},
-        # p1 keys handed over
-        {"key": "keys", "box": [1, 130, 597, 200, 614]},
-        # p2 verbal notes
-        {"key": "notes", "box": [2, 40, 560, 540, 580]},
-        # signature line details
-        {"key": "place", "box": [2, 90, 793, 200, 810]},
-        {"key": "date", "box": [2, 120, 793, 200, 810]},
+        # ── People (p1) ──────────────────────────────────────────────────────
+        # "Übergebende Person:" label is at y=246-259.
+        # The underline "____" is at y=261-273. Draw value ON the underline.
+        {"key": "giving_person",    "box": [1, 28,  261, 566, 273]},
+        # "Übernehmende Person:" label at y=299-312, underline at y=314-326.
+        {"key": "receiving_person", "box": [1, 28,  314, 566, 326]},
+
+        # ── Vehicle data (p1) ────────────────────────────────────────────────
+        # "Hersteller: ____" — label ends at x=83, underline is x=83–272, y=377-390
+        {"key": "manufacturer", "box": [1,  83, 378, 272, 390]},
+        # "Modell: ________" — label ends at x=319, underline x=319–566
+        {"key": "model",        "box": [1, 319, 378, 566, 390]},
+
+        # "Amtl. Kennzeichen: ____" — label ends at x=130, underline x=130–274, y=396-409
+        {"key": "license",      "box": [1, 130, 397, 274, 409]},
+        # "Fahrgestellnr.: ______" — label ends at x=356, underline x=356–567
+        {"key": "vin",          "box": [1, 356, 397, 566, 409]},
+
+        # "Kilometerstand laut Anzeige: ___" — label ends at x=180, underline x=180–275, y=415-428
+        {"key": "mileage",      "box": [1, 180, 416, 275, 428]},
+        # "HU/AU gültig bis: _____" — label ends at x=374, underline x=374–566
+        {"key": "tuev_until",   "box": [1, 374, 416, 566, 428]},
+
+        # ── Keys (p1) ────────────────────────────────────────────────────────
+        # "Fahrzeugschlüssel: _____ Stück" — underline x=131–162, y=591-603
+        {"key": "keys",         "box": [1, 131, 592, 162, 603]},
+
+        # ── Notes / Freitext (p2) ────────────────────────────────────────────
+        # "Sonstige Mängel / Fehlermeldungen" label at y=228-240.
+        # Draw free-text below the label.
+        {"key": "notes",        "box": [2,  28, 245, 540, 280]},
+
+        # ── Signature block (p2) ─────────────────────────────────────────────
+        # "Ort, Datum, Uhrzeit" section at y=787-800 (x=28-129).
+        # Place and date go together in the first column.
+        {"key": "place",        "box": [2,  28, 788, 130, 800]},
+        {"key": "date",         "box": [2, 135, 788, 280, 800]},
     ],
 }
 
@@ -301,30 +386,75 @@ _LEGACY_TOKEN_KEYS = ({**SELL_B2C_TOKEN_KEY, **PRICE_TOKEN_KEYS})
 
 
 def _fill_token_document(doc, data: dict) -> None:
-    """Auto-detect '[TokenX]' spans and box-fill them with values."""
+    """Fill the sell_b2c AcroForm PDF by writing values into form widgets.
+
+    The sell_b2c template is an interactive AcroForm PDF — the fillable cells
+    are PDF form widgets (text fields, checkboxes), NOT plain text spans.
+
+    Steps:
+      1. Collect every checkbox widget rect + checked-state before baking
+         (bake() destroys the AcroForm structure, making checkboxes invisible).
+      2. Fill all text fields via widget.field_value + widget.update().
+      3. bake() the form so text-field values are baked into static page content.
+      4. Redraw each checkbox as a crisp drawn square (empty or with X).
+    """
+    # ── Step 1: catalogue every checkbox position before baking ──────────────
+    # (pno, fitz.Rect, is_checked)
+    checkbox_infos: list[tuple[int, fitz.Rect, bool]] = []
     for pno in range(len(doc)):
         page = doc[pno]
-        for block in page.get_text("dict")["blocks"]:
-            if "lines" not in block:
+        for widget in page.widgets():
+            if widget.field_type_string == "CheckBox":
+                val = widget.field_value or ""
+                is_checked = val.strip() not in ("", "Off")
+                checkbox_infos.append((pno, fitz.Rect(widget.rect), is_checked))
+
+    # ── Step 2: fill text fields ──────────────────────────────────────────────
+    filled = 0
+    for pno in range(len(doc)):
+        page = doc[pno]
+        for widget in page.widgets():
+            if widget.field_type_string == "CheckBox":
+                continue  # handled separately above
+            fname = widget.field_name or ""
+            # Exact match first, then case-insensitive fallback.
+            key = SELL_B2C_WIDGET_KEY.get(fname)
+            if not key:
+                fname_lower = fname.lower()
+                for wname, wkey in SELL_B2C_WIDGET_KEY.items():
+                    if wname.lower() == fname_lower:
+                        key = wkey
+                        break
+            if not key:
                 continue
-            for line in block["lines"]:
-                for span in line["spans"]:
-                    st = span["text"].strip()
-                    if not st.startswith("["):
-                        continue
-                    token = st.replace("[", "").replace("]", "").strip()
-                    key = SELL_B2C_TOKEN_KEY.get(token) or PRICE_TOKEN_KEYS.get(token)
-                    if not key:
-                        continue
-                    val = data.get(key)
-                    if val is None or str(val).strip() == "":
-                        continue
-                    x0, y0, x1, y1 = span["bbox"]
-                    size = span.get("size", 9.0)
-                    box_w = max(x1 - x0, 120.0)
-                    page.add_redact_annot(fitz.Rect(x0, y0, x0 + box_w, y1), fill=(1, 1, 1))
-                    page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
-                    _draw_fitted(page, x0, y0 + size * 0.15, x0 + box_w, y1, str(val), fontsize=size - 1.0)
+            val = data.get(key)
+            if val is None or str(val).strip() == "":
+                continue
+            widget.field_value = str(val).strip()
+            widget.update()
+            filled += 1
+
+    # ── Step 3: flatten / bake the AcroForm ──────────────────────────────────
+    try:
+        doc.bake()
+    except AttributeError:
+        pass  # Older PyMuPDF — no bake(); form fields render via viewer
+
+    # ── Step 4: redraw checkboxes as visible drawn squares ────────────────────
+    # bake() removes all widget appearances. We redraw each checkbox position
+    # as a small outlined square so the boxes remain visible in the PDF.
+    BLACK = (0, 0, 0)
+    for pno, rect, is_checked in checkbox_infos:
+        page = doc[pno]
+        # Inset slightly so we don't clip the border
+        box = rect + fitz.Rect(0.5, 0.5, -0.5, -0.5)
+        # White fill + black border (clean square)
+        page.draw_rect(box, color=BLACK, fill=(1, 1, 1), width=0.5)
+        if is_checked:
+            # Draw an X mark inside for checked boxes
+            inner = box + fitz.Rect(1.5, 1.5, -1.5, -1.5)
+            page.draw_line(inner.top_left, inner.bottom_right, color=BLACK, width=0.7)
+            page.draw_line(inner.top_right, inner.bottom_left, color=BLACK, width=0.7)
 
 
 def _fill_manual_document(doc, template_type: str, data: dict) -> None:
@@ -339,6 +469,34 @@ def _fill_manual_document(doc, template_type: str, data: dict) -> None:
         page = doc[pno - 1]
         _draw_fitted(page, x0, y0, x1, y1, str(val),
                      fontsize=spec.get("size", spec.get("fontsize", 9.0)), align=align)
+
+    # Convert text checkboxes like "[ ]" into actual drawn squares
+    BLACK = (0, 0, 0)
+    WHITE = (1, 1, 1)
+    for pno in range(len(doc)):
+        page = doc[pno]
+        
+        boxes_empty = page.search_for("[ ]")
+        boxes_checked = page.search_for("[x]") + page.search_for("[X]")
+        
+        for r in boxes_empty:
+            page.add_redact_annot(r, fill=WHITE)
+            page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
+            size = r.height * 0.7
+            cx, cy = r.x0 + r.width / 2, r.y0 + r.height / 2
+            sq = fitz.Rect(cx - size / 2, cy - size / 2, cx + size / 2, cy + size / 2)
+            page.draw_rect(sq, color=BLACK, fill=WHITE, width=0.5)
+            
+        for r in boxes_checked:
+            page.add_redact_annot(r, fill=WHITE)
+            page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
+            size = r.height * 0.7
+            cx, cy = r.x0 + r.width / 2, r.y0 + r.height / 2
+            sq = fitz.Rect(cx - size / 2, cy - size / 2, cx + size / 2, cy + size / 2)
+            page.draw_rect(sq, color=BLACK, fill=WHITE, width=0.5)
+            # Draw X
+            page.draw_line(sq.top_left, sq.bottom_right, color=BLACK, width=0.7)
+            page.draw_line(sq.top_right, sq.bottom_left, color=BLACK, width=0.7)
 
 
 def render_contract_pdf(template_type: str, data: dict, output_dir: str) -> str:
