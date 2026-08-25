@@ -22,12 +22,17 @@ router = APIRouter(prefix="/telegram", tags=["Telegram Master Agent"])
 @router.post("/webhook")
 async def telegram_webhook(request: Request):
     """
-    Receive and process Telegram update messages sent via webhook.
-    Register webhook URL at: https://api.telegram.org/bot{TOKEN}/setWebhook?url={URL}
+    Receive and process Telegram update messages & inline button clicks sent via webhook.
     """
     try:
         body = await request.json()
         message = body.get("message") or body.get("edited_message")
+        cb = body.get("callback_query")
+        if cb:
+            message = cb.get("message", {})
+            message["text"] = cb.get("data")
+            message["from"] = cb.get("from")
+
         if message:
             await dispatch_telegram_command(message)
         return {"ok": True}

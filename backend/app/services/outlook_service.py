@@ -139,22 +139,48 @@ def _parse_ics_all_events(ics_content: str) -> List[Dict]:
 
 async def get_todays_schedule() -> List[Dict]:
     """
-    Fetch today's events from Maxim's Outlook ICS feed.
-    Requires OUTLOOK_ICS_URL to be set in .env or Supabase settings.
+    Fetch today's events merged from BOTH:
+    1. Microsoft Outlook ICS feed
+    2. Supabase DB 'meetings' table
     """
-    ics_url = getattr(settings, "OUTLOOK_ICS_URL", None)
-    if not ics_url:
-        logger.warning("OUTLOOK_ICS_URL not configured. Return empty schedule.")
-        return []
+    events = []
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
+    # 1. Fetch from Outlook ICS
+    ics_url = getattr(settings, "OUTLOOK_ICS_URL", None)
+    if ics_url:
+        try:
+            req = urllib.request.Request(ics_url, headers={"User-Agent": "CAR-AGENTS/1.0"})
+            with urllib.request.urlopen(req, timeout=15) as r:
+                ics_content = r.read().decode("utf-8", errors="ignore")
+            events.extend(_parse_ics_events(ics_content))
+        except Exception as e:
+            logger.error(f"ICS fetch error: {e}")
+
+    # 2. Fetch from Supabase DB meetings table
     try:
-        req = urllib.request.Request(ics_url, headers={"User-Agent": "CAR-AGENTS/1.0"})
-        with urllib.request.urlopen(req, timeout=15) as r:
-            ics_content = r.read().decode("utf-8", errors="ignore")
-        return _parse_ics_events(ics_content)
-    except Exception as e:
-        logger.error(f"ICS fetch error: {e}")
-        return []
+        sb = get_supabase()
+        db_meetings = sb.table("meetings").select("*").execute().data or []
+        for m in db_meetings:
+            start_iso = m.get("start_time", "")
+            if start_iso and start_iso.startswith(today_str):
+                time_str = start_iso.split("T")[1][:5] if "T" in start_iso else "All Day"
+                title = m.get("title") or m.get("subject") or "Client Meeting"
+                if m.get("client_name"):
+                    title += f" (w/ {m.get('client_name')})"
+                events.append({
+                    "subject": title,
+                    "time": time_str,
+                    "location": m.get("location_address") or m.get("location") or "",
+                    "dtstart": start_iso,
+                    "source": "database"
+                })
+    except Exception as db_err:
+        logger.warning(f"DB meetings fetch error for schedule: {db_err}")
+
+    # Sort all events by time
+    events.sort(key=lambda e: (e.get("time", ""), e.get("dtstart", "")))
+    return events
 
 
 async def get_outlook_events(time_min: str = None, time_max: str = None) -> Dict:

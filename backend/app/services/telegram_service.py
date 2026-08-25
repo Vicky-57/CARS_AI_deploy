@@ -32,8 +32,8 @@ TELEGRAM_API = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}"
 MAIN_REPLY_KEYBOARD = {
     "keyboard": [
         [{"text": "📊 Summary"}, {"text": "📋 Leads"}],
-        [{"text": "💼 Active Deals"}, {"text": "📅 Schedule"}],
-        [{"text": "📰 Briefing"}, {"text": "🚗 Cars"}]
+        [{"text": "💼 Active Deals"}, {"text": "👤 Customers"}],
+        [{"text": "📅 Schedule"}, {"text": "📰 Briefing"}, {"text": "🚗 Cars"}]
     ],
     "resize_keyboard": True,
     "one_time_keyboard": False
@@ -98,10 +98,13 @@ async def dispatch_telegram_command(message: dict) -> str:
             "📊 *Summary* — Daily CRM snapshot\n"
             "📋 *Leads* — View active customer inquiries\n"
             "💼 *Deals* — View active Buy/Sell projects\n"
+            "👤 *Customers* — Browse active customers & full profiles\n"
             "📅 *Schedule* — Read today's Outlook calendar\n"
             "📰 *Briefing* — Generate executive digest\n"
             "🚗 *Cars* — Browse active car inventory\n\n"
             "💡 *Shortcuts & Advanced Commands:*\n"
+            "`/stage [Name] [Stage]` — Update deal stage\n"
+            "`/customer [Name]` — View full profile & Drive folders\n"
             "`/createlead [Name] [Phone] [Vehicle] [buy|sell]`\n"
             "`/convert [Lead Name]` — Create project from lead\n"
             "`/search [Name]` — Search leads & customers"
@@ -116,11 +119,20 @@ async def dispatch_telegram_command(message: dict) -> str:
     if text_lower.startswith("/convert"):
         return await _handle_convert_lead(text, chat_id)
 
+    if text_lower.startswith("/stage"):
+        return await _handle_stage(text, chat_id)
+
     if text_lower.startswith("/search"):
         return await _handle_get_lead(text, chat_id)
 
     if text_lower.startswith("/summary"):
         return await _handle_summary(chat_id)
+
+    if text_lower.startswith("/customers") or text_lower.startswith("/getcustomers"):
+        return await _handle_get_customers(text, chat_id)
+
+    if text_lower.startswith("/customer") or text_lower.startswith("/getcustomer"):
+        return await _handle_customer_detail(text, chat_id)
 
     if text_lower.startswith("/leads") or text_lower.startswith("/getlead"):
         return await _handle_get_lead(text, chat_id)
@@ -146,6 +158,9 @@ async def dispatch_telegram_command(message: dict) -> str:
 
     if text_lower == "💼 active deals" or text_lower == "deals" or text_lower == "projects":
         return await _handle_get_projects(chat_id)
+
+    if text_lower == "👤 customers" or text_lower == "customers":
+        return await _handle_get_customers(text, chat_id)
 
     if text_lower == "📅 schedule" or text_lower == "schedule" or text_lower == "calendar":
         return await _handle_schedule(chat_id)
@@ -189,18 +204,27 @@ async def _handle_create_lead(text: str, chat_id: str) -> str:
     pipeline_type = "SELL" if intent == "SELL_INTENT" else "BUY"
     args_clean = args.replace("sell", "").replace("buy", "").strip()
 
-    # Extract phone (starts with + or is 10+ digits)
+    # Extract phone (starts with + or is 8+ digits)
     tokens = args_clean.split()
     phone = next((t for t in tokens if t.startswith("+") or (t.isdigit() and len(t) >= 8)), "")
-    tokens_no_phone = [t for t in tokens if t != phone]
 
-    # Heuristic: last 2-3 tokens = vehicle, earlier tokens = name
-    vehicle = " ".join(tokens_no_phone[-3:]) if len(tokens_no_phone) >= 4 else ""
-    name_tokens = tokens_no_phone[:-3] if len(tokens_no_phone) >= 4 else tokens_no_phone
-    full_name = " ".join(name_tokens)
-
-    if not full_name:
-        full_name = args_clean.split()[0] if args_clean.split() else "Unknown"
+    if phone and phone in tokens:
+        phone_idx = tokens.index(phone)
+        name_tokens = tokens[:phone_idx]
+        vehicle_tokens = tokens[phone_idx + 1:]
+        full_name = " ".join(name_tokens) if name_tokens else "Unknown"
+        vehicle = " ".join(vehicle_tokens) if vehicle_tokens else ""
+    else:
+        # Fallback if no phone token found: last 2 tokens = vehicle, rest = name
+        if len(tokens) >= 3:
+            full_name = " ".join(tokens[:-2])
+            vehicle = " ".join(tokens[-2:])
+        elif len(tokens) == 2:
+            full_name = tokens[0]
+            vehicle = tokens[1]
+        else:
+            full_name = " ".join(tokens) if tokens else "Unknown"
+            vehicle = ""
 
     try:
         sb = get_supabase()
@@ -219,6 +243,20 @@ async def _handle_create_lead(text: str, chat_id: str) -> str:
         result = sb.table("leads").insert(lead_data).execute()
         lead_id = result.data[0].get("id", "N/A") if result.data else "N/A"
 
+        phone_button = (
+            {"text": f"📞 Call {phone}", "url": f"tel:{phone}"}
+            if phone and phone.startswith("+")
+            else {"text": "👤 View Customer", "callback_data": f"/customer {full_name}"}
+        )
+        inline_buttons = {
+            "inline_keyboard": [
+                [
+                    {"text": "⚡ Convert to Project", "callback_data": f"/convert {full_name}"},
+                    phone_button
+                ]
+            ]
+        }
+
         reply = (
             f"✅ *Lead Created!*\n\n"
             f"👤 *Name:* {full_name}\n"
@@ -226,14 +264,15 @@ async def _handle_create_lead(text: str, chat_id: str) -> str:
             f"🚗 *Vehicle Interest:* {vehicle or 'Not specified'}\n"
             f"📌 *Intent:* {pipeline_type} pipeline\n"
             f"🆔 *Lead ID:* `{lead_id}`\n\n"
-            f"Use `/convert {full_name}` to create a project from this lead."
+            f"Tap **⚡ Convert to Project** below or use `/convert {full_name}`."
         )
+        await send_telegram_message(reply, chat_id, reply_markup=inline_buttons)
+        return reply
     except Exception as e:
         logger.error(f"Create lead error: {e}")
         reply = f"❌ Failed to create lead: {str(e)}"
-
-    await send_telegram_message(reply, chat_id)
-    return reply
+        await send_telegram_message(reply, chat_id)
+        return reply
 
 
 async def _handle_get_lead(text: str, chat_id: str) -> str:
@@ -269,6 +308,8 @@ async def _handle_get_cars(text: str, chat_id: str) -> str:
     """List vehicles from active projects."""
     parts = text.split(maxsplit=1)
     query = parts[1].strip().lower() if len(parts) > 1 else ""
+    if query in ["cars", "inventory"]:
+        query = ""
 
     try:
         projects = get_all_projects()
@@ -393,14 +434,14 @@ async def _handle_convert_lead(text: str, chat_id: str) -> str:
 
 
 async def _handle_schedule(chat_id: str) -> str:
-    """Fetch today's schedule from Outlook calendar."""
+    """Fetch today's merged schedule from Outlook and DB calendar."""
     try:
         from app.services.outlook_service import get_todays_schedule
         events = await get_todays_schedule()
         if not events:
-            reply = "📅 No appointments found in your Outlook calendar for today."
+            reply = "📅 No appointments found for today."
         else:
-            lines = ["📅 *Today's Schedule (Outlook):*\n"]
+            lines = ["📅 *Today's Schedule (Outlook & Calendar DB):*\n"]
             for evt in events:
                 lines.append(
                     f"• *{evt.get('time', 'All Day')}* — {evt.get('subject', 'No Subject')}"
@@ -453,3 +494,267 @@ async def _handle_briefing(chat_id: str) -> str:
         reply = f"❌ Briefing error: {str(e)}"
         await send_telegram_message(reply, chat_id)
         return reply
+
+
+async def _handle_get_customers(text: str, chat_id: str) -> str:
+    """List all customers (from active projects & converted clients) with summary details."""
+    parts = text.split(maxsplit=1)
+    query = parts[1].strip().lower() if len(parts) > 1 else ""
+
+    try:
+        projects = get_all_projects()
+        if query:
+            projects = [
+                p for p in projects
+                if query in (p.get("client_name") or "").lower()
+                or query in (p.get("target_vehicle") or "").lower()
+            ]
+
+        if not projects:
+            reply = f"👤 No active customers found{' matching *' + query + '*' if query else ''}."
+        else:
+            lines = [f"👤 *Active Customers ({len(projects)} found):*\n"]
+            for p in projects[:10]:
+                name = p.get("client_name", "Unknown")
+                p_type = p.get("project_type", "?")
+                veh = p.get("target_vehicle") or "TBD"
+                stage = p.get("current_stage") or p.get("stage") or "N/A"
+                phone = p.get("client_phone") or "N/A"
+                lines.append(f"• *{name}* — {p_type} — {veh}\n  └ Stage: _{stage}_ | 📞 {phone}")
+
+            if len(projects) > 10:
+                lines.append(f"\n_...and {len(projects) - 10} more_")
+            
+            lines.append("\n💡 _Type `/customer [Name]` to view full customer profile & Drive folders._")
+            reply = "\n".join(lines)
+    except Exception as e:
+        reply = f"❌ Error fetching customers: {str(e)}"
+
+    await send_telegram_message(reply, chat_id)
+    return reply
+
+
+async def _handle_customer_detail(text: str, chat_id: str) -> str:
+    """Fetch full detailed customer card for a specific client name or project ID."""
+    parts = text.split(maxsplit=1)
+    query = parts[1].strip() if len(parts) > 1 else ""
+
+    if not query:
+        reply = (
+            "👤 *Customer Profile Lookup — Usage:*\n"
+            "`/customer [Customer Name or ID]`\n\n"
+            "Example: `/customer Stefan Meier` or `/customers` to view all active customers."
+        )
+        await send_telegram_message(reply, chat_id)
+        return reply
+
+    try:
+        # Search in active projects/customers first
+        projects = get_all_projects()
+        match = next(
+            (p for p in projects if query.lower() in (p.get("client_name") or "").lower() or str(p.get("id")) == query),
+            None
+        )
+
+        if match:
+            c_name = match.get("client_name") or "Unknown"
+            c_phone = match.get("client_phone") or "Not provided"
+            c_email = match.get("client_email") or "Not provided"
+            p_type = match.get("project_type") or "N/A"
+            veh = match.get("target_vehicle") or "TBD"
+            stage = match.get("current_stage") or match.get("stage") or "Intake"
+            status = match.get("status") or "ACTIVE"
+            p_id = match.get("id") or "N/A"
+            notes = match.get("notes") or "No internal notes."
+
+            # Drive folders information
+            drive_info = ""
+            if match.get("drive_folder_id") or match.get("ocr_folder_id"):
+                ocr_link = match.get("ocr_folder_id") or match.get("drive_folder_id")
+                legal_link = match.get("legal_docs_folder_id")
+                signed_link = match.get("signed_docs_folder_id")
+                drive_info = (
+                    f"\n\n📂 *Google Drive Customer Storage:*\n"
+                    f"• 📁 OCR Scans: `{ocr_link}`\n"
+                    f"• 📁 Legal Docs: `{legal_link or 'Attached'}`\n"
+                    f"• 📁 Signed Contracts: `{signed_link or 'Attached'}`"
+                )
+
+            reply = (
+                f"👤 *Customer Full Profile — {c_name}*\n\n"
+                f"📞 *Phone:* {c_phone}\n"
+                f"📧 *Email:* {c_email}\n"
+                f"📌 *Deal Type:* {p_type} Brokerage\n"
+                f"🚗 *Target Vehicle:* {veh}\n"
+                f"🔄 *Sales Stage:* {stage}\n"
+                f"📊 *Project Status:* {status}\n"
+                f"🆔 *Project ID:* `{p_id}`"
+                f"{drive_info}\n\n"
+                f"📝 *Notes:* {notes}"
+            )
+        else:
+            # Fallback to check leads if customer isn't converted yet
+            leads = get_all_leads()
+            lead_match = next(
+                (l for l in leads if query.lower() in (l.get("name") or "").lower()),
+                None
+            )
+            if lead_match:
+                reply = (
+                    f"📋 *Customer Inquiry (Lead) — {lead_match.get('name')}*\n\n"
+                    f"📞 *Phone:* {lead_match.get('phone') or 'N/A'}\n"
+                    f"📧 *Email:* {lead_match.get('email') or 'N/A'}\n"
+                    f"📌 *Intent:* {lead_match.get('intent', 'N/A')} ({lead_match.get('pipeline_type', 'N/A')})\n"
+                    f"🚗 *Vehicle Interest:* {lead_match.get('vehicle_interest') or (lead_match.get('manufacturer', '') + ' ' + lead_match.get('model', '')).strip()}\n"
+                    f"📊 *Lead Status:* {lead_match.get('status')}\n"
+                    f"🆔 *Lead ID:* `{lead_match.get('id')}`\n\n"
+                    f"📝 *Notes:* {lead_match.get('notes') or 'No notes.'}\n\n"
+                    f"💡 _Use `/convert {lead_match.get('name')}` to upgrade this lead to an active customer project._"
+                )
+            else:
+                reply = f"❌ No customer or lead found matching *{query}*. Type `/customers` to view all active customers."
+
+    except Exception as e:
+        logger.error(f"Customer detail error: {e}")
+        reply = f"❌ Error fetching customer details: {str(e)}"
+
+    await send_telegram_message(reply, chat_id)
+    return reply
+
+
+# ─── Sales Stage Management ──────────────────────────────────────────────────
+
+STAGES = [
+    "Intake & Onboarding",
+    "Sourcing & Inspection",
+    "Contract Signing",
+    "Payment & Settlement",
+    "Handover & Delivered"
+]
+
+
+def _match_stage(query: str) -> Optional[str]:
+    """Matches partial query string to standard sales stage."""
+    q = query.strip().lower()
+    for s in STAGES:
+        if q == s.lower():
+            return s
+    if "intake" in q or "onboard" in q:
+        return "Intake & Onboarding"
+    if "sourc" in q or "inspect" in q:
+        return "Sourcing & Inspection"
+    if "contract" in q or "sign" in q:
+        return "Contract Signing"
+    if "pay" in q or "settle" in q:
+        return "Payment & Settlement"
+    if "handover" in q or "deliver" in q or "done" in q:
+        return "Handover & Delivered"
+    return None
+
+
+async def _handle_stage(text: str, chat_id: str) -> str:
+    """
+    View or update sales stage for an active deal:
+      /stage                          → List active projects & valid stages
+      /stage Stefan Meier             → View current stage & stage action buttons
+      /stage Stefan Meier Contract    → Update stage to 'Contract Signing'
+    """
+    parts = text.split(maxsplit=1)
+    args = parts[1].strip() if len(parts) > 1 else ""
+
+    projects = get_all_projects()
+    active_projects = [p for p in projects if p.get("status") == "ACTIVE"]
+
+    if not args:
+        lines = [
+            "🔄 *Sales Stage Manager*\n",
+            "Usage: `/stage [Client Name] [Stage Name]`",
+            "Example: `/stage Stefan Meier Contract Signing`\n",
+            "📌 *Standard Sales Stages:*",
+            "1️⃣ `Intake & Onboarding`",
+            "2️⃣ `Sourcing & Inspection`",
+            "3️⃣ `Contract Signing`",
+            "4️⃣ `Payment & Settlement`",
+            "5️⃣ `Handover & Delivered`\n",
+        ]
+        if active_projects:
+            lines.append("📁 *Active Client Projects:*")
+            for p in active_projects[:8]:
+                c_name = p.get("client_name", "Unknown")
+                stg = p.get("current_stage") or p.get("stage") or "Intake & Onboarding"
+                lines.append(f"• *{c_name}* — Stage: _{stg}_")
+            lines.append("\n💡 _Type `/stage [Client Name]` to get stage action buttons._")
+        else:
+            lines.append("📁 _No active projects found._")
+
+        reply = "\n".join(lines)
+        await send_telegram_message(reply, chat_id)
+        return reply
+
+    # Match client name in active projects (longest client name first)
+    active_projects.sort(key=lambda p: len(p.get("client_name") or ""), reverse=True)
+    match = next(
+        (p for p in active_projects if (p.get("client_name") or "").lower() in args.lower() or str(p.get("id")) == args),
+        None
+    )
+
+    if not match:
+        match = next(
+            (p for p in projects if (p.get("client_name") or "").lower() in args.lower() or str(p.get("id")) == args),
+            None
+        )
+
+    if not match:
+        reply = f"❌ No project found matching *{args}*. Type `/stage` to view active projects."
+        await send_telegram_message(reply, chat_id)
+        return reply
+
+    c_name = match.get("client_name", "Unknown")
+    current_stg = match.get("current_stage") or match.get("stage") or "Intake & Onboarding"
+    p_id = match.get("id")
+
+    # Extract target stage text if user specified one
+    remaining_text = args.lower().replace(c_name.lower(), "").strip()
+    target_stage = _match_stage(remaining_text) if remaining_text else None
+
+    if target_stage:
+        try:
+            sb = get_supabase()
+            upd = {
+                "current_stage": target_stage,
+                "stage": target_stage,
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            sb.table("projects").update(upd).eq("id", p_id).execute()
+
+            reply = (
+                f"✅ *Sales Stage Updated!*\n\n"
+                f"👤 *Client:* {c_name}\n"
+                f"🚗 *Vehicle:* {match.get('target_vehicle') or 'TBD'}\n"
+                f"📌 *Pipeline:* {match.get('project_type')} Brokerage\n"
+                f"🔄 *New Stage:* {target_stage}\n"
+                f"🆔 *Project ID:* `{p_id}`"
+            )
+        except Exception as e:
+            logger.error(f"Stage update error: {e}")
+            reply = f"❌ Failed to update stage: {str(e)}"
+
+        await send_telegram_message(reply, chat_id)
+        return reply
+
+    # If client matched but no target stage provided: display current stage + transition buttons!
+    buttons = []
+    for s in STAGES:
+        if s != current_stg:
+            buttons.append([{"text": f"➡️ Move to: {s}", "callback_data": f"/stage {c_name} {s}"}])
+
+    inline_markup = {"inline_keyboard": buttons}
+
+    reply = (
+        f"👤 *Customer:* {c_name}\n"
+        f"🚗 *Vehicle:* {match.get('target_vehicle') or 'TBD'}\n"
+        f"🔄 *Current Stage:* *{current_stg}*\n\n"
+        f"Tap a button below to advance stage:"
+    )
+    await send_telegram_message(reply, chat_id, reply_markup=inline_markup)
+    return reply
