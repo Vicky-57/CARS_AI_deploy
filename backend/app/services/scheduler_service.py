@@ -20,9 +20,8 @@ logger = logging.getLogger("scheduler_service")
 scheduler = AsyncIOScheduler()
 
 
-async def run_daily_briefing():
-    """W5: Generates daily executive briefing digest and delivers via Telegram."""
-    logger.info("Executing W5 Daily Executive Briefing job...")
+async def generate_daily_briefing() -> str:
+    """Generates daily executive briefing digest text."""
     try:
         leads = get_all_leads()
         projects = get_all_projects()
@@ -33,13 +32,24 @@ async def run_daily_briefing():
         active_buy = [p for p in projects if p.get("project_type") == "BUY" and p.get("status") == "ACTIVE"]
 
         text_msg = (
-            f"📋 *CAR-AGENTS Daily Briefing*\n"
-            f"Date: {datetime.utcnow().strftime('%Y-%m-%d')}\n\n"
+            f"📰 *CAR-AGENTS Executive Briefing*\n"
+            f"_{datetime.utcnow().strftime('%A, %d %B %Y')}_\n\n"
             f"🆕 New Leads (24h): *{len(new_leads_24h)}*\n"
             f"🏷️ Active SELL Projects: *{len(active_sell)}*\n"
             f"🔍 Active BUY Projects: *{len(active_buy)}*\n\n"
-            f"Have a productive day! 🚗"
+            f"Have a successful & productive day! 🚗"
         )
+        return text_msg
+    except Exception as e:
+        logger.error(f"Error generating briefing: {e}")
+        return f"❌ Could not generate briefing: {str(e)}"
+
+
+async def run_daily_briefing():
+    """W5: Generates daily executive briefing digest and delivers via Telegram & Email."""
+    logger.info("Executing W5 Daily Executive Briefing job...")
+    try:
+        text_msg = await generate_daily_briefing()
 
         # Send via Telegram bot
         try:

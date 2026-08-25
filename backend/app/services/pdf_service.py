@@ -44,7 +44,6 @@ except ImportError:
     pytesseract = None
     OCR_AVAILABLE = False
 
-
 # ─── Template registry ────────────────────────────────────────────────────────
 
 TEMPLATE_FILES = {
@@ -70,10 +69,8 @@ TEMPLATE_PIPELINE = {
 
 SAFE_FONT = "helv"
 
-
 def _client_data_dir() -> str:
     return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "client_data"))
-
 
 # ─── sell_b2c token → canonical field key ────────────────────────────────────
 # Engines fill values by canonical key. The UI / forms / API all agree on these

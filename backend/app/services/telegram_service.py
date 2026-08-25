@@ -109,41 +109,52 @@ async def dispatch_telegram_command(message: dict) -> str:
         await send_telegram_message(reply, chat_id, reply_markup=MAIN_REPLY_KEYBOARD)
         return reply
 
-    # ── /summary or 📊 Summary ──
-    if "summary" in text_lower or text_lower == "📊 summary" or text_lower.startswith("/summary"):
-        return await _handle_summary(chat_id)
-
-    # ── /leads, /getlead, or 📋 Leads ──
-    if "lead" in text_lower or text_lower == "📋 leads" or text_lower.startswith("/leads") or text_lower.startswith("/getlead"):
-        return await _handle_get_lead(text, chat_id)
-
-    # ── /projects, /getprojects, /deals, or 💼 Active Deals ──
-    if "deal" in text_lower or "project" in text_lower or text_lower == "💼 active deals" or text_lower.startswith("/deals") or text_lower.startswith("/projects"):
-        return await _handle_get_projects(chat_id)
-
-    # ── /schedule, /calendar, or 📅 Schedule ──
-    if "schedule" in text_lower or "calendar" in text_lower or text_lower == "📅 schedule" or text_lower.startswith("/schedule"):
-        return await _handle_schedule(chat_id)
-
-    # ── /briefing or 📰 Briefing ──
-    if "briefing" in text_lower or text_lower == "📰 briefing" or text_lower.startswith("/briefing"):
-        return await _handle_briefing(chat_id)
-
-    # ── /cars, /getcars, or 🚗 Cars ──
-    if "car" in text_lower or text_lower == "🚗 cars" or text_lower.startswith("/cars") or text_lower.startswith("/getcars"):
-        return await _handle_get_cars(text, chat_id)
-
-    # ── /createlead ──
+    # ── Explicit Slash Commands (MUST BE CHECKED FIRST!) ──
     if text_lower.startswith("/createlead"):
         return await _handle_create_lead(text, chat_id)
 
-    # ── /convert ──
     if text_lower.startswith("/convert"):
         return await _handle_convert_lead(text, chat_id)
 
-    # ── /search ──
     if text_lower.startswith("/search"):
         return await _handle_get_lead(text, chat_id)
+
+    if text_lower.startswith("/summary"):
+        return await _handle_summary(chat_id)
+
+    if text_lower.startswith("/leads") or text_lower.startswith("/getlead"):
+        return await _handle_get_lead(text, chat_id)
+
+    if text_lower.startswith("/deals") or text_lower.startswith("/projects") or text_lower.startswith("/getprojects"):
+        return await _handle_get_projects(chat_id)
+
+    if text_lower.startswith("/schedule") or text_lower.startswith("/calendar"):
+        return await _handle_schedule(chat_id)
+
+    if text_lower.startswith("/briefing"):
+        return await _handle_briefing(chat_id)
+
+    if text_lower.startswith("/cars") or text_lower.startswith("/getcars"):
+        return await _handle_get_cars(text, chat_id)
+
+    # ── Quick Keyboard Button Matches ──
+    if text_lower == "📊 summary" or text_lower == "summary":
+        return await _handle_summary(chat_id)
+
+    if text_lower == "📋 leads" or text_lower == "leads":
+        return await _handle_get_lead(text, chat_id)
+
+    if text_lower == "💼 active deals" or text_lower == "deals" or text_lower == "projects":
+        return await _handle_get_projects(chat_id)
+
+    if text_lower == "📅 schedule" or text_lower == "schedule" or text_lower == "calendar":
+        return await _handle_schedule(chat_id)
+
+    if text_lower == "📰 briefing" or text_lower == "briefing":
+        return await _handle_briefing(chat_id)
+
+    if text_lower == "🚗 cars" or text_lower == "cars" or text_lower == "inventory":
+        return await _handle_get_cars(text, chat_id)
 
     # ── Unknown Command Fallback ──
     reply = (
