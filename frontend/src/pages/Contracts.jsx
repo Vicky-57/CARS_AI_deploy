@@ -7,55 +7,63 @@ import { api, supabase } from '../api/api';
 
 const PIPELINE_TEMPLATES = {
   sell: [
-    { type: 'sell_b2c',    label: 'Vermittlungsvertrag B2C (Aktiv)',         desc: 'Sell-side brokerage contract' },
-    { type: 'kaufvertrag', label: 'Kaufvertrag C2C (Bilingual)',             desc: 'Bilingual C2C sales contract (DE/EN)' },
-    { type: 'handover',    label: 'Fahrzeug-Übergabeprotokoll',              desc: 'Vehicle handover protocol' },
+    { type: 'sell_b2c', label: 'Vermittlungsvertrag B2C (Aktiv)', desc: 'Sell-side brokerage contract' },
+    { type: 'kaufvertrag', label: 'Kaufvertrag C2C (Bilingual)', desc: 'Bilingual C2C sales contract (DE/EN)' },
+    { type: 'handover', label: 'Fahrzeug-Übergabeprotokoll', desc: 'Vehicle handover protocol' },
   ],
   buy: [
-    { type: 'buy_passiv',  label: 'Vermittlungsvertrag Beschaffung (Passiv)', desc: 'Buy-side procurement contract' },
-    { type: 'kaufvertrag', label: 'Kaufvertrag C2C (Bilingual)',             desc: 'Bilingual C2C sales contract (DE/EN)' },
-    { type: 'handover',    label: 'Fahrzeug-Übergabeprotokoll',              desc: 'Vehicle handover protocol' },
+    { type: 'buy_passiv', label: 'Vermittlungsvertrag Beschaffung (Passiv)', desc: 'Buy-side procurement contract' },
+    { type: 'kaufvertrag', label: 'Kaufvertrag C2C (Bilingual)', desc: 'Bilingual C2C sales contract (DE/EN)' },
+    { type: 'handover', label: 'Fahrzeug-Übergabeprotokoll', desc: 'Vehicle handover protocol' },
   ],
 };
 
 // Editable template field groups (canonical keys, shared with the PDF engine)
 const EDITABLE_FIELDS = [
-  { group: 'Client', keyPrefix: 'person', fields: [
-    { key: 'full_name',   label: 'Full Name / Name' },
-    { key: 'phone',       label: 'Phone / Telefon' },
-    { key: 'email',       label: 'Email / E-Mail' },
-    { key: 'street',      label: 'Street / Straße' },
-    { key: 'zip_city',    label: 'ZIP, City / PLZ, Ort' },
-    { key: 'id_card',     label: 'ID Type / No. (Ausweis)' },
-  ]},
-  { group: 'Vehicle', keyPrefix: 'vehicle', fields: [
-    { key: 'manufacturer', label: 'Manufacturer / Hersteller' },
-    { key: 'model',        label: 'Model / Typ' },
-    { key: 'vin',          label: 'VIN / FIN' },
-    { key: 'license',      label: 'License Plate / Kennzeichen' },
-    { key: 'first_date',   label: 'First Registration / Erstzulassung' },
-    { key: 'mileage',      label: 'Mileage (km) / Kilometerstand' },
-    { key: 'power',        label: 'Power / Leistung' },
-    { key: 'displacement', label: 'Displacement / Hubraum' },
-    { key: 'tuev_until',   label: 'TÜV valid until / TÜV bis' },
-    { key: 'owners',       label: 'Owners / Halter' },
-    { key: 'color',        label: 'Color / Farbe' },
-    { key: 'zb2',          label: 'Reg. Cert. Part II No. / ZB II' },
-    { key: 'keys',         label: 'Keys / Schlüssel' },
-    { key: 'engine_number',label: 'Engine No. / Motor-Nr.' },
-  ]},
-  { group: 'Price', keyPrefix: 'price', fields: [
-    { key: 'min_price',    label: 'Min. Price (€) / Mindestpreis' },
-    { key: 'price',        label: 'Purchase Price (€) / Kaufpreis' },
-    { key: 'special_agreements', label: 'Special Agreements / Sondervereinbarungen' },
-  ]},
-  { group: 'Handover', keyPrefix: 'handover', fields: [
-    { key: 'giving_person',   label: 'Giving Person / Übergebend' },
-    { key: 'receiving_person',label: 'Receiving Person / Übernehmend' },
-    { key: 'place',         label: 'Place / Ort' },
-    { key: 'date',          label: 'Date / Datum' },
-    { key: 'notes',         label: 'Notes / Anmerkungen' },
-  ]},
+  {
+    group: 'Client', keyPrefix: 'person', fields: [
+      { key: 'full_name', label: 'Full Name / Name' },
+      { key: 'phone', label: 'Phone / Telefon' },
+      { key: 'email', label: 'Email / E-Mail' },
+      { key: 'street', label: 'Street / Straße' },
+      { key: 'zip_city', label: 'ZIP, City / PLZ, Ort' },
+      { key: 'id_card', label: 'ID Type / No. (Ausweis)' },
+    ]
+  },
+  {
+    group: 'Vehicle', keyPrefix: 'vehicle', fields: [
+      { key: 'manufacturer', label: 'Manufacturer / Hersteller' },
+      { key: 'model', label: 'Model / Typ' },
+      { key: 'vin', label: 'VIN / FIN' },
+      { key: 'license', label: 'License Plate / Kennzeichen' },
+      { key: 'first_date', label: 'First Registration / Erstzulassung' },
+      { key: 'mileage', label: 'Mileage (km) / Kilometerstand' },
+      { key: 'power', label: 'Power / Leistung' },
+      { key: 'displacement', label: 'Displacement / Hubraum' },
+      { key: 'tuev_until', label: 'TÜV valid until / TÜV bis' },
+      { key: 'owners', label: 'Owners / Halter' },
+      { key: 'color', label: 'Color / Farbe' },
+      { key: 'zb2', label: 'Reg. Cert. Part II No. / ZB II' },
+      { key: 'keys', label: 'Keys / Schlüssel' },
+      { key: 'engine_number', label: 'Engine No. / Motor-Nr.' },
+    ]
+  },
+  {
+    group: 'Price', keyPrefix: 'price', fields: [
+      { key: 'min_price', label: 'Min. Price (€) / Mindestpreis' },
+      { key: 'price', label: 'Purchase Price (€) / Kaufpreis' },
+      { key: 'special_agreements', label: 'Special Agreements / Sondervereinbarungen' },
+    ]
+  },
+  {
+    group: 'Handover', keyPrefix: 'handover', fields: [
+      { key: 'giving_person', label: 'Giving Person / Übergebend' },
+      { key: 'receiving_person', label: 'Receiving Person / Übernehmend' },
+      { key: 'place', label: 'Place / Ort' },
+      { key: 'date', label: 'Date / Datum' },
+      { key: 'notes', label: 'Notes / Anmerkungen' },
+    ]
+  },
 ];
 
 export default function Contracts() {
@@ -70,6 +78,7 @@ export default function Contracts() {
   const [activeSession, setActiveSession] = useState(null);
   const [editor, setEditor] = useState(null);           // { templateType, fieldData, status, drive_url }
   const [previewing, setPreviewing] = useState(null);
+  const [embedFormUrl, setEmbedFormUrl] = useState(null);
   const [busy, setBusy] = useState('');                 // busy action key
 
   const loadAll = async () => {
@@ -293,14 +302,13 @@ export default function Contracts() {
                   <button className="btn btn-primary" onClick={() => handleCopyLink(sessionForProject(selectedProject))} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px' }}>
                     <Copy size={14} /> Copy Form Link
                   </button>
-                  <a
-                    href={publicLink(sessionForProject(selectedProject))}
-                    target="_blank" rel="noreferrer"
+                  <button
+                    onClick={() => setEmbedFormUrl(publicLink(sessionForProject(selectedProject)))}
                     className="btn btn-secondary"
                     style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', textDecoration: 'none' }}
                   >
-                    <ExternalLink size={14} /> Open Form
-                  </a>
+                    Open Form
+                  </button>
                 </>
               ) : (
                 <button className="btn btn-primary" onClick={handleCreateSession} disabled={creating} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px' }}>
@@ -421,6 +429,23 @@ export default function Contracts() {
               <button className="btn-icon" onClick={() => setPreviewing(null)}><X size={18} /></button>
             </div>
             <iframe src={previewing.url} title="Contract Preview" style={{ flex: 1, border: 'none', width: '100%' }} />
+          </div>
+        </div>
+      )}
+
+      {/* Embed Form modal */}
+      {embedFormUrl && (
+        <div className="modal-overlay" onClick={() => setEmbedFormUrl(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 1100, width: '100%', height: '95vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
+            <div className="modal-header" style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
+              <h3 className="modal-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                Client Intake Form
+              </h3>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <button className="btn-icon" onClick={() => setEmbedFormUrl(null)}><X size={18} /></button>
+              </div>
+            </div>
+            <iframe src={embedFormUrl} title="Client Intake Form" style={{ flex: 1, border: 'none', width: '100%', background: 'var(--bg)' }} />
           </div>
         </div>
       )}
