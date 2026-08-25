@@ -131,7 +131,7 @@ export default function Leads() {
       {/* Header */}
       <div className="page-header" style={{ alignItems: 'flex-end', marginBottom: 32 }}>
         <div className="page-header-left">
-          <h1 style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '-0.5px' }}>Lead Management</h1>
+          <h1 style={{ fontSize: '1.85rem', fontWeight: 800, letterSpacing: '-0.5px', color: '#0f172a', margin: '0 0 6px 0' }}>Lead Management</h1>
           <p style={{ fontSize: '0.9rem' }}>Inbound client inquiries from Email, WhatsApp, and Web Forms</p>
         </div>
         <button className="btn btn-primary" onClick={() => setIsModalOpen(true)} style={{ padding: '10px 16px' }}>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Car, CheckCircle, ChevronLeft, ChevronRight, Loader } from 'lucide-react';
+import { Car, CheckCircle, ChevronLeft, ChevronRight, Loader, ChevronDown } from 'lucide-react';
 import { api } from '../api/api';
 
 const SECTION_LABEL = (en, de) => ({ en, de });
@@ -25,12 +25,29 @@ function SelectField({ label, de, required = false, options = [], value, onChang
         {label} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>[{de}]</span>
         {required && <span style={{ color: '#dc2626' }}> *</span>}
       </label>
-      <select id={id} className="form-select" required={required} value={value ?? ''} onChange={e => onChange(e.target.value)} disabled={disabled}>
-        <option value="">— Please select / Bitte wählen —</option>
-        {options.map(o => (
-          <option key={o} value={o}>{o}</option>
-        ))}
-      </select>
+      <div style={{ position: 'relative' }}>
+        <select 
+          id={id} 
+          className="form-select" 
+          required={required} 
+          value={value ?? ''} 
+          onChange={e => onChange(e.target.value)}
+          disabled={disabled}
+          style={{ 
+            appearance: 'none', WebkitAppearance: 'none',
+            paddingRight: 36, cursor: 'pointer', width: '100%',
+            borderColor: '#e2e8f0', background: '#ffffff', color: '#0f172a'
+          }}
+        >
+          <option value="">— Please select / Bitte wählen —</option>
+          {options.map(o => (
+            <option key={o} value={o}>{o}</option>
+          ))}
+        </select>
+        <div style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#ea580c' }}>
+          <ChevronDown size={16} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -81,13 +98,23 @@ function ServiceItem({ label, de, priceType = 'number', value, onPriceChange, on
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Billing [Abrechnung]</span>
-        <select className="form-select" style={{ width: 110, padding: '4px 8px', fontSize: '0.8rem' }} value={value?.billing ?? ''} onChange={e => onBillingChange(e.target.value)}>
-          <option value="">—</option>
-          <option>VK</option>
-          <option>VR</option>
-          <option>INCL</option>
-          <option>SZ</option>
-        </select>
+        <div style={{ position: 'relative' }}>
+          <select 
+            className="form-select" 
+            style={{ width: 110, padding: '4px 28px 4px 8px', fontSize: '0.8rem', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }} 
+            value={value?.billing ?? ''} 
+            onChange={e => onBillingChange(e.target.value)}
+          >
+            <option value="">—</option>
+            <option>VK</option>
+            <option>VR</option>
+            <option>INCL</option>
+            <option>SZ</option>
+          </select>
+          <div style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#ea580c' }}>
+            <ChevronDown size={14} />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -227,19 +254,36 @@ export default function SellForm() {
         </div>
 
         {/* Step indicator */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
-          {steps.map(s => (
-            <div key={s.n} style={{
-              display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 999,
-              background: step === s.n ? 'var(--brand-600,#2563eb)' : 'var(--surface,#fff)',
-              color: step === s.n ? '#fff' : 'var(--text-secondary)',
-              fontSize: '0.72rem', fontWeight: 600, border: step === s.n ? 'none' : '1px solid var(--border)',
-            }}>
-              <span style={{
-                width: 18, height: 18, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                background: step === s.n ? 'rgba(255,255,255,.25)' : 'var(--gray-100,#f3f4f6)', fontSize: '0.65rem',
-              }}>{s.n}</span>
-              {s.label}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 40, position: 'relative', maxWidth: 640, margin: '0 auto 40px' }}>
+          {/* Connecting line */}
+          <div style={{ position: 'absolute', top: 20, left: '10%', right: '10%', height: 2, background: '#e2e8f0', zIndex: 0 }}></div>
+          
+          {steps.map((s) => (
+            <div key={s.n} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, position: 'relative', zIndex: 1 }}>
+              <div style={{
+                width: 42, height: 42, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: step === s.n ? '#ba5d39' : '#ffffff',
+                color: step === s.n ? '#ffffff' : '#64748b',
+                border: step === s.n ? 'none' : '3px solid #e2e8f0',
+                fontSize: '0.9rem', fontWeight: 800, marginBottom: 12,
+                boxShadow: step === s.n ? '0 4px 12px rgba(186, 93, 57, 0.3)' : '0 2px 4px rgba(0,0,0,0.02)'
+              }}>
+                0{s.n}
+              </div>
+              <div style={{
+                fontSize: '0.65rem',
+                fontWeight: step === s.n ? 800 : 700,
+                color: step === s.n ? '#0f172a' : '#94a3b8',
+                textTransform: 'uppercase',
+                textAlign: 'center',
+                lineHeight: 1.4,
+                letterSpacing: '0.5px',
+                padding: '0 4px'
+              }}>
+                {s.label.split(' / ')[0]}
+                <br />
+                <span style={{ fontSize: '0.55rem', opacity: step === s.n ? 0.7 : 0.5, fontWeight: 600 }}>{s.label.split(' / ')[1]}</span>
+              </div>
             </div>
           ))}
         </div>

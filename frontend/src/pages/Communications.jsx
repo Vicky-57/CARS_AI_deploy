@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, MessageSquare, Search, MessageCircle, User, Sparkles, RefreshCw, CheckCircle2, ChevronLeft, Clock, Zap, ShieldCheck } from 'lucide-react';
+import { Mail, MessageSquare, Search, MessageCircle, User, Sparkles, RefreshCw, CheckCircle2, ChevronLeft, Clock, Zap, ShieldCheck, Inbox } from 'lucide-react';
 import { api } from '../api/api';
 import { format } from 'date-fns';
 
@@ -112,61 +112,81 @@ export default function Communications() {
 
   return (
     <div>
-      <div className="page-header">
+      <div className="page-header" style={{ alignItems: 'flex-end', marginBottom: 32 }}>
         <div className="page-header-left">
-          <h1>Communications Inbox</h1>
-          <p>Live Primary Inbox (Strato IMAP & Outlook) + WhatsApp Cloud API Integration</p>
+          <h1 style={{ fontSize: '1.85rem', fontWeight: 800, letterSpacing: '-0.5px', color: '#0f172a', margin: '0 0 6px 0' }}>Communications Inbox</h1>
+          <p style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 500, margin: 0, lineHeight: 1.5 }}>Live Primary Inbox (Strato IMAP & Outlook) + WhatsApp Cloud API Integration</p>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div className="filters-row" style={{ margin: 0 }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'inline-flex', gap: 4, background: '#f1f5f9', padding: 4, borderRadius: 12, flexShrink: 0 }}>
             {['ALL', 'EMAIL', 'WHATSAPP'].map(f => (
-              <button key={f} className={`filter-chip${filter === f ? ' active' : ''}`} onClick={() => setFilter(f)}>{f === 'ALL' ? 'All' : f}</button>
+              <button key={f} onClick={() => setFilter(f)} style={{
+                padding: '8px 20px', borderRadius: 8, fontWeight: 800, fontSize: '0.85rem',
+                border: 'none', cursor: 'pointer', transition: 'all 0.2s',
+                background: filter === f ? '#0f172a' : 'transparent',
+                color: filter === f ? '#ffffff' : '#64748b',
+                boxShadow: filter === f ? '0 4px 12px rgba(0, 0, 0, 0.15)' : 'none',
+              }}>{f === 'ALL' ? 'All' : f}</button>
             ))}
           </div>
-          <button className="btn btn-secondary" onClick={loadCommunications} style={{ flexShrink: 0 }}><RefreshCw size={14} /> Refresh</button>
+          <button className="btn" onClick={loadCommunications} style={{ flexShrink: 0, padding: '10px 16px', background: '#ffffff', color: '#0f172a', border: '1.5px solid #e2e8f0', borderRadius: 10, fontWeight: 700, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+            <RefreshCw size={14} /> Refresh
+          </button>
         </div>
       </div>
 
       {contacts.length === 0 && !loading ? (
         /* Dynamic "Coming Soon / Realtime Stream Ready" State when no messages are in DB */
-        <div className="card" style={{ padding: '48px 32px', textAlign: 'center', maxWidth: 840, margin: '20px auto', borderRadius: 16 }}>
-          <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--brand-50)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
-            <Sparkles size={32} color="var(--brand-600)" />
+        <div className="card" style={{ padding: '64px 40px', textAlign: 'center', maxWidth: 880, margin: '40px auto', borderRadius: 24, border: 'none', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0,0,0,0.02)' }}>
+          <div style={{ width: 56, height: 56, borderRadius: '16px', background: '#f8fafc', border: '1.5px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)' }}>
+            <Inbox size={24} color="#64748b" />
           </div>
-          <div style={{ display: 'inline-block', background: '#fef3c7', color: '#92400e', padding: '4px 14px', borderRadius: 20, fontSize: '0.78rem', fontWeight: 700, marginBottom: 16 }}>
-            ⚡ Dynamic Live Inbox — Ready for Streaming
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', padding: '6px 14px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700, margin: '0 auto 20px' }}>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} /> Live Inbox Ready for Streaming
           </div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: 12, color: 'var(--text-primary)' }}>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '-0.5px', marginBottom: 12, color: '#0f172a' }}>
             No Static Sample Messages
           </h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', maxWidth: 620, margin: '0 auto 32px', lineHeight: 1.6 }}>
-            All static mock data has been purged. Inbound emails from <strong>info@car-agents.de</strong> (via Strato/Outlook IMAP) and <strong>WhatsApp Cloud API</strong> webhooks will dynamically populate here in real-time as leads message in.
+          <p style={{ color: '#64748b', fontSize: '1rem', maxWidth: 620, margin: '0 auto 40px', lineHeight: 1.6, fontWeight: 500 }}>
+            All static mock data has been purged. Inbound emails from <strong style={{ color: '#0f172a' }}>info@car-agents.de</strong> (via Strato/Outlook IMAP) and <strong style={{ color: '#0f172a' }}>WhatsApp Cloud API</strong> webhooks will dynamically populate here in real-time as leads message in.
           </p>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16, textAlign: 'left', marginBottom: 32 }}>
-            <div style={{ background: 'var(--gray-50)', border: '1px solid var(--border)', padding: 18, borderRadius: 12 }}>
-              <div style={{ fontWeight: 700, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, color: '#1e40af' }}>
-                <Mail size={16} color="#2563eb" /> Strato / Outlook Email Poller
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20, textAlign: 'left' }}>
+            <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', padding: 24, borderRadius: 16, transition: 'all 0.2s', cursor: 'default' }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.05)'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+            >
+              <div style={{ fontWeight: 800, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, color: '#0f172a' }}>
+                <div style={{ background: '#eff6ff', color: '#2563eb', padding: 6, borderRadius: 8 }}><Mail size={16} /></div>
+                Strato / Outlook Poller
               </div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                Polls <strong>info@car-agents.de</strong> every 5 minutes, auto-extracts vehicle inquiries, and classifies <code>BUY_INTENT</code> vs <code>SELL_INTENT</code>.
+              <div style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: 1.6, fontWeight: 500 }}>
+                Polls <strong style={{ color: '#0f172a' }}>info@car-agents.de</strong> every 5 minutes, auto-extracts vehicle inquiries, and classifies <code>BUY_INTENT</code> vs <code>SELL_INTENT</code>.
               </div>
             </div>
 
-            <div style={{ background: 'var(--gray-50)', border: '1px solid var(--border)', padding: 18, borderRadius: 12 }}>
-              <div style={{ fontWeight: 700, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, color: '#166534' }}>
-                <MessageCircle size={16} color="#25D366" /> Meta WhatsApp Cloud API
+            <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', padding: 24, borderRadius: 16, transition: 'all 0.2s', cursor: 'default' }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.05)'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+            >
+              <div style={{ fontWeight: 800, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, color: '#0f172a' }}>
+                <div style={{ background: '#f0fdf4', color: '#16a34a', padding: 6, borderRadius: 8 }}><MessageCircle size={16} /></div>
+                WhatsApp Cloud API
               </div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              <div style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: 1.6, fontWeight: 500 }}>
                 Listens to incoming WhatsApp text messages and voice notes, with Whisper audio transcription & automated scheduling assistant.
               </div>
             </div>
 
-            <div style={{ background: 'var(--gray-50)', border: '1px solid var(--border)', padding: 18, borderRadius: 12 }}>
-              <div style={{ fontWeight: 700, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, color: '#9333ea' }}>
-                <Sparkles size={16} color="#9333ea" /> 1-Click AI Lead Conversion
+            <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', padding: 24, borderRadius: 16, transition: 'all 0.2s', cursor: 'default' }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.05)'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+            >
+              <div style={{ fontWeight: 800, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, color: '#0f172a' }}>
+                <div style={{ background: '#faf5ff', color: '#9333ea', padding: 6, borderRadius: 8 }}><Sparkles size={16} /></div>
+                1-Click AI Conversion
               </div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              <div style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: 1.6, fontWeight: 500 }}>
                 Instantly converts incoming email threads and WhatsApp conversations into active Lead database records with 1 click.
               </div>
             </div>

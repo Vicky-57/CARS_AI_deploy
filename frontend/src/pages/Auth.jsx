@@ -41,12 +41,14 @@ export default function Auth({ onLogin }) {
 
       {/* Left branding panel — hidden on mobile */}
       <div className="auth-left-panel" style={{
-        flex: 1,
+        flex: 1.2,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
         padding: '60px 80px',
         position: 'relative', zIndex: 1,
+        background: 'linear-gradient(to right, rgba(10, 11, 14, 0.6), rgba(10, 11, 14, 0.8)), url("/assets/login img.png") center top / cover no-repeat',
+        borderRight: '1px solid rgba(255,255,255,0.05)',
       }}>
         <div style={{ maxWidth: 480 }}>
           {/* Logo */}

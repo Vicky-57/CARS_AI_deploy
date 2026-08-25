@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   FolderKanban, LayoutGrid, List, Plus, Search, RefreshCw, User, Car,
-  ChevronRight, Calculator, Clock, Receipt, Folder, Sparkles, CheckCircle2,
+  ChevronRight, ChevronDown, Calculator, Clock, Receipt, Folder, Sparkles, CheckCircle2,
   X, ExternalLink, Tag, FileText, Phone, Mail, ShieldCheck, UploadCloud
 } from 'lucide-react';
 import { api } from '../api/api';
@@ -273,7 +273,7 @@ export default function Projects() {
       {/* Header */}
       <div className="page-header">
         <div className="page-header-left">
-          <h1>Deals & Projects</h1>
+          <h1 style={{ fontSize: '1.85rem', fontWeight: 800, letterSpacing: '-0.5px', color: '#0f172a', margin: '0 0 6px 0' }}>Deals & Projects</h1>
           <p>Unified Sales Pipeline, Financial Ledger & Drive Document Management</p>
         </div>
 
@@ -502,16 +502,16 @@ export default function Projects() {
                             {sIdx < STAGES.length - 1 && (
                               <button
                                 className="btn btn-secondary btn-sm"
-                                style={{ padding: '6px 12px', fontSize: '0.75rem', gap: 4, background: 'rgba(241, 245, 249, 0.8)', border: 'none', color: '#475569', fontWeight: 700 }}
+                                style={{ padding: '6px 12px', fontSize: '0.75rem', gap: 4, background: '#ffedd5', border: 'none', color: '#ea580c', fontWeight: 800 }}
                                 onClick={(e) => handleAdvanceStage(p, e)}
                                 title="Move to next stage"
                                 onMouseEnter={(e) => {
-                                  e.currentTarget.style.background = '#ffedd5';
-                                  e.currentTarget.style.color = '#ea580c';
+                                  e.currentTarget.style.background = '#ea580c';
+                                  e.currentTarget.style.color = '#ffffff';
                                 }}
                                 onMouseLeave={(e) => {
-                                  e.currentTarget.style.background = 'rgba(241, 245, 249, 0.8)';
-                                  e.currentTarget.style.color = '#475569';
+                                  e.currentTarget.style.background = '#ffedd5';
+                                  e.currentTarget.style.color = '#ea580c';
                                 }}
                               >
                                 Advance <ChevronRight size={14} />
@@ -562,45 +562,61 @@ export default function Projects() {
                     const stageIdx = STAGES.indexOf(currentStage);
 
                     return (
-                      <tr key={p.id} style={{ cursor: 'pointer' }} onClick={() => { setSelectedProject(p); setActiveTab('overview'); }}>
-                        <td style={{ paddingLeft: 24 }}>
-                          <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <User size={14} color="var(--gray-400)" /> {p.client_name}
+                      <tr key={p.id} style={{ cursor: 'pointer', transition: 'background-color 0.2s' }} onClick={() => { setSelectedProject(p); setActiveTab('overview'); }}>
+                        <td style={{ paddingLeft: 24, paddingTop: 12, paddingBottom: 12 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <div style={{ 
+                              width: 38, height: 38, borderRadius: 10, 
+                              background: 'linear-gradient(135deg, #fff3ec, #ffe4d6)',
+                              border: '1px solid #fed7aa',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: '0.85rem', fontWeight: 800, 
+                              color: '#ea580c',
+                              boxShadow: '0 2px 6px rgba(234, 88, 12, 0.1)', flexShrink: 0
+                            }}>
+                              {getInitials(p.client_name)}
+                            </div>
+                            <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0f172a' }}>
+                              {p.client_name}
+                            </div>
                           </div>
                         </td>
                         <td>
                           {p.target_vehicle ? (
-                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <Car size={14} color="var(--brand-500)" /> {p.target_vehicle}
+                            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                              <Car size={16} color="#f47c3c" style={{ marginTop: 2, flexShrink: 0 }} /> 
+                              <span>{p.target_vehicle}</span>
                             </div>
                           ) : (
-                            <span style={{ color: 'var(--text-muted)' }}>-</span>
+                            <span style={{ color: '#94a3b8' }}>—</span>
                           )}
                         </td>
                         <td>
-                          <span style={{ fontSize: '0.82rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}>
+                          <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: '#64748b', background: '#f1f5f9', padding: '4px 8px', borderRadius: 6, border: '1px solid #e2e8f0', fontWeight: 600 }}>
                             {p.vin || '—'}
                           </span>
                         </td>
                         <td>
-                          <span className={`badge ${p.project_type === 'BUY' ? 'badge-email' : 'badge-whatsapp'}`}>
-                            {p.project_type === 'BUY' ? 'Buy Side' : 'Sell Side'}
+                          <span className={`badge ${p.project_type === 'BUY' ? 'badge-buy' : 'badge-sell'}`} style={{ fontSize: '0.7rem', padding: '4px 8px', border: 'none' }}>
+                            {p.project_type === 'BUY' ? 'BUY SIDE' : 'SELL SIDE'}
                           </span>
                         </td>
                         <td>
-                          <span className="badge" style={{ background: 'var(--gray-100)', color: 'var(--text-primary)' }}>
-                            <span style={{ color: 'var(--brand-500)', marginRight: 6 }}>{stageIdx + 1}.</span>
-                            {currentStage}
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#ffffff', border: '1px solid #e2e8f0', padding: '4px 12px 4px 4px', borderRadius: 20, boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                            <span style={{ width: 22, height: 22, minWidth: 22, flexShrink: 0, borderRadius: '50%', background: 'linear-gradient(135deg, #f97316, #ea580c)', color: '#ffffff', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
+                              {stageIdx + 1}
+                            </span>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>{currentStage}</span>
                           </span>
                         </td>
                         <td>
-                          <span style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>
                             €{totalInvestment.toLocaleString()}
                           </span>
                         </td>
                         <td>
-                          <span style={{ fontSize: '0.88rem', fontWeight: 700, color: netProfit >= 0 ? '#166534' : '#991b1b' }}>
-                            €{netProfit.toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: netProfit >= 0 ? '#059669' : '#dc2626', background: netProfit >= 0 ? '#dcfce7' : '#fee2e2', padding: '4px 8px', borderRadius: 6 }}>
+                            {netProfit >= 0 ? '+' : ''}€{netProfit.toLocaleString(undefined, { minimumFractionDigits: 0 })}
                           </span>
                         </td>
                         <td style={{ paddingRight: 24, textAlign: 'right' }}>
@@ -608,16 +624,31 @@ export default function Projects() {
                             <button
                               className="btn btn-secondary btn-sm"
                               onClick={(e) => { e.stopPropagation(); setSelectedProject(p); setActiveTab('financials'); }}
-                              style={{ padding: '6px 12px' }}
+                              style={{ padding: '6px 12px', background: 'rgba(241, 245, 249, 0.8)', border: 'none', color: '#475569' }}
                               title="Financial Ledger & Expenses"
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#e2e8f0';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'rgba(241, 245, 249, 0.8)';
+                              }}
                             >
                               <Calculator size={14} />
                             </button>
                             {stageIdx < STAGES.length - 1 && (
                               <button
-                                className="btn btn-primary btn-sm"
+                                className="btn btn-secondary btn-sm"
                                 onClick={(e) => handleAdvanceStage(p, e)}
-                                style={{ padding: '6px 12px' }}
+                                style={{ padding: '6px 12px', fontSize: '0.75rem', gap: 4, background: '#ffedd5', border: 'none', color: '#ea580c', fontWeight: 800 }}
+                                title="Move to next stage"
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = '#ea580c';
+                                  e.currentTarget.style.color = '#ffffff';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = '#ffedd5';
+                                  e.currentTarget.style.color = '#ea580c';
+                                }}
                               >
                                 Advance <ChevronRight size={14} />
                               </button>
@@ -677,28 +708,52 @@ export default function Projects() {
             </div>
 
             {/* Drawer Tabs Bar */}
-            <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', background: 'var(--gray-50)', padding: '0 28px' }}>
-              <button
-                className={`tab-item ${activeTab === 'overview' ? 'active' : ''}`}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, padding: '12px 18px', fontSize: '0.85rem', fontWeight: 600, borderBottom: activeTab === 'overview' ? '2px solid var(--brand-600)' : '2px solid transparent', color: activeTab === 'overview' ? 'var(--brand-700)' : 'var(--text-muted)' }}
-                onClick={() => setActiveTab('overview')}
-              >
-                <FileText size={16} /> Stage & Overview
-              </button>
-              <button
-                className={`tab-item ${activeTab === 'financials' ? 'active' : ''}`}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, padding: '12px 18px', fontSize: '0.85rem', fontWeight: 600, borderBottom: activeTab === 'financials' ? '2px solid var(--brand-600)' : '2px solid transparent', color: activeTab === 'financials' ? 'var(--brand-700)' : 'var(--text-muted)' }}
-                onClick={() => setActiveTab('financials')}
-              >
-                <Receipt size={16} /> Financials & Profit Ledger
-              </button>
-              <button
-                className={`tab-item ${activeTab === 'drive' ? 'active' : ''}`}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, padding: '12px 18px', fontSize: '0.85rem', fontWeight: 600, borderBottom: activeTab === 'drive' ? '2px solid var(--brand-600)' : '2px solid transparent', color: activeTab === 'drive' ? 'var(--brand-700)' : 'var(--text-muted)' }}
-                onClick={() => setActiveTab('drive')}
-              >
-                <img src="/assets/google-drive (1).png" alt="Drive" style={{ width: 16, height: 16, objectFit: 'contain' }} /> Drive Cloud Storage
-              </button>
+            <div style={{ padding: '16px 28px 0 28px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', gap: 6, marginBottom: '-1px' }}>
+                {[
+                  { id: 'overview', icon: <FileText size={16} />, label: 'Stage & Overview' },
+                  { id: 'financials', icon: <Receipt size={16} />, label: 'Financials & Profit Ledger' },
+                  { id: 'drive', icon: <img src="/assets/google-drive (1).png" alt="Drive" style={{ width: 16, height: 16, objectFit: 'contain' }} />, label: 'Drive Cloud Storage' }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    style={{
+                      background: activeTab === tab.id ? '#ffffff' : 'transparent',
+                      border: '1px solid',
+                      borderColor: activeTab === tab.id ? '#e2e8f0' : 'transparent',
+                      borderBottomColor: activeTab === tab.id ? '#ffffff' : 'transparent',
+                      borderTopLeftRadius: 10,
+                      borderTopRightRadius: 10,
+                      padding: '12px 24px',
+                      fontSize: '0.85rem',
+                      fontWeight: activeTab === tab.id ? 800 : 600,
+                      color: activeTab === tab.id ? '#ea580c' : '#64748b',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      transition: 'color 0.2s, background-color 0.2s',
+                      position: 'relative',
+                      zIndex: activeTab === tab.id ? 2 : 1
+                    }}
+                    onMouseEnter={(e) => {
+                      if (activeTab !== tab.id) {
+                        e.currentTarget.style.color = '#0f172a';
+                        e.currentTarget.style.background = 'rgba(226, 232, 240, 0.4)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (activeTab !== tab.id) {
+                        e.currentTarget.style.color = '#64748b';
+                        e.currentTarget.style.background = 'transparent';
+                      }
+                    }}
+                  >
+                    {tab.icon} {tab.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Drawer Body Content */}
@@ -849,88 +904,104 @@ export default function Projects() {
                   </div>
 
                   {/* Direct Folder Links */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 520, margin: '0 auto 32px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: 'var(--gray-50)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: 'var(--shadow-sm)' }}>
-                      <div>
-                        <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <Folder size={16} color="var(--brand-500)" style={{ flexShrink: 0 }} /> 1. OCR & Media Scans Folder
-                        </div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>Vehicle photos, walkaround videos, vehicle specs</div>
-                      </div>
-                      <a
-                        href={driveUrls?.ocr_folder_url || 'https://drive.google.com'}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn btn-secondary btn-sm"
-                        style={{ gap: 6 }}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 540, margin: '0 auto 36px' }}>
+                    {[
+                      { num: 1, title: 'OCR & Media Scans Folder', desc: 'Vehicle photos, walkaround videos, vehicle specs', link: driveUrls?.ocr_folder_url },
+                      { num: 2, title: 'Legal Contracts Folder', desc: 'Power of Attorney, CAR-AGENTS GTC, disclaimers', link: driveUrls?.legal_docs_folder_url },
+                      { num: 3, title: 'Signed PDF Contracts', desc: 'Final signed brokerage & sale contracts', link: driveUrls?.signed_docs_folder_url }
+                    ].map(folder => (
+                      <div 
+                        key={folder.num}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 14, boxShadow: '0 2px 8px rgba(0,0,0,0.03)', transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'pointer' }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          e.currentTarget.style.borderColor = '#fed7aa';
+                          e.currentTarget.style.boxShadow = '0 6px 16px rgba(234, 88, 12, 0.08)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.borderColor = '#e2e8f0';
+                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.03)';
+                        }}
                       >
-                        Open Drive <ExternalLink size={13} />
-                      </a>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: 'var(--gray-50)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: 'var(--shadow-sm)' }}>
-                      <div>
-                        <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <Folder size={16} color="var(--brand-500)" style={{ flexShrink: 0 }} /> 2. Legal Contracts Folder
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                          <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg, #fff3ec, #ffe4d6)', border: '1px solid #fed7aa', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ea580c', flexShrink: 0 }}>
+                            <Folder size={18} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a' }}>
+                              {folder.num}. {folder.title}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 3, fontWeight: 500 }}>{folder.desc}</div>
+                          </div>
                         </div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>Power of Attorney, CAR-AGENTS GTC, disclaimers</div>
+                        <a
+                          href={folder.link || 'https://drive.google.com'}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-secondary btn-sm"
+                          style={{ gap: 6, background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569', fontWeight: 700, transition: 'all 0.2s' }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = '#ffedd5'; e.currentTarget.style.color = '#ea580c'; e.currentTarget.style.borderColor = '#fed7aa'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.color = '#475569'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+                        >
+                          Open Drive <ExternalLink size={14} />
+                        </a>
                       </div>
-                      <a
-                        href={driveUrls?.legal_docs_folder_url || 'https://drive.google.com'}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn btn-secondary btn-sm"
-                        style={{ gap: 6 }}
-                      >
-                        Open Drive <ExternalLink size={13} />
-                      </a>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: 'var(--gray-50)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: 'var(--shadow-sm)' }}>
-                      <div>
-                        <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <Folder size={16} color="var(--brand-500)" style={{ flexShrink: 0 }} /> 3. Signed PDF Contracts
-                        </div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>Final signed brokerage & sale contracts</div>
-                      </div>
-                      <a
-                        href={driveUrls?.signed_docs_folder_url || 'https://drive.google.com'}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn btn-secondary btn-sm"
-                        style={{ gap: 6 }}
-                      >
-                        Open Drive <ExternalLink size={13} />
-                      </a>
-                    </div>
+                    ))}
                   </div>
 
                   {/* Upload Media / Videos / Documents Box */}
-                  <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 14, padding: 24, maxWidth: 520, margin: '0 auto', boxShadow: 'var(--shadow-sm)' }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-primary)' }}>
-                      <UploadCloud size={16} color="var(--brand-600)" /> Upload Media or Documents to Drive
+                  <div style={{ background: '#fffcf9', border: '2px dashed #fed7aa', borderRadius: 16, padding: '28px 24px', maxWidth: 540, margin: '0 auto', textAlign: 'center', transition: 'all 0.2s' }}>
+                    <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg, #f97316, #ea580c)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 4px 12px rgba(234, 88, 12, 0.2)' }}>
+                      <UploadCloud size={22} />
                     </div>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 16 }}>
-                      Select a vehicle walkaround video, photo, or PDF scan to upload directly to customer's Google Drive.
+                    <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: 6, color: '#0f172a' }}>
+                      Upload Media or Documents
+                    </div>
+                    <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: 20, maxWidth: 400, margin: '0 auto 20px', lineHeight: 1.5, fontWeight: 500 }}>
+                      Select a vehicle walkaround video, photo, or PDF scan to upload directly to this customer's Google Drive.
                     </p>
 
-                    <div className="form-group" style={{ marginBottom: 16 }}>
-                      <label className="form-label">Target Drive Subfolder</label>
-                      <select
-                        className="form-select"
-                        value={uploadTargetFolder}
-                        onChange={e => setUploadTargetFolder(e.target.value)}
-                      >
-                        <option value="1. OCR">1. OCR (Vehicle Photos, Videos & Spec Scans)</option>
-                        <option value="2. Legal Docs">2. Legal Docs (GTC & Power of Attorney)</option>
-                        <option value="3. Signed Docs">3. Signed Docs (Executed PDF Contracts)</option>
-                      </select>
+                    <div className="form-group" style={{ marginBottom: 24, textAlign: 'left', maxWidth: 360, margin: '0 auto 24px' }}>
+                      <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: 8, display: 'block' }}>Target Drive Subfolder</label>
+                      <div style={{ position: 'relative' }}>
+                        <select
+                          className="form-select"
+                          value={uploadTargetFolder}
+                          onChange={e => setUploadTargetFolder(e.target.value)}
+                          style={{ 
+                            appearance: 'none', 
+                            WebkitAppearance: 'none',
+                            borderColor: '#fed7aa', 
+                            background: '#ffffff', 
+                            fontWeight: 700, 
+                            color: '#ea580c',
+                            padding: '12px 40px 12px 16px',
+                            borderRadius: 10,
+                            boxShadow: '0 2px 8px rgba(234,88,12,0.06)',
+                            cursor: 'pointer',
+                            outline: 'none',
+                            width: '100%',
+                            fontSize: '0.9rem'
+                          }}
+                        >
+                          <option value="1. OCR">1. OCR (Vehicle Photos, Videos & Spec Scans)</option>
+                          <option value="2. Legal Docs">2. Legal Docs (GTC & Power of Attorney)</option>
+                          <option value="3. Signed Docs">3. Signed Docs (Executed PDF Contracts)</option>
+                        </select>
+                        <div style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#ea580c' }}>
+                          <ChevronDown size={18} />
+                        </div>
+                      </div>
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                      <label className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', padding: '10px 16px' }}>
-                        {uploadingDriveFile ? <Sparkles size={16} className="spin" /> : <Folder size={16} />}
-                        <span>{uploadingDriveFile ? 'Uploading File to Drive…' : 'Select Photo, Video, or PDF to Upload'}</span>
+                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                      <label style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', padding: '12px 24px', background: 'linear-gradient(135deg, #f97316, #ea580c)', color: 'white', borderRadius: 8, fontWeight: 800, fontSize: '0.9rem', boxShadow: '0 4px 12px rgba(234, 88, 12, 0.25)', transition: 'transform 0.2s, box-shadow 0.2s' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(234, 88, 12, 0.3)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(234, 88, 12, 0.25)'; }}
+                      >
+                        {uploadingDriveFile ? <Sparkles size={18} className="spin" /> : <Folder size={18} />}
+                        <span>{uploadingDriveFile ? 'Uploading File to Drive…' : 'Select File to Upload'}</span>
                         <input
                           type="file"
                           accept="image/*,video/*,application/pdf"

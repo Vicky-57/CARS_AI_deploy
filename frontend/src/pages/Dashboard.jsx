@@ -98,7 +98,7 @@ export default function Dashboard() {
     <div style={{ paddingBottom: 40 }}>
       <div className="page-header" style={{ alignItems: 'flex-end' }}>
         <div className="page-header-left">
-          <h1 style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '-0.5px' }}>Overview</h1>
+          <h1 style={{ fontSize: '1.85rem', fontWeight: 800, letterSpacing: '-0.5px', color: '#0f172a', margin: '0 0 6px 0' }}>Overview</h1>
           <p style={{ fontSize: '0.9rem' }}>Here's what's happening in your brokerage today.</p>
         </div>
         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>

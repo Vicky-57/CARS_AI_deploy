@@ -217,30 +217,34 @@ export default function Contracts() {
   return (
     <div style={{ paddingBottom: 40 }}>
       {/* Header */}
-      <div className="page-header" style={{ alignItems: 'flex-end', marginBottom: 28 }}>
+      <div className="page-header" style={{ alignItems: 'flex-end', marginBottom: 32 }}>
         <div className="page-header-left">
-          <h1 style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '-0.5px' }}>Documentation</h1>
-          <p style={{ fontSize: '0.9rem' }}>
-            Generate, preview and approve the 3 contracts per client, then save to Google Drive.
+          <h1 style={{ fontSize: '1.85rem', fontWeight: 800, letterSpacing: '-0.5px', color: '#0f172a', margin: '0 0 6px 0' }}>
+            Documentation
+          </h1>
+          <p style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 500, margin: 0, lineHeight: 1.5 }}>
+            Generate, preview, and approve contracts per client, then save them directly to Google Drive.
           </p>
         </div>
-        <button className="btn btn-secondary" onClick={loadAll} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px' }}>
-          <RefreshCw size={14} /> Refresh
+        <button className="btn" onClick={loadAll} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', background: '#ffffff', color: '#475569', border: '1px solid #e2e8f0', borderRadius: 10, fontWeight: 700, fontSize: '0.85rem', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', transition: 'all 0.2s' }}>
+          <RefreshCw size={16} /> Refresh
         </button>
       </div>
 
       {/* Pipeline toggle */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 24 }}>
+      <div style={{ display: 'inline-flex', gap: 4, marginBottom: 24, background: '#f1f5f9', padding: 4, borderRadius: 12 }}>
         {(['sell', 'buy']).map(p => (
           <button
             key={p}
             onClick={() => { setPipeline(p); setSelectedProject(null); }}
             className="btn"
             style={{
-              padding: '10px 28px', borderRadius: 10, fontWeight: 700, fontSize: '0.95rem',
-              background: pipeline === p ? (p === 'sell' ? 'var(--brand-600,#2563eb)' : 'var(--brand-700,#1d4ed8)') : 'var(--surface,#fff)',
-              color: pipeline === p ? '#fff' : 'var(--text-secondary)',
-              border: pipeline === p ? 'none' : '1px solid var(--border)',
+              padding: '8px 24px', borderRadius: 8, fontWeight: 800, fontSize: '0.85rem',
+              background: pipeline === p ? '#0f172a' : 'transparent',
+              color: pipeline === p ? '#fff' : '#64748b',
+              border: 'none',
+              boxShadow: pipeline === p ? '0 4px 12px rgba(0, 0, 0, 0.15)' : 'none',
+              transition: 'all 0.2s',
             }}
           >
             {p === 'sell' ? 'SELL / VERKAUF' : 'BUY / BESCHAFFUNG'}
@@ -249,10 +253,10 @@ export default function Contracts() {
       </div>
 
       {/* Project selector + create session */}
-      <div className="card" style={{ marginBottom: 24, border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-        <div className="card-header" style={{ padding: '18px 24px' }}>
-          <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
-            <FolderKanban size={16} /> {pipeline.toUpperCase()} Projects
+      <div className="card" style={{ marginBottom: 24, border: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.04)', borderRadius: 16, overflow: 'hidden' }}>
+        <div className="card-header" style={{ padding: '18px 24px', background: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
+          <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 800, color: '#0f172a' }}>
+            <FolderKanban size={18} color="#ea580c" /> {pipeline.toUpperCase()} Projects
           </span>
         </div>
         <div className="card-body" style={{ padding: 24 }}>
@@ -271,22 +275,24 @@ export default function Contracts() {
                     key={p.id}
                     onClick={() => setSelectedProject(p.id)}
                     style={{
-                      border: `1.5px solid ${selectedProject === p.id ? 'var(--brand-600,#2563eb)' : 'var(--border)'}`,
-                      borderRadius: 12, padding: '14px 16px', cursor: 'pointer',
-                      background: selectedProject === p.id ? 'var(--brand-50,#eff6ff)' : 'var(--surface,#fff)',
+                      border: `1.5px solid ${selectedProject === p.id ? '#ea580c' : '#e2e8f0'}`,
+                      borderRadius: 14, padding: '16px 20px', cursor: 'pointer',
+                      background: selectedProject === p.id ? '#fffaf5' : '#ffffff',
+                      boxShadow: selectedProject === p.id ? '0 4px 16px rgba(234, 88, 12, 0.12)' : '0 2px 4px rgba(0,0,0,0.02)',
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                     }}
                   >
-                    <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>{p.client_name}</div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                    <div style={{ fontWeight: 800, fontSize: '1rem', color: '#0f172a' }}>{p.client_name}</div>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 4, fontWeight: 500 }}>
                       {p.target_vehicle || p.vin || 'Vehicle not set'}
                     </div>
-                    <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
                       {sess ? (
-                        <span className="badge badge-success" style={{ fontSize: '0.65rem', padding: '3px 8px' }}>
-                          <CheckCircle size={11} /> Session ready · {sess.stage}/3
+                        <span className="badge" style={{ fontSize: '0.65rem', padding: '4px 10px', background: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0', borderRadius: 20 }}>
+                          <CheckCircle size={12} /> Session ready · {sess.stage}/3
                         </span>
                       ) : (
-                        <span className="badge badge-new" style={{ fontSize: '0.65rem', padding: '3px 8px' }}>No session yet</span>
+                        <span className="badge" style={{ fontSize: '0.65rem', padding: '4px 10px', background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 20 }}>No session yet</span>
                       )}
                     </div>
                   </div>
@@ -299,19 +305,19 @@ export default function Contracts() {
             <div style={{ marginTop: 20, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               {sessionForProject(selectedProject) ? (
                 <>
-                  <button className="btn btn-primary" onClick={() => handleCopyLink(sessionForProject(selectedProject))} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px' }}>
+                  <button className="btn" onClick={() => handleCopyLink(sessionForProject(selectedProject))} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 20px', background: '#0f172a', color: 'white', border: 'none', borderRadius: 10, fontWeight: 800, fontSize: '0.85rem', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)' }}>
                     <Copy size={14} /> Copy Form Link
                   </button>
                   <button
                     onClick={() => setEmbedFormUrl(publicLink(sessionForProject(selectedProject)))}
-                    className="btn btn-secondary"
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', textDecoration: 'none' }}
+                    className="btn"
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 20px', background: '#ffffff', color: '#ea580c', border: '1.5px solid #fed7aa', borderRadius: 10, fontWeight: 800, fontSize: '0.85rem', textDecoration: 'none' }}
                   >
                     Open Form
                   </button>
                 </>
               ) : (
-                <button className="btn btn-primary" onClick={handleCreateSession} disabled={creating} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px' }}>
+                <button className="btn" onClick={handleCreateSession} disabled={creating} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 20px', background: '#0f172a', color: 'white', border: 'none', borderRadius: 10, fontWeight: 800, fontSize: '0.85rem', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)' }}>
                   <Plus size={14} /> {creating ? 'Creating…' : 'Create Form Session'}
                 </button>
               )}
@@ -322,47 +328,48 @@ export default function Contracts() {
 
       {/* Templates per selected session */}
       {selectedProject && sessionForProject(selectedProject) && (
-        <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
           {templates.map(({ type, label, desc }) => {
             const sess = sessionForProject(selectedProject);
             const doc = docFor(sess.id, type);
             const status = doc?.status || 'not rendered';
-            const busyKey = 'preview-' + type + 'approve-' + type;
             const isBusy = busy === 'preview-' + type || busy === 'approve-' + type;
 
             return (
-              <div key={type} className="card" style={{ padding: 16, border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 12, flex: 1 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 8, background: 'linear-gradient(135deg, var(--brand-50), var(--brand-100))', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <FileText size={16} color="var(--brand-600)" />
+              <div key={type} style={{ padding: 20, background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 16, boxShadow: '0 4px 12px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', transition: 'transform 0.2s, box-shadow 0.2s' }}>
+                <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', marginBottom: 16, flex: 1 }}>
+                  <div style={{ width: 42, height: 42, borderRadius: 12, background: 'linear-gradient(135deg, #fff3ec, #ffe4d6)', border: '1px solid #fed7aa', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <FileText size={18} color="#ea580c" />
                   </div>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)', lineHeight: 1.2 }}>{label}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.3 }}>{desc}</div>
-                    <div style={{ marginTop: 6 }}>
-                      <span className={`badge ${status === 'saved' ? 'badge-success' : status === 'draft' ? 'badge-buy' : 'badge-new'}`} style={{ padding: '2px 8px', fontSize: '0.65rem' }}>
-                        {status === 'saved' ? 'Saved to Drive' : status === 'draft' ? 'Rendered (draft)' : 'Not rendered'}
-                      </span>
+                    <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#0f172a', lineHeight: 1.2 }}>{label}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500, lineHeight: 1.3, marginTop: 4 }}>{desc}</div>
+                    <div style={{ marginTop: 8 }}>
+                      {status === 'saved' ? (
+                        <span style={{ fontSize: '0.65rem', padding: '4px 10px', background: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0', borderRadius: 20, fontWeight: 700 }}>Saved to Drive</span>
+                      ) : status === 'draft' ? (
+                        <span style={{ fontSize: '0.65rem', padding: '4px 10px', background: '#e0e7ff', color: '#3730a3', border: '1px solid #c7d2fe', borderRadius: 20, fontWeight: 700 }}>Rendered (Draft)</span>
+                      ) : (
+                        <span style={{ fontSize: '0.65rem', padding: '4px 10px', background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 20, fontWeight: 700 }}>Not Rendered</span>
+                      )}
                     </div>
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', gap: 8, marginTop: 'auto', flexWrap: 'wrap' }}>
-                  <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem' }} onClick={() => handleOpenEditor(sess, type)}>
-                    <Save size={13} /> Edit Template
+                  <button className="btn" style={{ padding: '8px 14px', fontSize: '0.8rem', fontWeight: 700, background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => handleOpenEditor(sess, type)}>
+                    <Save size={14} /> Edit Template
                   </button>
-                  <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 5 }}
-                    disabled={isBusy} onClick={() => handlePreview(sess, type)}>
-                    {busy === 'preview-' + type ? <Loader size={13} className="spin" /> : <Eye size={13} />} Preview PDF
+                  <button className="btn" style={{ padding: '8px 14px', fontSize: '0.8rem', fontWeight: 700, background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6 }} disabled={isBusy} onClick={() => handlePreview(sess, type)}>
+                    {busy === 'preview-' + type ? <Loader size={14} className="spin" /> : <Eye size={14} />} Preview PDF
                   </button>
                   {doc?.drive_url ? (
-                    <a href={doc.drive_url} target="_blank" rel="noreferrer" className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <Download size={13} /> Drive
+                    <a href={doc.drive_url} target="_blank" rel="noreferrer" className="btn" style={{ padding: '8px 14px', fontSize: '0.8rem', fontWeight: 700, background: '#0f172a', color: '#ffffff', border: 'none', borderRadius: 8, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Download size={14} /> View in Drive
                     </a>
                   ) : (
-                    <button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 5 }}
-                      disabled={isBusy} onClick={() => handleApprove(sess, type)}>
-                      {busy === 'approve-' + type ? <Loader size={13} className="spin" /> : <ShieldCheck size={13} />} Approve & Save
+                    <button className="btn" style={{ padding: '8px 14px', fontSize: '0.8rem', fontWeight: 800, background: '#0f172a', color: '#ffffff', border: 'none', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} disabled={isBusy} onClick={() => handleApprove(sess, type)}>
+                      {busy === 'approve-' + type ? <Loader size={14} className="spin" /> : <ShieldCheck size={14} />} Approve & Save
                     </button>
                   )}
                 </div>
@@ -374,31 +381,34 @@ export default function Contracts() {
 
       {/* Editable template modal */}
       {editor && (
-        <div className="modal-overlay" onClick={() => setEditor(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 720, display: 'flex', flexDirection: 'column', flex: 1, maxHeight: '88vh', overflow: 'hidden' }}>
-            <div className="modal-header">
+        <div className="modal-overlay" onClick={() => setEditor(null)} style={{ background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)' }}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 760, display: 'flex', flexDirection: 'column', flex: 1, maxHeight: '88vh', overflow: 'hidden', background: '#ffffff', borderRadius: 24, boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', border: '1px solid #e2e8f0' }}>
+            <div className="modal-header" style={{ borderBottom: '1px solid #e2e8f0', padding: '24px 28px 20px', background: '#ffffff' }}>
               <div>
-                <h3 className="modal-title" style={{ margin: 0 }}>
+                <h3 className="modal-title" style={{ margin: 0, fontWeight: 800, fontSize: '1.25rem', color: '#0f172a' }}>
                   Edit Template — {templates.find(t => t.type === editor.templateType)?.label}
                 </h3>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 500, marginTop: 6 }}>
                   {editor.clientName} · {editor.pipeline.toUpperCase()} · Status: {editor.status}
                 </div>
               </div>
-              <button className="btn-icon" onClick={() => setEditor(null)}><X size={18} /></button>
+              <button className="btn-icon" onClick={() => setEditor(null)} style={{ background: '#f1f5f9', color: '#64748b', borderRadius: '50%', padding: 6 }}><X size={18} /></button>
             </div>
-            <div className="modal-body" style={{ overflowY: 'auto', padding: '20px 24px' }}>
+            <div className="modal-body" style={{ overflowY: 'auto', padding: '24px 28px' }}>
               {EDITABLE_FIELDS.map(group => (
-                <div key={group.group} style={{ marginBottom: 20 }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--brand-700,#1d4ed8)', marginBottom: 10, borderBottom: '2px solid var(--brand-100,#dbeafe)', paddingBottom: 6 }}>
+                <div key={group.group} style={{ marginBottom: 28 }}>
+                  <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0f172a', marginBottom: 16, borderBottom: '2px solid #fed7aa', paddingBottom: 8, display: 'inline-block' }}>
                     {group.group}
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                     {group.fields.map(f => (
                       <div className="form-group" key={f.key} style={f.key.includes('agreement') || f.key === 'notes' ? { gridColumn: '1 / -1' } : undefined}>
-                        <label className="form-label" style={{ fontSize: '0.75rem' }}>{f.label}</label>
+                        <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: 6 }}>{f.label}</label>
                         <input
                           className="form-input"
+                          style={{ padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', color: '#0f172a', fontSize: '0.9rem', width: '100%', background: '#f8fafc', transition: 'all 0.2s', outline: 'none' }}
+                          onFocus={e => { e.target.style.borderColor = '#ea580c'; e.target.style.background = '#ffffff'; e.target.style.boxShadow = '0 0 0 3px rgba(234, 88, 12, 0.1)'; }}
+                          onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.background = '#f8fafc'; e.target.style.boxShadow = 'none'; }}
                           value={editor.fieldData[f.key] ?? ''}
                           onChange={e => setEditor(prev => ({ ...prev, fieldData: { ...prev.fieldData, [f.key]: e.target.value } }))}
                         />
@@ -408,10 +418,10 @@ export default function Contracts() {
                 </div>
               ))}
             </div>
-            <div className="modal-footer" style={{ background: 'var(--surface)', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-              <button className="btn btn-secondary" onClick={() => setEditor(null)}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleSaveEditor} disabled={busy === 'save'} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                {busy === 'save' ? <Loader size={14} className="spin" /> : <Save size={14} />} Save Template
+            <div className="modal-footer" style={{ background: '#f8fafc', borderTop: '1px solid #e2e8f0', padding: '20px 28px', display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+              <button className="btn" style={{ padding: '10px 20px', background: '#ffffff', color: '#475569', border: '1.5px solid #e2e8f0', borderRadius: 10, fontWeight: 700, fontSize: '0.85rem' }} onClick={() => setEditor(null)}>Cancel</button>
+              <button className="btn" onClick={handleSaveEditor} disabled={busy === 'save'} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 20px', background: 'linear-gradient(135deg, #f97316, #ea580c)', color: 'white', border: 'none', borderRadius: 10, fontWeight: 800, fontSize: '0.85rem', boxShadow: '0 4px 12px rgba(234, 88, 12, 0.25)' }}>
+                {busy === 'save' ? <Loader size={16} className="spin" /> : <Save size={16} />} Save Template
               </button>
             </div>
           </div>
