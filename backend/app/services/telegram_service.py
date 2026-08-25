@@ -18,6 +18,7 @@ import logging
 import urllib.request
 import urllib.parse
 import json
+from typing import Optional, List, Dict, Any
 from config import settings
 from app.services.supabase_service import get_all_leads, get_all_projects
 from database import get_supabase
