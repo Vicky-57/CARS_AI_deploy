@@ -280,6 +280,8 @@ async def _handle_get_lead(text: str, chat_id: str) -> str:
     """Search or list leads."""
     parts = text.split(maxsplit=1)
     query = parts[1].strip().lower() if len(parts) > 1 else ""
+    if query in ["leads", "lead", "📋 leads"]:
+        query = ""
 
     try:
         leads = get_all_leads()
@@ -309,7 +311,7 @@ async def _handle_get_cars(text: str, chat_id: str) -> str:
     """List vehicles from active projects."""
     parts = text.split(maxsplit=1)
     query = parts[1].strip().lower() if len(parts) > 1 else ""
-    if query in ["cars", "inventory"]:
+    if query in ["cars", "car", "inventory", "🚗 cars"]:
         query = ""
 
     try:
@@ -501,6 +503,8 @@ async def _handle_get_customers(text: str, chat_id: str) -> str:
     """List all customers (from active projects & converted clients) with summary details."""
     parts = text.split(maxsplit=1)
     query = parts[1].strip().lower() if len(parts) > 1 else ""
+    if query in ["customers", "customer", "👤 customers"]:
+        query = ""
 
     try:
         projects = get_all_projects()
