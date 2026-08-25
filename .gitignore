@@ -39,8 +39,7 @@ pip-log.txt
 
 # ─── Generated PDFs & documents ───────────────────────────────────────────────
 *.pdf
-# (keep template PDFs in other docs/ — un-ignore if needed)
-# !other docs/
+!client_data/*.pdf
 
 # ─── Node / Frontend ──────────────────────────────────────────────────────────
 frontend/node_modules/
