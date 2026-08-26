@@ -106,9 +106,13 @@ def create_customer_folder_structure(customer_name: str, project_id: str) -> Dic
         "root_folder_id": root_id,
         "customer_folder_id": customer_folder_id,
         "customer_folder_name": folder_name,
+        "customer_folder_url": f"https://drive.google.com/drive/folders/{customer_folder_id}",
         "ocr_folder_id": subfolder_ids["1. OCR"],
+        "ocr_folder_url": f"https://drive.google.com/drive/folders/{subfolder_ids['1. OCR']}",
         "legal_docs_folder_id": subfolder_ids["2. Legal Docs"],
+        "legal_docs_folder_url": f"https://drive.google.com/drive/folders/{subfolder_ids['2. Legal Docs']}",
         "signed_docs_folder_id": subfolder_ids["3. Signed Docs"],
+        "signed_docs_folder_url": f"https://drive.google.com/drive/folders/{subfolder_ids['3. Signed Docs']}",
         "folder_path": f"My Drive / {ROOT_FOLDER_NAME} / {folder_name}",
     }
 

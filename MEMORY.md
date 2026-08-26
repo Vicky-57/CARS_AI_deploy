@@ -50,3 +50,44 @@ cd "d:\CARS AI\frontend"
 npm run dev
 ```
 * Open in browser: `http://localhost:5173`
+
+---
+
+## 🕒 Recent Updates & Log (Aug 25, 2026)
+
+### 🤖 Telegram Bot Enhancements & Fixes
+* **Inline Buttons & Stage Transitions**: Interactive inline keyboard buttons for lead/customer management and `/stage` transitions in Telegram ([`telegram_service.py`](file:///d:/CARS AI/backend/app/services/telegram_service.py), [`telegram_bot.py`](file:///d:/CARS AI/backend/app/api/v1/endpoints/telegram_bot.py)).
+* **Customer Lookup & Calendar Sync**: Added `/customer` lookup and merged Outlook calendar schedules with Telegram scheduler notifications.
+* **Fixes**: Stripped emoji text from query filters in search handlers and replaced invalid `tel:` URI schemes with `callback_data` handlers.
+
+### 🎨 Frontend UI/UX Redesign
+* **Theme & Styles**: Comprehensive styling overhaul across [`index.css`](file:///d:/CARS AI/frontend/src/index.css), [`Dashboard.jsx`](file:///d:/CARS AI/frontend/src/pages/Dashboard.jsx), [`Projects.jsx`](file:///d:/CARS AI/frontend/src/pages/Projects.jsx), [`Customers.jsx`](file:///d:/CARS AI/frontend/src/pages/Customers.jsx), [`Leads.jsx`](file:///d:/CARS AI/frontend/src/pages/Leads.jsx), [`Calendar.jsx`](file:///d:/CARS AI/frontend/src/pages/Calendar.jsx), [`Communications.jsx`](file:///d:/CARS AI/frontend/src/pages/Communications.jsx), [`BuyForm.jsx`](file:///d:/CARS AI/frontend/src/pages/BuyForm.jsx), and [`SellForm.jsx`](file:///d:/CARS AI/frontend/src/pages/SellForm.jsx).
+* **Assets & Navigation**: Added asset images in [`frontend/public/assets/`](file:///d:/CARS AI/frontend/public/assets/) and updated [`Contracts.jsx`](file:///d:/CARS AI/frontend/src/pages/Contracts.jsx) to open contract forms in the same tab.
+
+### 📄 PDF Engine & Master Document Templates
+* **PDF Layout**: Alignment and formatting improvements in [`pdf_service.py`](file:///d:/CARS AI/backend/app/services/pdf_service.py).
+* **Master Templates**: Added master PDF contract templates in `client_data/` (`Kaufvertrag-C2C-Bilingual.pdf`, `CAR-AGENTS_Fahrzeug-Übergabeprotokoll.pdf`, `CAR-AGENTS_Vermittlungsvertrag_B2C_aktiv.pdf`, `CAR-AGENTS_Vermittlungsvertrag_Beschaffung_Final__passiv.pdf`).
+
+### 🗓️ Outlook & Scheduler Integration
+* **Calendar Sync**: Unified Outlook calendar event fetching and automated scheduler notifications in [`outlook_service.py`](file:///d:/CARS AI/backend/app/services/outlook_service.py) and [`scheduler_service.py`](file:///d:/CARS AI/backend/app/services/scheduler_service.py).
+
+---
+
+## 🕒 Recent Updates & Log (Aug 26, 2026)
+
+### 🐛 Bug Fixes & API Client Updates
+* **Labor Hours Logging Fix**: Added missing `addLabor` method to [`api.js`](file:///d:/CARS AI/frontend/src/api/api.js) supporting both object payloads (`{ hours_spent, activity_description }`) and standard parameter calls, fixing the `api.addLabor is not a function` error.
+* **Database Persistence for Deals**: Updated [`Deals.jsx`](file:///d:/CARS AI/frontend/src/pages/Deals.jsx) to save labor logs and expenses directly to Supabase (`project_labor` & `project_expenses` tables).
+* **Telegram Bot Datetime Fix**: Imported `from datetime import datetime` in [`telegram_service.py`](file:///d:/CARS AI/backend/app/services/telegram_service.py) to fix `NameError` during `/stage` transitions.
+* **Stage Display Fix**: Updated `💼 Active Deals` project lookup in [`telegram_service.py`](file:///d:/CARS AI/backend/app/services/telegram_service.py) to check `current_stage` field instead of returning `N/A`.
+* **Project Dates Tracking**: Auto-capturing project creation dates and stage update dates, displaying them in Kanban cards, Table view, and Project Details Drawer in [`Projects.jsx`](file:///d:/CARS AI/frontend/src/pages/Projects.jsx).
+* **Google Drive Redirection Fix**: Fixed stale state bug in [`Projects.jsx`](file:///d:/CARS AI/frontend/src/pages/Projects.jsx) where switching between customers retained the previous customer's `driveUrls` during network fetch. Reset `driveUrls` state immediately on project selection, validated `project_id` matching in [`projects.py`](file:///d:/CARS AI/backend/app/api/v1/endpoints/projects.py), and added disabled `Loading Drive…` state on buttons until fresh folder URLs resolve.
+* **Lead Management Filter Fix**: Updated `getLeads()` in [`api.js`](file:///d:/CARS AI/frontend/src/api/api.js) to query both `'SELL'` and `'SELL_INTENT'` (and `'BUY'` / `'BUY_INTENT'`), ensuring the "Sell Intent" tab displays all sell-side inbound leads instead of returning an empty list.
+* **Communications Inbox UI & Sidebar**: Commented out the Communications navigation tab from the Sidebar in [`App.jsx`](file:///d:/CARS AI/frontend/src/App.jsx) as well as the channel filters and hero card in [`Communications.jsx`](file:///d:/CARS AI/frontend/src/pages/Communications.jsx).
+* **Telegram Responses Data Enrichment**: Enhanced all Telegram bot responses in [`telegram_service.py`](file:///d:/CARS AI/backend/app/services/telegram_service.py):
+  * `💼 Active Deals` & `👤 Customers`: Added direct Google Drive folder links (`📂 Drive Folder`) and formatted Creation Dates (`📅 Created: DD/MM/YYYY`).
+  * `📊 Summary`: Upgraded to Executive CRM Summary showing total portfolio valuation (€), active deal counts, stage breakdown, and today's Outlook appointments.
+  * `📋 Leads`: Fixed intent formatting (`SELL_INTENT` / `BUY_INTENT`) and added creation dates.
+  * `/customer`: Simplified Google Drive section to output one direct, clickable customer Google Drive folder URL (`🔗 https://drive.google.com/drive/folders/...`).
+
+

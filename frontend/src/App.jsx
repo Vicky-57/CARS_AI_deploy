@@ -32,7 +32,7 @@ const NAV = [
     items: [
       { path: '/leads', icon: Users, label: 'Leads' },
       { path: '/customers', icon: Users, label: 'Customers' },
-      { path: '/communications', icon: MessageSquare, label: 'Communications' },
+      // { path: '/communications', icon: MessageSquare, label: 'Communications' },
       { path: '/projects', icon: FolderKanban, label: 'Deals & Projects' },
     ],
   },

@@ -42,6 +42,7 @@ async def get_project_drive_folders(project_id: str, client_name: Optional[str] 
         struct = create_customer_folder_structure(client_name, project_id)
         return {
             "success": True,
+            "project_id": project_id,
             "customer_folder_id": struct["customer_folder_id"],
             "customer_folder_url": f"https://drive.google.com/drive/folders/{struct['customer_folder_id']}",
             "ocr_folder_id": struct["ocr_folder_id"],

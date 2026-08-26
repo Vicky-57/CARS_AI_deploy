@@ -55,15 +55,20 @@ def get_project_by_id(project_id: str) -> Optional[Dict]:
 
 def create_project(payload: Dict) -> Dict:
     sb = get_supabase()
-    payload["created_at"] = datetime.utcnow().isoformat()
+    now = datetime.utcnow().isoformat()
+    if "created_at" not in payload or not payload["created_at"]:
+        payload["created_at"] = now
+    payload["updated_at"] = now
     res = sb.table("projects").insert(payload).execute()
     return res.data[0] if res.data else {}
 
 
 def update_project(project_id: str, updates: Dict) -> Dict:
     sb = get_supabase()
+    updates["updated_at"] = datetime.utcnow().isoformat()
     res = sb.table("projects").update(updates).eq("id", project_id).execute()
     return res.data[0] if res.data else {}
+
 
 
 # ─── COMMUNICATIONS ────────────────────────────────────────────────────────────

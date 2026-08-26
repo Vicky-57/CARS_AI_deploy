@@ -56,10 +56,11 @@ export default function Projects() {
 
   const fetchDriveUrls = async (project) => {
     if (!project) return;
+    setDriveUrls(null); // Clear stale driveUrls immediately before fetching new project links
     setLoadingDriveUrls(true);
     try {
       const res = await api.getProjectDriveFolders(project.id, project.client_name);
-      if (res && res.success) {
+      if (res && res.success && res.project_id === project.id) {
         setDriveUrls(res);
       }
     } catch (err) {
@@ -70,10 +71,11 @@ export default function Projects() {
   };
 
   useEffect(() => {
+    setDriveUrls(null); // Reset driveUrls when switching selected project
     if (selectedProject && activeTab === 'drive') {
       fetchDriveUrls(selectedProject);
     }
-  }, [selectedProject, activeTab]);
+  }, [selectedProject?.id, activeTab]);
 
   const handleFileUploadToDrive = async (e) => {
     const file = e.target.files[0];
@@ -196,13 +198,13 @@ export default function Projects() {
     setAdvancingCardId(project.id);
     const nextStage = STAGES[currentIdx + 1];
     try {
-      // 1. Send the backend update
-      await api.updateProject(project.id, { current_stage: nextStage });
+      const nowIso = new Date().toISOString();
+      await api.updateProject(project.id, { current_stage: nextStage, updated_at: nowIso });
       
       // 2. Wait for the slide animation to complete
       setTimeout(() => {
         // 3. Optimistically update the UI without triggering the loading spinner
-        setProjects(prev => prev.map(p => p.id === project.id ? { ...p, current_stage: nextStage } : p));
+        setProjects(prev => prev.map(p => p.id === project.id ? { ...p, current_stage: nextStage, updated_at: nowIso } : p));
         setAdvancingCardId(null);
         
         // 4. Quietly refresh real data in the background
@@ -488,9 +490,19 @@ export default function Projects() {
                           </div>
 
                           {/* Target Vehicle */}
-                          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                             <Car size={16} color="#f47c3c" />
                             {p.target_vehicle || 'No vehicle specified'}
+                          </div>
+
+                          {/* Project Date Info */}
+                          <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 500 }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <Clock size={12} /> {formatDateDDMMYYYY(p.created_at)}
+                            </span>
+                            <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                              Updated {formatDateDDMMYYYY(p.updated_at)}
+                            </span>
                           </div>
 
                           {/* Profit & Action Footer */}
@@ -539,6 +551,7 @@ export default function Projects() {
                   <th>VIN</th>
                   <th>Pipeline Type</th>
                   <th>Current Stage</th>
+                  <th>Created Date</th>
                   <th>Investment</th>
                   <th>Net Profit</th>
                   <th style={{ textAlign: 'right', paddingRight: 24 }}>Actions</th>
@@ -547,7 +560,7 @@ export default function Projects() {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={8} style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>
+                    <td colSpan={9} style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>
                       No deals or projects found.
                     </td>
                   </tr>
@@ -607,6 +620,11 @@ export default function Projects() {
                               {stageIdx + 1}
                             </span>
                             <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>{currentStage}</span>
+                          </span>
+                        </td>
+                        <td>
+                          <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500 }}>
+                            {formatDateDDMMYYYY(p.created_at)}
                           </span>
                         </td>
                         <td>
@@ -781,7 +799,7 @@ export default function Projects() {
                   </div>
 
                   {/* Client Info Grid */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
                     <div style={{ background: 'var(--gray-50)', border: '1px solid var(--border)', padding: 16, borderRadius: 10 }}>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 4 }}>Phone Number</div>
                       <div style={{ fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -793,6 +811,27 @@ export default function Projects() {
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 4 }}>Email Address</div>
                       <div style={{ fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 6 }}>
                         <Mail size={14} color="var(--brand-600)" /> {selectedProject.client_email || 'Not provided'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Project Dates & Lifecycle Grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: 16, borderRadius: 10 }}>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Clock size={14} color="#ea580c" /> Project Created Date
+                      </div>
+                      <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a' }}>
+                        {formatDateDDMMYYYY(selectedProject.created_at)}
+                      </div>
+                    </div>
+
+                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: 16, borderRadius: 10 }}>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <RefreshCw size={14} color="#ea580c" /> Stage Last Updated
+                      </div>
+                      <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a' }}>
+                        {formatDateDDMMYYYY(selectedProject.updated_at)}
                       </div>
                     </div>
                   </div>
@@ -935,17 +974,27 @@ export default function Projects() {
                             <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 3, fontWeight: 500 }}>{folder.desc}</div>
                           </div>
                         </div>
-                        <a
-                          href={folder.link || 'https://drive.google.com'}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="btn btn-secondary btn-sm"
-                          style={{ gap: 6, background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569', fontWeight: 700, transition: 'all 0.2s' }}
-                          onMouseEnter={(e) => { e.currentTarget.style.background = '#ffedd5'; e.currentTarget.style.color = '#ea580c'; e.currentTarget.style.borderColor = '#fed7aa'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.color = '#475569'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
-                        >
-                          Open Drive <ExternalLink size={14} />
-                        </a>
+                        {loadingDriveUrls || !folder.link ? (
+                          <button
+                            disabled
+                            className="btn btn-secondary btn-sm"
+                            style={{ gap: 6, background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#94a3b8', fontWeight: 600, cursor: 'not-allowed' }}
+                          >
+                            <div className="spinner" style={{ width: 12, height: 12, borderWidth: 2 }} /> Loading Drive…
+                          </button>
+                        ) : (
+                          <a
+                            href={folder.link}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn btn-secondary btn-sm"
+                            style={{ gap: 6, background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569', fontWeight: 700, transition: 'all 0.2s' }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = '#ffedd5'; e.currentTarget.style.color = '#ea580c'; e.currentTarget.style.borderColor = '#fed7aa'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.color = '#475569'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+                          >
+                            Open Drive <ExternalLink size={14} />
+                          </a>
+                        )}
                       </div>
                     ))}
                   </div>

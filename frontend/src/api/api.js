@@ -65,8 +65,17 @@ export const api = {
   // ── LEADS ───────────────────────────────────────────────────────────────────
   getLeads: async (filters = {}) => {
     let q = supabase.from('leads').select('*').order('created_at', { ascending: false });
-    if (filters.intent)  q = q.eq('intent', filters.intent);
-    if (filters.status)  q = q.eq('status', filters.status);
+    if (filters.intent) {
+      const upperIntent = String(filters.intent).toUpperCase();
+      if (upperIntent.includes('SELL')) {
+        q = q.in('intent', ['SELL', 'SELL_INTENT', 'Sell Intent', 'sell']);
+      } else if (upperIntent.includes('BUY')) {
+        q = q.in('intent', ['BUY', 'BUY_INTENT', 'Buy Intent', 'buy']);
+      } else {
+        q = q.eq('intent', filters.intent);
+      }
+    }
+    if (filters.status) q = q.eq('status', filters.status);
     const { data, error } = await q;
     if (error) throw error;
     return data;
@@ -177,6 +186,21 @@ export const api = {
   },
 
   // ── LABOR ───────────────────────────────────────────────────────────────────
+  addLabor: async (projectId, payloadOrHours, description = null) => {
+    let hours = payloadOrHours;
+    let desc = description;
+    if (typeof payloadOrHours === 'object' && payloadOrHours !== null) {
+      hours = payloadOrHours.hours_spent || payloadOrHours.hours;
+      desc = payloadOrHours.activity_description || payloadOrHours.description;
+    }
+    const { data, error } = await supabase
+      .from('project_labor')
+      .insert({ project_id: projectId, hours_spent: hours, activity_description: desc })
+      .select().single();
+    if (error) throw error;
+    return data;
+  },
+
   logLabor: async (projectId, hours, description) => {
     const { data, error } = await supabase
       .from('project_labor')

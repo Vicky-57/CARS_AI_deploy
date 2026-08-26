@@ -118,6 +118,7 @@ export default function Communications() {
           <p style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 500, margin: 0, lineHeight: 1.5 }}>Live Primary Inbox (Strato IMAP & Outlook) + WhatsApp Cloud API Integration</p>
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Channels Filter — Disabled for now until channels are connected
           <div style={{ display: 'inline-flex', gap: 4, background: '#f1f5f9', padding: 4, borderRadius: 12, flexShrink: 0 }}>
             {['ALL', 'EMAIL', 'WHATSAPP'].map(f => (
               <button key={f} onClick={() => setFilter(f)} style={{
@@ -129,71 +130,21 @@ export default function Communications() {
               }}>{f === 'ALL' ? 'All' : f}</button>
             ))}
           </div>
+          */}
           <button className="btn" onClick={loadCommunications} style={{ flexShrink: 0, padding: '10px 16px', background: '#ffffff', color: '#0f172a', border: '1.5px solid #e2e8f0', borderRadius: 10, fontWeight: 700, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
             <RefreshCw size={14} /> Refresh
           </button>
         </div>
       </div>
 
+      {/* Large Hero Card commented out per request
       {contacts.length === 0 && !loading ? (
-        /* Dynamic "Coming Soon / Realtime Stream Ready" State when no messages are in DB */
         <div className="card" style={{ padding: '64px 40px', textAlign: 'center', maxWidth: 880, margin: '40px auto', borderRadius: 24, border: 'none', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0,0,0,0.02)' }}>
-          <div style={{ width: 56, height: 56, borderRadius: '16px', background: '#f8fafc', border: '1.5px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)' }}>
-            <Inbox size={24} color="#64748b" />
-          </div>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', padding: '6px 14px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700, margin: '0 auto 20px' }}>
-            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} /> Live Inbox Ready for Streaming
-          </div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '-0.5px', marginBottom: 12, color: '#0f172a' }}>
-            No Static Sample Messages
-          </h2>
-          <p style={{ color: '#64748b', fontSize: '1rem', maxWidth: 620, margin: '0 auto 40px', lineHeight: 1.6, fontWeight: 500 }}>
-            All static mock data has been purged. Inbound emails from <strong style={{ color: '#0f172a' }}>info@car-agents.de</strong> (via Strato/Outlook IMAP) and <strong style={{ color: '#0f172a' }}>WhatsApp Cloud API</strong> webhooks will dynamically populate here in real-time as leads message in.
-          </p>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20, textAlign: 'left' }}>
-            <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', padding: 24, borderRadius: 16, transition: 'all 0.2s', cursor: 'default' }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.05)'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
-            >
-              <div style={{ fontWeight: 800, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, color: '#0f172a' }}>
-                <div style={{ background: '#eff6ff', color: '#2563eb', padding: 6, borderRadius: 8 }}><Mail size={16} /></div>
-                Strato / Outlook Poller
-              </div>
-              <div style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: 1.6, fontWeight: 500 }}>
-                Polls <strong style={{ color: '#0f172a' }}>info@car-agents.de</strong> every 5 minutes, auto-extracts vehicle inquiries, and classifies <code>BUY_INTENT</code> vs <code>SELL_INTENT</code>.
-              </div>
-            </div>
-
-            <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', padding: 24, borderRadius: 16, transition: 'all 0.2s', cursor: 'default' }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.05)'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
-            >
-              <div style={{ fontWeight: 800, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, color: '#0f172a' }}>
-                <div style={{ background: '#f0fdf4', color: '#16a34a', padding: 6, borderRadius: 8 }}><MessageCircle size={16} /></div>
-                WhatsApp Cloud API
-              </div>
-              <div style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: 1.6, fontWeight: 500 }}>
-                Listens to incoming WhatsApp text messages and voice notes, with Whisper audio transcription & automated scheduling assistant.
-              </div>
-            </div>
-
-            <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', padding: 24, borderRadius: 16, transition: 'all 0.2s', cursor: 'default' }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.05)'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
-            >
-              <div style={{ fontWeight: 800, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, color: '#0f172a' }}>
-                <div style={{ background: '#faf5ff', color: '#9333ea', padding: 6, borderRadius: 8 }}><Sparkles size={16} /></div>
-                1-Click AI Conversion
-              </div>
-              <div style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: 1.6, fontWeight: 500 }}>
-                Instantly converts incoming email threads and WhatsApp conversations into active Lead database records with 1 click.
-              </div>
-            </div>
-          </div>
+          ...
         </div>
-      ) : (
-        <div className={`split-panel ${selected ? 'thread-active' : ''}`}>
+      ) : ( */}
+
+      <div className={`split-panel ${selected ? 'thread-active' : ''}`}>
           {/* Contact list */}
           <div className="split-left">
             <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 10, background: 'var(--surface)' }}>

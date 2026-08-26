@@ -77,53 +77,71 @@ export default function Deals() {
     loadDeals();
   }, []);
 
-  const handleLogTime = (e) => {
+  const handleLogTime = async (e) => {
     e.preventDefault();
     if (!selectedDeal) return;
-    
-    const newLabor = {
-      id: Math.random().toString(),
-      hours_spent: parseFloat(timeForm.hours),
-      activity_description: timeForm.description,
-      logged_at: new Date().toISOString()
-    };
-    
-    const updatedDeal = {
-      ...selectedDeal,
-      project_labor: [newLabor, ...selectedDeal.project_labor]
-    };
-    
-    const updatedDeals = deals.map(d => d.id === updatedDeal.id ? updatedDeal : d);
-    
-    setDeals(updatedDeals);
-    setSelectedDeal(updatedDeal);
-    setShowTimeModal(false);
-    setTimeForm({ hours: '', description: '' });
+    try {
+      const hours = parseFloat(timeForm.hours) || 0;
+      const desc = timeForm.description;
+      const savedLabor = await api.addLabor(selectedDeal.id, {
+        hours_spent: hours,
+        activity_description: desc
+      });
+      
+      const newLabor = savedLabor || {
+        id: Math.random().toString(),
+        hours_spent: hours,
+        activity_description: desc,
+        logged_at: new Date().toISOString()
+      };
+      
+      const updatedDeal = {
+        ...selectedDeal,
+        project_labor: [newLabor, ...(selectedDeal.project_labor || [])]
+      };
+      
+      setDeals(prev => prev.map(d => d.id === updatedDeal.id ? updatedDeal : d));
+      setSelectedDeal(updatedDeal);
+      setShowTimeModal(false);
+      setTimeForm({ hours: '', description: '' });
+    } catch (err) {
+      alert('Error logging labor time: ' + err.message);
+    }
   };
 
-  const handleLogExpense = (e) => {
+  const handleLogExpense = async (e) => {
     e.preventDefault();
     if (!selectedDeal) return;
+    try {
+      const amount = parseFloat(expenseForm.amount) || 0;
+      const desc = expenseForm.description;
+      const type = expenseForm.expense_type;
+      const savedExpense = await api.addExpense(selectedDeal.id, {
+        amount,
+        description: desc,
+        expense_type: type
+      });
 
-    const newExpense = {
-      id: Math.random().toString(),
-      amount: parseFloat(expenseForm.amount),
-      description: expenseForm.description,
-      expense_type: expenseForm.expense_type,
-      logged_at: new Date().toISOString()
-    };
-    
-    const updatedDeal = {
-      ...selectedDeal,
-      project_expenses: [newExpense, ...selectedDeal.project_expenses]
-    };
-    
-    const updatedDeals = deals.map(d => d.id === updatedDeal.id ? updatedDeal : d);
-    
-    setDeals(updatedDeals);
-    setSelectedDeal(updatedDeal);
-    setShowExpenseModal(false);
-    setExpenseForm({ amount: '', description: '', expense_type: 'OTHER' });
+      const newExpense = savedExpense || {
+        id: Math.random().toString(),
+        amount,
+        description: desc,
+        expense_type: type,
+        logged_at: new Date().toISOString()
+      };
+      
+      const updatedDeal = {
+        ...selectedDeal,
+        project_expenses: [newExpense, ...(selectedDeal.project_expenses || [])]
+      };
+      
+      setDeals(prev => prev.map(d => d.id === updatedDeal.id ? updatedDeal : d));
+      setSelectedDeal(updatedDeal);
+      setShowExpenseModal(false);
+      setExpenseForm({ amount: '', description: '', expense_type: 'OTHER' });
+    } catch (err) {
+      alert('Error logging expense: ' + err.message);
+    }
   };
 
   const calculateTotalTime = (laborArray) => {
@@ -248,6 +266,10 @@ export default function Deals() {
                     <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'flex-start', gap: 6, fontWeight: 500 }}>
                       <Car size={14} style={{ flexShrink: 0, marginTop: 2 }} /> 
                       <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{selectedDeal.target_vehicle || 'Vehicle details missing'}</span>
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4, display: 'flex', gap: 12, alignItems: 'center', fontWeight: 500 }}>
+                      <span>📅 Created: {selectedDeal.created_at ? new Date(selectedDeal.created_at).toLocaleDateString() : '—'}</span>
+                      <span>🔄 Updated: {selectedDeal.updated_at ? new Date(selectedDeal.updated_at).toLocaleDateString() : '—'}</span>
                     </div>
                   </div>
                 </div>
