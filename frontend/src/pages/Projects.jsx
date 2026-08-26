@@ -66,7 +66,7 @@ export default function Projects() {
   const [pipelineFilter, setPipelineFilter] = useState('ALL'); // 'ALL' | 'BUY' | 'SELL'
   const [search, setSearch] = useState('');
   const [advancingCardId, setAdvancingCardId] = useState(null);
-  
+
   // Selected detail drawer
   const [selectedProject, setSelectedProject] = useState(null);
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'financials' | 'drive'
@@ -224,7 +224,7 @@ export default function Projects() {
     try {
       const nowIso = new Date().toISOString();
       await api.updateProject(project.id, { current_stage: nextStage, updated_at: nowIso });
-      
+
       setProjects(prev => prev.map(p => p.id === project.id ? { ...p, current_stage: nextStage, updated_at: nowIso } : p));
       if (selectedProject && selectedProject.id === project.id) {
         setSelectedProject(prev => ({ ...prev, current_stage: nextStage, updated_at: nowIso }));
@@ -244,7 +244,7 @@ export default function Projects() {
       api.getProjects().then(res => {
         const fresh = Array.isArray(res) ? res : (res?.projects || []);
         if (fresh.length > 0) setProjects(fresh);
-      }).catch(() => {});
+      }).catch(() => { });
     } catch (err) {
       alert('Error advancing stage: ' + err.message);
     } finally {
@@ -607,12 +607,12 @@ export default function Projects() {
                       <tr key={p.id} style={{ cursor: 'pointer', transition: 'background-color 0.2s' }} onClick={() => { setSelectedProject(p); setActiveTab('overview'); }}>
                         <td style={{ paddingLeft: 24, paddingTop: 12, paddingBottom: 12 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <div className="notranslate" style={{ 
-                              width: 38, height: 38, borderRadius: 10, 
+                            <div className="notranslate" style={{
+                              width: 38, height: 38, borderRadius: 10,
                               background: 'linear-gradient(135deg, #fff3ec, #ffe4d6)',
                               border: '1px solid #fed7aa',
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              fontSize: '0.85rem', fontWeight: 800, 
+                              fontSize: '0.85rem', fontWeight: 800,
                               color: '#ea580c',
                               boxShadow: '0 2px 6px rgba(234, 88, 12, 0.1)', flexShrink: 0
                             }}>
@@ -626,7 +626,7 @@ export default function Projects() {
                         <td>
                           {p.target_vehicle ? (
                             <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                              <Car size={16} color="#f47c3c" style={{ marginTop: 2, flexShrink: 0 }} /> 
+                              <Car size={16} color="#f47c3c" style={{ marginTop: 2, flexShrink: 0 }} />
                               <span>{p.target_vehicle}</span>
                             </div>
                           ) : (
@@ -734,9 +734,9 @@ export default function Projects() {
                   <h2 style={{ fontSize: '1.3rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
                     {selectedProject.client_name}
                   </h2>
-                  <span className="badge" style={{ 
-                    background: 'var(--brand-100)', color: 'var(--brand-700)', 
-                    padding: '4px 10px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700, 
+                  <span className="badge" style={{
+                    background: 'var(--brand-100)', color: 'var(--brand-700)',
+                    padding: '4px 10px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700,
                     textTransform: 'uppercase', letterSpacing: '0.5px', border: 'none'
                   }}>
                     {selectedProject.project_type === 'BUY' ? 'Buy Side (Beschaffung)' : 'Sell Side (Vermittlung)'}
@@ -744,7 +744,7 @@ export default function Projects() {
                 </div>
                 <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', marginTop: 4 }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Car size={14} style={{ color: 'var(--brand-500)' }} /> 
+                    <Car size={14} style={{ color: 'var(--brand-500)' }} />
                     <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{selectedProject.target_vehicle || 'No vehicle specified'}</span>
                   </span>
                   {selectedProject.vin && <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Tag size={14} style={{ color: 'var(--brand-500)' }} /> VIN: <code>{selectedProject.vin}</code></span>}
@@ -979,7 +979,7 @@ export default function Projects() {
                       { num: 2, title: 'Legal Contracts Folder', desc: 'Power of Attorney, CAR-AGENTS GTC, disclaimers', link: driveUrls?.legal_docs_folder_url },
                       { num: 3, title: 'Signed PDF Contracts', desc: 'Final signed brokerage & sale contracts', link: driveUrls?.signed_docs_folder_url }
                     ].map(folder => (
-                      <div 
+                      <div
                         key={folder.num}
                         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 14, boxShadow: '0 2px 8px rgba(0,0,0,0.03)', transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'pointer' }}
                         onMouseEnter={(e) => {
@@ -1048,12 +1048,12 @@ export default function Projects() {
                           className="form-select"
                           value={uploadTargetFolder}
                           onChange={e => setUploadTargetFolder(e.target.value)}
-                          style={{ 
-                            appearance: 'none', 
+                          style={{
+                            appearance: 'none',
                             WebkitAppearance: 'none',
-                            borderColor: '#fed7aa', 
-                            background: '#ffffff', 
-                            fontWeight: 700, 
+                            borderColor: '#fed7aa',
+                            background: '#ffffff',
+                            fontWeight: 700,
                             color: '#ea580c',
                             padding: '12px 40px 12px 16px',
                             borderRadius: 10,
