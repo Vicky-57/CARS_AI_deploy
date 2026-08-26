@@ -220,25 +220,30 @@ export default function Projects() {
     try {
       const nowIso = new Date().toISOString();
       await api.updateProject(project.id, { current_stage: nextStage, updated_at: nowIso });
-        
-        // Scroll logic for mobile
-        if (window.innerWidth <= 768) {
-          setTimeout(() => {
-            const targetCol = document.getElementById(`kanban-col-${currentIdx + 1}`);
-            if (targetCol) {
-              targetCol.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-          }, 50);
-        }
+      
+      setProjects(prev => prev.map(p => p.id === project.id ? { ...p, current_stage: nextStage, updated_at: nowIso } : p));
+      if (selectedProject && selectedProject.id === project.id) {
+        setSelectedProject(prev => ({ ...prev, current_stage: nextStage, updated_at: nowIso }));
+      }
 
-        // 4. Quietly refresh real data in the background
-        api.getProjects().then(res => {
-          const fresh = Array.isArray(res) ? res : (res.projects || []);
-          if (fresh.length > 0) setProjects(fresh);
-        }).catch(() => {});
-      }, 350);
+      // Scroll logic for mobile
+      if (window.innerWidth <= 768) {
+        setTimeout(() => {
+          const targetCol = document.getElementById(`kanban-col-${currentIdx + 1}`);
+          if (targetCol) {
+            targetCol.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 50);
+      }
+
+      // Quietly refresh real data in the background
+      api.getProjects().then(res => {
+        const fresh = Array.isArray(res) ? res : (res?.projects || []);
+        if (fresh.length > 0) setProjects(fresh);
+      }).catch(() => {});
     } catch (err) {
       alert('Error advancing stage: ' + err.message);
+    } finally {
       setAdvancingCardId(null);
     }
   };
