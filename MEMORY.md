@@ -95,6 +95,15 @@ npm run dev
   * **HTML Parse Mode**: Converted Telegram responses to `parse_mode="HTML"` (`<b>`, `<i>`, `<code>`, `<a href="...">`) in [`telegram_service.py`](file:///d:/CARS AI/backend/app/services/telegram_service.py).
   * **Clean Bold Text Numbers (`<b>1.</b>`, `<b>2.</b>`...)**: Replaced keycap emoji icons with bold text numbers (`<b>1.</b>`, `<b>2.</b>` ... `<b>10.</b>`, `<b>11.</b>` ...) across all lists (`👤 Customers`, `💼 Active Deals`, `📋 Leads`, `🚗 Cars`), ensuring 100% consistent, crisp alignment on all mobile and desktop Telegram apps regardless of list size.
   * **Clean Sub-Bullets (`   • `)**: Replaced ASCII tree elbows (`└`) with clean indented sub-bullet points.
-  * **Direct HTML Drive Links**: Formatted Google Drive links as `<a href="...">Google Drive Folder</a>` so URLs open directly without backslashes (`\`) or broken 404 links.
+* **Google Drive API Caching & Performance Fix**:
+  * **In-Memory Cache (`_DRIVE_FOLDER_CACHE`)**: Added caching in [`gdrive_service.py`](file:///d:/CARS AI/backend/app/services/gdrive_service.py) so resolved Google Drive folder IDs take **0 ms** on repeat calls.
+* **Sales Stage Synchronization & Zero-Loss Normalization**:
+  * **Unified Standard 5 Sales Stages**: Synchronized sales stage names across [`telegram_service.py`](file:///d:/CARS AI/backend/app/services/telegram_service.py), [`Projects.jsx`](file:///d:/CARS AI/frontend/src/pages/Projects.jsx), and [`CreateProjectModal.jsx`](file:///d:/CARS AI/frontend/src/components/CreateProjectModal.jsx):
+    1. `Intake & Onboarding`
+    2. `Sourcing & Inspection`
+    3. `Marketing & Listing`
+    4. `Negotiation & Contract`
+    5. `Completed & Delivered`
+  * **Stage Normalization (`getNormalizedStage`)**: Added `getNormalizedStage()` helper in [`Projects.jsx`](file:///d:/CARS AI/frontend/src/pages/Projects.jsx) so variant stage names (e.g. `Contract Signing`, `Payment & Settlement`, `Handover & Delivered`, `Vehicle Inspection`) automatically map to standard Kanban columns, preventing deal cards from vanishing when updated in Telegram. Cleaned up existing database records in Supabase.
 
 

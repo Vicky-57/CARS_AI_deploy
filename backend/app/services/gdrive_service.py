@@ -75,12 +75,29 @@ def _find_or_create_folder(name: str, parent_id: str = None) -> str:
     return created["id"]
 
 
+_DRIVE_FOLDER_CACHE: Dict[str, Dict[str, str]] = {}
+
+
 def _get_or_create_root_folder() -> str:
     """Get or create the root 'CAR-AGENTS' folder in My Drive."""
     return _find_or_create_folder(ROOT_FOLDER_NAME)
 
 
-def create_customer_folder_structure(customer_name: str, project_id: str) -> Dict[str, str]:
+def get_customer_folder_url(customer_name: str, project_id: str) -> Optional[str]:
+    """Fast, cached lookup of a customer's main Google Drive folder URL."""
+    cache_key = f"{str(project_id)[:8]}_{customer_name.strip().lower()}"
+    if cache_key in _DRIVE_FOLDER_CACHE:
+        return _DRIVE_FOLDER_CACHE[cache_key].get("customer_folder_url")
+    
+    try:
+        struct = create_customer_folder_structure(customer_name, str(project_id), create_subfolders=False)
+        return struct.get("customer_folder_url")
+    except Exception as e:
+        logger.warning(f"Failed to fetch Drive folder for {customer_name}: {e}")
+        return None
+
+
+def create_customer_folder_structure(customer_name: str, project_id: str, create_subfolders: bool = True) -> Dict[str, str]:
     """
     Creates the standardized 3-tier folder hierarchy for a project:
       My Drive / CAR-AGENTS / {Customer Name} - #{Project ID} /
@@ -88,33 +105,47 @@ def create_customer_folder_structure(customer_name: str, project_id: str) -> Dic
         ├── 2. Legal Docs
         └── 3. Signed Docs
     Returns dictionary with all folder IDs and shareable URLs.
+    Caches folder IDs in memory so repeated calls execute in 0 ms.
     """
+    pid_str = str(project_id)
+    cache_key = f"{pid_str[:8]}_{customer_name.strip().lower()}"
+    if cache_key in _DRIVE_FOLDER_CACHE:
+        cached = _DRIVE_FOLDER_CACHE[cache_key]
+        if not create_subfolders or "ocr_folder_id" in cached:
+            return cached
+
     clean_name = "".join(c for c in customer_name if c.isalnum() or c in (" ", "_", "-")).strip() or "Client"
-    folder_name = f"{clean_name} - #{project_id[:8]}"
+    folder_name = f"{clean_name} - #{pid_str[:8]}"
 
     root_id = _get_or_create_root_folder()
     customer_folder_id = _find_or_create_folder(folder_name, parent_id=root_id)
 
-    subfolder_ids = {}
-    for sub in SUBFOLDER_NAMES:
-        sub_id = _find_or_create_folder(sub, parent_id=customer_folder_id)
-        subfolder_ids[sub] = sub_id
-
-    logger.info(f"Created 3-tier Drive structure for {folder_name}")
-
-    return {
+    res = {
         "root_folder_id": root_id,
         "customer_folder_id": customer_folder_id,
         "customer_folder_name": folder_name,
         "customer_folder_url": f"https://drive.google.com/drive/folders/{customer_folder_id}",
-        "ocr_folder_id": subfolder_ids["1. OCR"],
-        "ocr_folder_url": f"https://drive.google.com/drive/folders/{subfolder_ids['1. OCR']}",
-        "legal_docs_folder_id": subfolder_ids["2. Legal Docs"],
-        "legal_docs_folder_url": f"https://drive.google.com/drive/folders/{subfolder_ids['2. Legal Docs']}",
-        "signed_docs_folder_id": subfolder_ids["3. Signed Docs"],
-        "signed_docs_folder_url": f"https://drive.google.com/drive/folders/{subfolder_ids['3. Signed Docs']}",
         "folder_path": f"My Drive / {ROOT_FOLDER_NAME} / {folder_name}",
     }
+
+    if create_subfolders:
+        subfolder_ids = {}
+        for sub in SUBFOLDER_NAMES:
+            sub_id = _find_or_create_folder(sub, parent_id=customer_folder_id)
+            subfolder_ids[sub] = sub_id
+
+        res.update({
+            "ocr_folder_id": subfolder_ids["1. OCR"],
+            "ocr_folder_url": f"https://drive.google.com/drive/folders/{subfolder_ids['1. OCR']}",
+            "legal_docs_folder_id": subfolder_ids["2. Legal Docs"],
+            "legal_docs_folder_url": f"https://drive.google.com/drive/folders/{subfolder_ids['2. Legal Docs']}",
+            "signed_docs_folder_id": subfolder_ids["3. Signed Docs"],
+            "signed_docs_folder_url": f"https://drive.google.com/drive/folders/{subfolder_ids['3. Signed Docs']}",
+        })
+
+    logger.info(f"Resolved Drive structure for {folder_name} (subfolders={create_subfolders})")
+    _DRIVE_FOLDER_CACHE[cache_key] = res
+    return res
 
 
 def upload_file_to_drive_folder(

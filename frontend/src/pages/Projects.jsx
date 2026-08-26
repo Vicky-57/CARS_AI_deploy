@@ -7,13 +7,37 @@ import {
 import { api } from '../api/api';
 import { format } from 'date-fns';
 
-const STAGES = [
+export const STAGES = [
   'Intake & Onboarding',
-  'Vehicle Inspection',
+  'Sourcing & Inspection',
   'Marketing & Listing',
   'Negotiation & Contract',
   'Completed & Delivered'
 ];
+
+export function getNormalizedStage(rawStage) {
+  if (!rawStage) return STAGES[0];
+  const s = String(rawStage).trim();
+  const lower = s.toLowerCase();
+
+  if (lower.includes('intake') || lower.includes('onboard') || lower.includes('lead capture') || lower.includes('requirement')) {
+    return 'Intake & Onboarding';
+  }
+  if (lower.includes('sourc') || lower.includes('inspect')) {
+    return 'Sourcing & Inspection';
+  }
+  if (lower.includes('market') || lower.includes('list')) {
+    return 'Marketing & Listing';
+  }
+  if (lower.includes('contract') || lower.includes('sign') || lower.includes('pay') || lower.includes('settle') || lower.includes('negotiat')) {
+    return 'Negotiation & Contract';
+  }
+  if (lower.includes('handover') || lower.includes('deliver') || lower.includes('complet') || lower.includes('close')) {
+    return 'Completed & Delivered';
+  }
+
+  return STAGES[0];
+}
 
 function formatDateDDMMYYYY(dateInput) {
   if (!dateInput) return '—';
@@ -185,13 +209,9 @@ export default function Projects() {
     }
   };
 
-  useEffect(() => {
-    loadProjects();
-  }, []);
-
   const handleAdvanceStage = async (project, e) => {
     if (e) e.stopPropagation();
-    const currentStage = project.current_stage || STAGES[0];
+    const currentStage = getNormalizedStage(project.current_stage);
     const currentIdx = STAGES.indexOf(currentStage);
     if (currentIdx >= STAGES.length - 1) return;
 
@@ -200,12 +220,6 @@ export default function Projects() {
     try {
       const nowIso = new Date().toISOString();
       await api.updateProject(project.id, { current_stage: nextStage, updated_at: nowIso });
-      
-      // 2. Wait for the slide animation to complete
-      setTimeout(() => {
-        // 3. Optimistically update the UI without triggering the loading spinner
-        setProjects(prev => prev.map(p => p.id === project.id ? { ...p, current_stage: nextStage, updated_at: nowIso } : p));
-        setAdvancingCardId(null);
         
         // Scroll logic for mobile
         if (window.innerWidth <= 768) {
@@ -577,7 +591,7 @@ export default function Projects() {
                     const laborCost = totalLaborHours * (p.hourly_rate || 20);
                     const totalInvestment = (p.purchase_price || 0) + totalExpenses + laborCost;
                     const netProfit = (p.agreed_sale_price || 0) - totalInvestment;
-                    const currentStage = p.current_stage || STAGES[0];
+                    const currentStage = getNormalizedStage(p.current_stage);
                     const stageIdx = STAGES.indexOf(currentStage);
 
                     return (
@@ -793,11 +807,11 @@ export default function Projects() {
                           <ShieldCheck size={14} /> Current Sales Stage
                         </div>
                         <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--brand-900)', marginTop: 4 }}>
-                          {selectedProject.current_stage || STAGES[0]}
+                          {getNormalizedStage(selectedProject.current_stage)}
                         </div>
                       </div>
 
-                      {STAGES.indexOf(selectedProject.current_stage || STAGES[0]) < STAGES.length - 1 && (
+                      {STAGES.indexOf(getNormalizedStage(selectedProject.current_stage)) < STAGES.length - 1 && (
                         <button className="btn btn-primary" onClick={(e) => handleAdvanceStage(selectedProject, e)} style={{ padding: '8px 16px', boxShadow: 'var(--shadow)' }}>
                           Advance Stage <ChevronRight size={16} />
                         </button>

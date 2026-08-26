@@ -414,9 +414,8 @@ async def _handle_get_projects(chat_id: str) -> str:
                 # Google Drive folder link
                 drive_str = ""
                 try:
-                    from app.services.gdrive_service import create_customer_folder_structure
-                    struct = create_customer_folder_structure(p.get("client_name", "Unknown"), str(p.get("id")))
-                    cust_url = struct.get("customer_folder_url")
+                    from app.services.gdrive_service import get_customer_folder_url
+                    cust_url = get_customer_folder_url(p.get("client_name", "Unknown"), str(p.get("id")))
                     if cust_url:
                         drive_str = f"\n   • 📂 <a href=\"{cust_url}\">Google Drive Folder</a>"
                 except Exception:
@@ -632,9 +631,8 @@ async def _handle_get_customers(text: str, chat_id: str) -> str:
 
                 drive_str = ""
                 try:
-                    from app.services.gdrive_service import create_customer_folder_structure
-                    struct = create_customer_folder_structure(p.get("client_name", "Unknown"), str(p.get("id")))
-                    cust_url = struct.get("customer_folder_url")
+                    from app.services.gdrive_service import get_customer_folder_url
+                    cust_url = get_customer_folder_url(p.get("client_name", "Unknown"), str(p.get("id")))
                     if cust_url:
                         drive_str = f"\n   • 📂 <a href=\"{cust_url}\">Google Drive Folder</a>"
                 except Exception:
@@ -727,9 +725,8 @@ async def _handle_customer_detail(text: str, chat_id: str) -> str:
 
                     drive_info = ""
                     try:
-                        from app.services.gdrive_service import create_customer_folder_structure
-                        folders = create_customer_folder_structure(p.get("client_name", "Unknown"), str(p_id))
-                        cust_url = folders.get("customer_folder_url")
+                        from app.services.gdrive_service import get_customer_folder_url
+                        cust_url = get_customer_folder_url(p.get("client_name", "Unknown"), str(p_id))
                         if cust_url:
                             drive_info = f"\n   • 📂 <a href=\"{cust_url}\">Google Drive Storage Folder</a>"
                     except Exception:
@@ -782,9 +779,9 @@ async def _handle_customer_detail(text: str, chat_id: str) -> str:
 STAGES = [
     "Intake & Onboarding",
     "Sourcing & Inspection",
-    "Contract Signing",
-    "Payment & Settlement",
-    "Handover & Delivered"
+    "Marketing & Listing",
+    "Negotiation & Contract",
+    "Completed & Delivered"
 ]
 
 
@@ -794,16 +791,16 @@ def _match_stage(query: str) -> Optional[str]:
     for s in STAGES:
         if q == s.lower():
             return s
-    if "intake" in q or "onboard" in q:
+    if "intake" in q or "onboard" in q or "lead capture" in q or "requirement" in q:
         return "Intake & Onboarding"
     if "sourc" in q or "inspect" in q:
         return "Sourcing & Inspection"
-    if "contract" in q or "sign" in q:
-        return "Contract Signing"
-    if "pay" in q or "settle" in q:
-        return "Payment & Settlement"
-    if "handover" in q or "deliver" in q or "done" in q:
-        return "Handover & Delivered"
+    if "market" in q or "list" in q:
+        return "Marketing & Listing"
+    if "contract" in q or "sign" in q or "pay" in q or "settle" in q or "negotiat" in q:
+        return "Negotiation & Contract"
+    if "handover" in q or "deliver" in q or "complet" in q or "done" in q or "close" in q:
+        return "Completed & Delivered"
     return None
 
 
@@ -828,9 +825,9 @@ async def _handle_stage(text: str, chat_id: str) -> str:
             "📌 *Standard Sales Stages:*",
             "1️⃣ `Intake & Onboarding`",
             "2️⃣ `Sourcing & Inspection`",
-            "3️⃣ `Contract Signing`",
-            "4️⃣ `Payment & Settlement`",
-            "5️⃣ `Handover & Delivered`\n",
+            "3️⃣ `Marketing & Listing`",
+            "4️⃣ `Negotiation & Contract`",
+            "5️⃣ `Completed & Delivered`\n",
         ]
         if active_projects:
             lines.append("📁 *Active Client Projects:*")

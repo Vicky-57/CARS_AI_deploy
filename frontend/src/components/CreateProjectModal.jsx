@@ -105,9 +105,7 @@ export default function CreateProjectModal({ isOpen, onClose, onCreated, default
     setSubmitting(true);
 
     try {
-      const initialStage = formData.project_type === 'SELL' 
-        ? 'Onboarding & Lead Capture' 
-        : 'Requirement Capture';
+      const initialStage = 'Intake & Onboarding';
 
       const payload = {
         client_name: formData.client_name,
