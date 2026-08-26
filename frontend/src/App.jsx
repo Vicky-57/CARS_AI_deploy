@@ -19,6 +19,7 @@ import Profile from './pages/Profile';
 import SellForm from './pages/SellForm';
 import BuyForm from './pages/BuyForm';
 import { api, supabase } from './api/api';
+import GoogleTranslate from './components/GoogleTranslate';
 
 const NAV = [
   {
@@ -51,7 +52,7 @@ function Sidebar({ online, onLogout, userProfile, isOpen, onClose, isCollapsed, 
   return (
     <aside className={`sidebar ${isOpen ? 'open' : ''} ${isCollapsed ? 'collapsed' : ''}`}>
       <div className="sidebar-brand">
-        <div className="sidebar-brand-logo" onClick={onToggleCollapse} style={{ cursor: 'pointer' }} title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}>
+        <div className="sidebar-brand-logo" onClick={() => { if (typeof window !== 'undefined' && window.innerWidth <= 768) { onClose(); } else { onToggleCollapse(); } }} style={{ cursor: 'pointer' }} title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}>
           <div className="sidebar-brand-icon" style={{ background: 'transparent', width: 36, height: 36 }}>
             <img src="/assets/car.png" alt="CAR-AGENTS Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
           </div>
@@ -61,7 +62,7 @@ function Sidebar({ online, onLogout, userProfile, isOpen, onClose, isCollapsed, 
           </div>
         </div>
         {!isCollapsed && (
-          <button className="collapse-toggle" onClick={onToggleCollapse} title="Collapse Sidebar">
+          <button className="collapse-toggle" onClick={() => { if (typeof window !== 'undefined' && window.innerWidth <= 768) { onClose(); } else { onToggleCollapse(); } }} title="Collapse Sidebar">
             <PanelLeftClose size={18} />
           </button>
         )}
@@ -120,7 +121,7 @@ function Sidebar({ online, onLogout, userProfile, isOpen, onClose, isCollapsed, 
             position: 'absolute',
             bottom: 'calc(100% + 8px)',
             left: 16,
-            right: 16,
+            width: 220,
             background: 'var(--surface)',
             border: '1px solid var(--border)',
             borderRadius: 'var(--radius)',
@@ -234,18 +235,29 @@ function AppRoutes({ isAuthenticated, online, userProfile, onLogin, onLogout }) 
   }
 
   if (!isAuthenticated) {
-    return <Auth onLogin={onLogin} />;
+    return (
+      <>
+        <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 9999 }}>
+          <GoogleTranslate />
+        </div>
+        <Auth onLogin={onLogin} />
+      </>
+    );
   }
 
   return (
-    <div className="portal-layout">
+    <>
+      <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 9999 }}>
+        <GoogleTranslate />
+      </div>
+      <div className="portal-layout">
       <Sidebar 
         online={online} 
         onLogout={onLogout} 
         userProfile={userProfile} 
         isOpen={sidebarOpen} 
         onClose={() => setSidebarOpen(false)}
-        isCollapsed={sidebarCollapsed}
+        isCollapsed={sidebarCollapsed && typeof window !== 'undefined' && window.innerWidth > 768}
         onToggleCollapse={() => {
           const newVal = !sidebarCollapsed;
           setSidebarCollapsed(newVal);
@@ -280,5 +292,6 @@ function AppRoutes({ isAuthenticated, online, userProfile, onLogin, onLogout }) 
         </div>
       </div>
     </div>
+    </>
   );
 }

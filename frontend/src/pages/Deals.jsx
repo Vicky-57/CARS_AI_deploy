@@ -213,7 +213,7 @@ export default function Deals() {
                     onClick={() => setSelectedDeal(deal)}
                     style={{ padding: '16px 20px', gap: 16 }}
                   >
-                    <div style={{ 
+                    <div className="notranslate" style={{ 
                       width: 42, height: 42, borderRadius: '50%', 
                       background: 'linear-gradient(135deg, var(--gray-100), var(--gray-200))',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -252,7 +252,7 @@ export default function Deals() {
                   <button className="btn-icon show-on-mobile" style={{ marginRight: -4, padding: 4 }} onClick={() => setSelectedDeal(null)}>
                     <ChevronLeft size={20} />
                   </button>
-                  <div className="deals-avatar-mobile" style={{ 
+                  <div className="deals-avatar-mobile notranslate" style={{ 
                     width: 52, height: 52, borderRadius: '50%', 
                     background: 'linear-gradient(135deg, var(--brand-100), var(--brand-200))',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',

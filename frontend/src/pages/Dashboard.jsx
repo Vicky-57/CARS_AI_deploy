@@ -38,7 +38,7 @@ export default function Dashboard() {
       icon: '/assets/customer.png',
       color: 'orange',
       trendValue: '12%',
-      trendText: 'last 24h',
+      trendText: '',
       trend: 'up'
     },
     {
@@ -183,7 +183,7 @@ export default function Dashboard() {
                   onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--gray-50)'}
                   onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                 >
-                  <div style={{
+                  <div className="notranslate" style={{
                     width: 44, height: 44, borderRadius: '50%',
                     background: 'linear-gradient(135deg, #fff3ec, #ffe4d6)',
                     border: '1px solid #fed7aa',

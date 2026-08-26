@@ -131,7 +131,7 @@ function MeetingModal({ meeting, onClose, onSaved }) {
             <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: 6 }}>Meeting Title <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 500 }}>(auto-filled if blank)</span></label>
             <input className="form-input" style={{ padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', color: '#0f172a', fontSize: '0.9rem', width: '100%', background: '#f8fafc', transition: 'all 0.2s', outline: 'none' }} onFocus={e => { e.target.style.borderColor = '#ea580c'; e.target.style.background = '#ffffff'; e.target.style.boxShadow = '0 0 0 3px rgba(234, 88, 12, 0.1)'; }} onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.background = '#f8fafc'; e.target.style.boxShadow = 'none'; }} value={form.title} onChange={e => set('title', e.target.value)} placeholder="e.g. Car inspection with Herr Müller" />
           </div>
-          <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+          <div className="grid-2" style={{ marginBottom: 16 }}>
             <div className="form-group">
               <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: 6 }}>Start Time *</label>
               <input ref={startRef} className="form-input" type="datetime-local" style={{ padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', color: '#0f172a', fontSize: '0.9rem', width: '100%', background: '#f8fafc', transition: 'all 0.2s', outline: 'none' }} onFocus={e => { e.target.style.borderColor = '#ea580c'; e.target.style.background = '#ffffff'; e.target.style.boxShadow = '0 0 0 3px rgba(234, 88, 12, 0.1)'; }} onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.background = '#f8fafc'; e.target.style.boxShadow = 'none'; }} value={form.start_time} onChange={e => { set('start_time', e.target.value); setConflict(null); setBookAnyway(false); }} />
@@ -156,7 +156,7 @@ function MeetingModal({ meeting, onClose, onSaved }) {
             </div>
           )}
 
-          <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+          <div className="grid-2" style={{ marginBottom: 16 }}>
             <div className="form-group">
               <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: 6 }}>Client Name *</label>
               <input className="form-input" style={{ padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', color: '#0f172a', fontSize: '0.9rem', width: '100%', background: '#f8fafc', transition: 'all 0.2s', outline: 'none' }} onFocus={e => { e.target.style.borderColor = '#ea580c'; e.target.style.background = '#ffffff'; e.target.style.boxShadow = '0 0 0 3px rgba(234, 88, 12, 0.1)'; }} onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.background = '#f8fafc'; e.target.style.boxShadow = 'none'; }} value={form.client_name} onChange={e => set('client_name', e.target.value)} placeholder="Full Name" />

@@ -297,7 +297,7 @@ export const api = {
   getPipelineSummary: async () => {
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const [newLeads, sellProjects, buyProjects, allProjects] = await Promise.all([
-      supabase.from('leads').select('id', { count: 'exact', head: true }).gt('created_at', yesterday),
+      supabase.from('leads').select('id', { count: 'exact', head: true }),
       supabase.from('projects').select('id', { count: 'exact', head: true }).eq('project_type', 'SELL').neq('status', 'COMPLETED'),
       supabase.from('projects').select('id', { count: 'exact', head: true }).eq('project_type', 'BUY').neq('status', 'COMPLETED'),
       supabase.from('projects').select('id, client_name, project_type, updated_at, status').lt('updated_at', yesterday).neq('status', 'COMPLETED'),

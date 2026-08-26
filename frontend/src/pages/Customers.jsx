@@ -282,7 +282,7 @@ export default function Customers() {
                   <tr key={customer.id} style={{ transition: 'background-color 0.2s', cursor: 'pointer' }}>
                     <td style={{ paddingLeft: 24, paddingVertical: 16 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                        <div style={{ 
+                        <div className="notranslate" style={{ 
                           width: 44, height: 44, borderRadius: '50%', 
                           background: customer.interactions.length > 1 ? 'linear-gradient(135deg, #fef3c7, #fde68a)' : 'linear-gradient(135deg, #fff3ec, #ffe4d6)',
                           border: customer.interactions.length > 1 ? '1px solid #fcd34d' : '1px solid #fed7aa',
@@ -525,7 +525,7 @@ export default function Customers() {
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 640 }}>
             <div className="modal-header" style={{ borderBottom: '1px solid var(--border)', paddingBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <div style={{
+                <div className="notranslate" style={{
                   width: 56, height: 56, borderRadius: '50%',
                   background: 'linear-gradient(135deg, #fff3ec, #ffe4d6)',
                   border: '1px solid #fed7aa',

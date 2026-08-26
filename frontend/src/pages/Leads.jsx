@@ -232,7 +232,7 @@ export default function Leads() {
                   <tr key={lead.id} style={{ transition: 'background-color 0.2s', cursor: 'pointer' }}>
                     <td style={{ paddingLeft: 24, paddingVertical: 16 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                        <div style={{
+                        <div className="notranslate" style={{
                           width: 44, height: 44, borderRadius: '50%',
                           background: 'linear-gradient(135deg, #fff3ec, #ffe4d6)',
                           border: '1px solid #fed7aa',

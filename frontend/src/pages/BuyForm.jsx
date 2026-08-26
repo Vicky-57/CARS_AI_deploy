@@ -278,7 +278,8 @@ export default function BuyForm() {
         <div className="card" style={{ border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.08)', borderRadius: 16 }}>
           <form
             onSubmit={handleSubmit}
-            style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 20px', padding: 28 }}
+            className="grid-2"
+            style={{ gap: '4px 20px', padding: 28 }}
           >
             {/* STEP 1: Personal */}
             {step === 1 && (

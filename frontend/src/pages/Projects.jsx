@@ -207,6 +207,16 @@ export default function Projects() {
         setProjects(prev => prev.map(p => p.id === project.id ? { ...p, current_stage: nextStage, updated_at: nowIso } : p));
         setAdvancingCardId(null);
         
+        // Scroll logic for mobile
+        if (window.innerWidth <= 768) {
+          setTimeout(() => {
+            const targetCol = document.getElementById(`kanban-col-${currentIdx + 1}`);
+            if (targetCol) {
+              targetCol.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }, 50);
+        }
+
         // 4. Quietly refresh real data in the background
         api.getProjects().then(res => {
           const fresh = Array.isArray(res) ? res : (res.projects || []);
@@ -397,15 +407,15 @@ export default function Projects() {
         </div>
       ) : viewMode === 'kanban' ? (
         /* KANBAN BOARD VIEW */
-        <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 24, minHeight: 500 }}>
+        <div className="kanban-board-container" style={{ gap: 16, overflowX: 'auto', paddingBottom: 24, minHeight: 500 }}>
           {STAGES.map((stage, sIdx) => {
             const stageDeals = filtered.filter(p => (p.current_stage || STAGES[0]) === stage);
             return (
               <div
                 key={stage}
+                id={`kanban-col-${sIdx}`}
+                className="kanban-column"
                 style={{
-                  flex: '1 0 280px',
-                  maxWidth: 320,
                   background: 'rgba(15, 23, 42, 0.04)', /* Subtle dark overlay to distinctly separate from bg */
                   border: '1px solid rgba(15, 23, 42, 0.08)',
                   borderRadius: 16,
@@ -445,7 +455,7 @@ export default function Projects() {
                       return (
                         <div
                           key={p.id}
-                          className="card kanban-card"
+                          className={`card kanban-card ${advancingCardId === p.id ? 'advancing-card' : ''}`}
                           onClick={() => { setSelectedProject(p); setActiveTab('overview'); }}
                           style={{
                             padding: 18,
@@ -455,11 +465,7 @@ export default function Projects() {
                             transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                             background: '#ffffff',
                             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
-                            transform: advancingCardId === p.id ? 'translateX(280px) scale(0.95)' : 'translateX(0) scale(1)',
-                            opacity: advancingCardId === p.id ? 0 : 1,
-                            zIndex: advancingCardId === p.id ? 10 : 1,
-                            position: 'relative',
-                            pointerEvents: advancingCardId === p.id ? 'none' : 'auto'
+                            position: 'relative'
                           }}
                           onMouseEnter={(e) => {
                             if (advancingCardId === p.id) return;
@@ -476,12 +482,12 @@ export default function Projects() {
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                              <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #fff3ec, #ffe4d6)', color: '#ea580c', border: '1px solid #fed7aa', fontSize: '0.85rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(234, 88, 12, 0.1)', flexShrink: 0 }}>
+                              <div className="client-avatar notranslate" style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #fff3ec, #ffe4d6)', color: '#ea580c', border: '1px solid #fed7aa', fontSize: '0.85rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(234, 88, 12, 0.1)', flexShrink: 0 }}>
                                 {getInitials(p.client_name)}
                               </div>
                               <div>
-                                <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#0f172a' }}>{p.client_name}</div>
-                                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500, marginTop: 2 }}>{p.client_phone || 'No phone'}</div>
+                                <div className="client-name" style={{ fontWeight: 800, fontSize: '0.95rem', color: '#0f172a' }}>{p.client_name}</div>
+                                <div className="client-phone" style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500, marginTop: 2 }}>{p.client_phone || 'No phone'}</div>
                               </div>
                             </div>
                             <span className={`badge ${p.project_type === 'BUY' ? 'badge-buy' : 'badge-sell'}`} style={{ fontSize: '0.7rem', padding: '4px 8px', border: 'none' }}>
@@ -490,7 +496,7 @@ export default function Projects() {
                           </div>
 
                           {/* Target Vehicle */}
-                          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div className="vehicle-details" style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                             <Car size={16} color="#f47c3c" />
                             {p.target_vehicle || 'No vehicle specified'}
                           </div>
@@ -506,14 +512,14 @@ export default function Projects() {
                           </div>
 
                           {/* Profit & Action Footer */}
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12, borderTop: '1px solid rgba(226, 232, 240, 0.6)' }}>
-                            <div style={{ fontWeight: 800, fontSize: '0.85rem', color: netProfit >= 0 ? '#059669' : '#dc2626', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <div className="profit-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12, borderTop: '1px solid rgba(226, 232, 240, 0.6)' }}>
+                            <div className="profit-value" style={{ fontWeight: 800, fontSize: '0.85rem', color: netProfit >= 0 ? '#059669' : '#dc2626', display: 'flex', alignItems: 'center', gap: 4 }}>
                               {netProfit >= 0 ? '+' : ''}€{netProfit.toLocaleString(undefined, { minimumFractionDigits: 0 })}
                             </div>
 
                             {sIdx < STAGES.length - 1 && (
                               <button
-                                className="btn btn-secondary btn-sm"
+                                className="btn btn-secondary btn-sm advance-btn"
                                 style={{ padding: '6px 12px', fontSize: '0.75rem', gap: 4, background: '#ffedd5', border: 'none', color: '#ea580c', fontWeight: 800 }}
                                 onClick={(e) => handleAdvanceStage(p, e)}
                                 title="Move to next stage"
@@ -578,7 +584,7 @@ export default function Projects() {
                       <tr key={p.id} style={{ cursor: 'pointer', transition: 'background-color 0.2s' }} onClick={() => { setSelectedProject(p); setActiveTab('overview'); }}>
                         <td style={{ paddingLeft: 24, paddingTop: 12, paddingBottom: 12 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <div style={{ 
+                            <div className="notranslate" style={{ 
                               width: 38, height: 38, borderRadius: 10, 
                               background: 'linear-gradient(135deg, #fff3ec, #ffe4d6)',
                               border: '1px solid #fed7aa',
@@ -687,7 +693,7 @@ export default function Projects() {
       {selectedProject && (
         <div className="modal-overlay" onClick={() => setSelectedProject(null)}>
           <div
-            className="modal"
+            className="modal project-drawer-modal"
             onClick={e => e.stopPropagation()}
             style={{
               maxWidth: 720,
@@ -699,9 +705,9 @@ export default function Projects() {
             }}
           >
             {/* Drawer Header */}
-            <div style={{ padding: '24px 28px', borderBottom: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div className="drawer-header" style={{ padding: '24px 28px', borderBottom: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                <div className="drawer-title-row" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
                   <h2 style={{ fontSize: '1.3rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
                     {selectedProject.client_name}
                   </h2>
@@ -726,8 +732,8 @@ export default function Projects() {
             </div>
 
             {/* Drawer Tabs Bar */}
-            <div style={{ padding: '16px 28px 0 28px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-              <div style={{ display: 'flex', gap: 6, marginBottom: '-1px' }}>
+            <div className="drawer-tabs-bar" style={{ padding: '16px 28px 0 28px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+              <div className="drawer-tabs-container" style={{ display: 'flex', gap: 6, marginBottom: '-1px' }}>
                 {[
                   { id: 'overview', icon: <FileText size={16} />, label: 'Stage & Overview' },
                   { id: 'financials', icon: <Receipt size={16} />, label: 'Financials & Profit Ledger' },
@@ -735,6 +741,7 @@ export default function Projects() {
                 ].map(tab => (
                   <button
                     key={tab.id}
+                    className="drawer-tab"
                     onClick={() => setActiveTab(tab.id)}
                     style={{
                       background: activeTab === tab.id ? '#ffffff' : 'transparent',
@@ -775,12 +782,12 @@ export default function Projects() {
             </div>
 
             {/* Drawer Body Content */}
-            <div style={{ padding: '24px 28px', overflowY: 'auto', flex: 1 }}>
+            <div className="drawer-body" style={{ padding: '24px 28px', overflowY: 'auto', flex: 1 }}>
               {activeTab === 'overview' && (
                 <div>
                   {/* Current Stage Card */}
                   <div style={{ background: 'var(--brand-50)', border: '1px solid var(--brand-200)', borderRadius: 12, padding: 20, marginBottom: 24, boxShadow: 'var(--shadow-sm)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="stage-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand-700)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
                           <ShieldCheck size={14} /> Current Sales Stage
@@ -799,7 +806,7 @@ export default function Projects() {
                   </div>
 
                   {/* Client Info Grid */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                  <div className="info-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
                     <div style={{ background: 'var(--gray-50)', border: '1px solid var(--border)', padding: 16, borderRadius: 10 }}>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 4 }}>Phone Number</div>
                       <div style={{ fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -816,7 +823,7 @@ export default function Projects() {
                   </div>
 
                   {/* Project Dates & Lifecycle Grid */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+                  <div className="info-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
                     <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: 16, borderRadius: 10 }}>
                       <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
                         <Clock size={14} color="#ea580c" /> Project Created Date
