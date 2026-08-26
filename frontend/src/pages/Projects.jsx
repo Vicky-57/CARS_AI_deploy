@@ -209,6 +209,10 @@ export default function Projects() {
     }
   };
 
+  useEffect(() => {
+    loadProjects();
+  }, []);
+
   const handleAdvanceStage = async (project, e) => {
     if (e) e.stopPropagation();
     const currentStage = getNormalizedStage(project.current_stage);
