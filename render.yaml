@@ -1,0 +1,72 @@
+services:
+  # ─── 1. CAR-AGENTS FastAPI Web API ─────────────────────────────────────────
+  - type: web
+    name: car-agents-backend
+    env: python
+    region: frankfurt
+    plan: starter
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: IMAP_HOST
+        value: imap.strato.de
+      - key: IMAP_PORT
+        value: "993"
+      - key: IMAP_USER
+        value: info@car-agents.de
+      - key: IMAP_PASSWORD
+        sync: false
+      - key: SMTP_HOST
+        value: smtp.strato.de
+      - key: SMTP_PORT
+        value: "465"
+      - key: SMTP_USER
+        value: info@car-agents.de
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+
+  # ─── 2. Telegram Bot 24/7 Poller Worker ────────────────────────────────────
+  - type: worker
+    name: car-agents-telegram-poller
+    env: python
+    region: frankfurt
+    plan: starter
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: python run_telegram_polling.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: IMAP_HOST
+        value: imap.strato.de
+      - key: IMAP_PORT
+        value: "993"
+      - key: IMAP_USER
+        value: info@car-agents.de
+      - key: IMAP_PASSWORD
+        sync: false
