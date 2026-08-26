@@ -88,6 +88,13 @@ npm run dev
   * `💼 Active Deals` & `👤 Customers`: Added direct Google Drive folder links (`📂 Drive Folder`) and formatted Creation Dates (`📅 Created: DD/MM/YYYY`).
   * `📊 Summary`: Upgraded to Executive CRM Summary showing total portfolio valuation (€), active deal counts, stage breakdown, and today's Outlook appointments.
   * `📋 Leads`: Fixed intent formatting (`SELL_INTENT` / `BUY_INTENT`) and added creation dates.
-  * `/customer`: Simplified Google Drive section to output one direct, clickable customer Google Drive folder URL (`🔗 https://drive.google.com/drive/folders/...`).
+  * `/customer`: Upgraded to find ALL matching customers and render all their associated projects simultaneously (grouped by distinct customer identity/phone).
+* **Telegram Bot Markdown Retry & Entity Fix**: Added automatic fallback in `send_telegram_message` in [`telegram_service.py`](file:///d:/CARS AI/backend/app/services/telegram_service.py) to immediately retry sending plain text without `parse_mode` whenever Telegram rejects a message due to Markdown entity parsing errors (HTTP 400).
+* **Telegram UI Clean-Up (Removed Raw UUIDs)**: Removed internal database UUID lines (`🆔 Project ID` / `🆔 Lead ID`) from user-facing Telegram bot responses in [`telegram_service.py`](file:///d:/CARS AI/backend/app/services/telegram_service.py), making messages cleaner and human-friendly.
+* **Telegram HTML Formatting & Layout Overhaul**:
+  * **HTML Parse Mode**: Converted Telegram responses to `parse_mode="HTML"` (`<b>`, `<i>`, `<code>`, `<a href="...">`) in [`telegram_service.py`](file:///d:/CARS AI/backend/app/services/telegram_service.py).
+  * **Clean Bold Text Numbers (`<b>1.</b>`, `<b>2.</b>`...)**: Replaced keycap emoji icons with bold text numbers (`<b>1.</b>`, `<b>2.</b>` ... `<b>10.</b>`, `<b>11.</b>` ...) across all lists (`👤 Customers`, `💼 Active Deals`, `📋 Leads`, `🚗 Cars`), ensuring 100% consistent, crisp alignment on all mobile and desktop Telegram apps regardless of list size.
+  * **Clean Sub-Bullets (`   • `)**: Replaced ASCII tree elbows (`└`) with clean indented sub-bullet points.
+  * **Direct HTML Drive Links**: Formatted Google Drive links as `<a href="...">Google Drive Folder</a>` so URLs open directly without backslashes (`\`) or broken 404 links.
 
 

@@ -18,6 +18,7 @@ import logging
 import urllib.request
 import urllib.parse
 import json
+import html
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from config import settings
@@ -29,6 +30,13 @@ logger = logging.getLogger("telegram_service")
 TELEGRAM_API = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}"
 
 
+def _h(val: Any) -> str:
+    """Safely escapes dynamic user text for Telegram HTML mode."""
+    if not val:
+        return ""
+    return html.escape(str(val).strip())
+
+
 def _format_date(iso_str: Optional[str]) -> str:
     if not iso_str:
         return "—"
@@ -37,6 +45,11 @@ def _format_date(iso_str: Optional[str]) -> str:
         return dt.strftime("%d/%m/%Y")
     except Exception:
         return str(iso_str)[:10] if iso_str else "—"
+
+
+def _num_badge(n: int) -> str:
+    """Returns clean bold text number prefix for Telegram lists."""
+    return f"<b>{n}.</b>"
 
 
 # ─── Keyboards ────────────────────────────────────────────────────────────────
@@ -85,6 +98,20 @@ async def send_telegram_message(text: str, chat_id: str = None, parse_mode: str 
     except urllib.error.HTTPError as e:
         err_body = e.read().decode('utf-8', errors='ignore') if hasattr(e, 'read') else str(e)
         logger.error(f"Telegram send HTTP error {e.code}: {err_body}")
+        if ("can't parse entities" in err_body or "parse_mode" in err_body) and parse_mode:
+            logger.info("Retrying Telegram message send without parse_mode due to Markdown entity parsing error...")
+            payload_dict.pop("parse_mode", None)
+            req_retry = urllib.request.Request(
+                f"{TELEGRAM_API}/sendMessage",
+                data=json.dumps(payload_dict).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+            try:
+                with urllib.request.urlopen(req_retry, timeout=15) as r_retry:
+                    return json.loads(r_retry.read())
+            except Exception as retry_err:
+                logger.error(f"Retry without parse_mode also failed: {retry_err}")
         return {}
     except Exception as e:
         logger.error(f"Telegram send error: {e}")
@@ -278,8 +305,7 @@ async def _handle_create_lead(text: str, chat_id: str) -> str:
             f"👤 *Name:* {full_name}\n"
             f"📞 *Phone:* {phone or 'Not provided'}\n"
             f"🚗 *Vehicle Interest:* {vehicle or 'Not specified'}\n"
-            f"📌 *Intent:* {pipeline_type} pipeline\n"
-            f"🆔 *Lead ID:* `{lead_id}`\n\n"
+            f"📌 *Intent:* {pipeline_type} pipeline\n\n"
             f"Tap **⚡ Convert to Project** below or use `/convert {full_name}`."
         )
         await send_telegram_message(reply, chat_id, reply_markup=inline_buttons)
@@ -292,7 +318,7 @@ async def _handle_create_lead(text: str, chat_id: str) -> str:
 
 
 async def _handle_get_lead(text: str, chat_id: str) -> str:
-    """Search or list leads with creation dates and formatted intents."""
+    """Search or list leads with numbered items and sub-bullet points."""
     parts = text.split(maxsplit=1)
     query = parts[1].strip().lower() if len(parts) > 1 else ""
     if query in ["leads", "lead", "📋 leads"]:
@@ -304,33 +330,33 @@ async def _handle_get_lead(text: str, chat_id: str) -> str:
             leads = [l for l in leads if query in (l.get("name") or "").lower()]
 
         if not leads:
-            reply = f"🔍 No leads found{' matching *' + query + '*' if query else ''}."
+            reply = f"🔍 No leads found{' matching <b>' + _h(query) + '</b>' if query else ''}."
         else:
-            lines = [f"📋 *Active Inbound Leads ({len(leads)} found):*\n"]
-            for l in leads[:10]:
-                name = l.get("name") or "Unknown Lead"
-                intent = l.get("intent") or l.get("pipeline_type") or "NEW"
-                phone = l.get("phone") or "N/A"
-                veh = l.get("vehicle_interest") or f"{l.get('manufacturer') or ''} {l.get('model') or ''}".strip() or "Vehicle TBD"
+            lines = [f"📋 <b>Active Inbound Leads ({len(leads)} found):</b>\n"]
+            for idx, l in enumerate(leads[:25], 1):
+                name = _h(l.get("name") or "Unknown Lead")
+                intent = _h(l.get("intent") or l.get("pipeline_type") or "NEW")
+                phone = _h(l.get("phone") or "N/A")
+                veh = _h(l.get("vehicle_interest") or f"{l.get('manufacturer') or ''} {l.get('model') or ''}".strip() or "Vehicle TBD")
                 created = _format_date(l.get("created_at"))
-                status = l.get("status") or "NEW"
+                status = _h(l.get("status") or "NEW")
                 lines.append(
-                    f"• *{name}* — `{intent}` — *{veh}*\n"
-                    f"  └ Status: _{status}_ | 📅 Created: {created} | 📞 {phone}"
+                    f"{_num_badge(idx)} <b>{name}</b> — <code>{intent}</code> — <b>{veh}</b>\n"
+                    f"   • Status: <i>{status}</i> | 📅 Created: {created} | 📞 {phone}"
                 )
-            if len(leads) > 10:
-                lines.append(f"\n_...and {len(leads) - 10} more_")
-            lines.append("\n💡 _Type `/convert [Lead Name]` to convert a lead into an active deal & Drive storage._")
+            if len(leads) > 25:
+                lines.append(f"\n<i>...and {len(leads) - 25} more</i>")
+            lines.append("\n💡 <i>Type <code>/convert [Lead Name]</code> to convert a lead into an active deal & Drive storage.</i>")
             reply = "\n".join(lines)
     except Exception as e:
         reply = f"❌ Error fetching leads: {str(e)}"
 
-    await send_telegram_message(reply, chat_id)
+    await send_telegram_message(reply, chat_id, parse_mode="HTML")
     return reply
 
 
 async def _handle_get_cars(text: str, chat_id: str) -> str:
-    """List vehicles from active projects with creation date and status."""
+    """List vehicles from active projects with numbered items and sub-bullet points."""
     parts = text.split(maxsplit=1)
     query = parts[1].strip().lower() if len(parts) > 1 else ""
     if query in ["cars", "car", "inventory", "🚗 cars"]:
@@ -346,68 +372,68 @@ async def _handle_get_cars(text: str, chat_id: str) -> str:
             vehicles = [v for v in vehicles if query in (v.get("target_vehicle") or "").lower()]
 
         if not vehicles:
-            reply = f"🚗 No active vehicles found{' for *' + query + '*' if query else ''}."
+            reply = f"🚗 No active vehicles found{' for <b>' + _h(query) + '</b>' if query else ''}."
         else:
-            lines = [f"🚗 *Active Vehicle Inventory ({len(vehicles)} found):*\n"]
-            for v in vehicles[:10]:
-                veh = v.get("target_vehicle")
-                p_type = v.get("project_type", "?")
-                client = v.get("client_name", "N/A")
+            lines = [f"🚗 <b>Active Vehicle Inventory ({len(vehicles)} found):</b>\n"]
+            for idx, v in enumerate(vehicles[:25], 1):
+                veh = _h(v.get("target_vehicle") or "Vehicle")
+                p_type = _h(v.get("project_type") or "?")
+                client = _h(v.get("client_name") or "N/A")
                 created = _format_date(v.get("created_at"))
-                stage = v.get("current_stage") or "Intake"
+                stage = _h(v.get("current_stage") or "Intake")
                 lines.append(
-                    f"• *{veh}* — {p_type} BROKERAGE\n"
-                    f"  └ Client: _{client}_ | Stage: _{stage}_ | 📅 Created: {created}"
+                    f"{_num_badge(idx)} <b>{veh}</b> — {p_type} BROKERAGE\n"
+                    f"   • Client: <i>{client}</i> | Stage: <i>{stage}</i> | 📅 Created: {created}"
                 )
-            if len(vehicles) > 10:
-                lines.append(f"\n_...and {len(vehicles) - 10} more_")
+            if len(vehicles) > 25:
+                lines.append(f"\n<i>...and {len(vehicles) - 25} more</i>")
             reply = "\n".join(lines)
     except Exception as e:
         reply = f"❌ Error fetching vehicles: {str(e)}"
 
-    await send_telegram_message(reply, chat_id)
+    await send_telegram_message(reply, chat_id, parse_mode="HTML")
     return reply
 
 
 async def _handle_get_projects(chat_id: str) -> str:
-    """List active projects with status, vehicle, stage, created date, and Google Drive links."""
+    """List active projects with numbered items, sub-bullets, and HTML Drive links."""
     try:
         projects = get_all_projects()
         active = [p for p in projects if p.get("status") == "ACTIVE"]
         if not active:
             reply = "📁 No active projects at the moment."
         else:
-            lines = [f"📁 *Active Projects & Deals ({len(active)}):*\n"]
-            for p in active[:10]:
-                c_name = p.get("client_name") or "Unknown"
-                p_type = p.get("project_type", "?")
-                veh = p.get("target_vehicle") or "TBD"
-                stage = p.get("current_stage") or p.get("stage") or "Intake & Onboarding"
+            lines = [f"📁 <b>Active Projects & Deals ({len(active)}):</b>\n"]
+            for idx, p in enumerate(active[:25], 1):
+                c_name = _h(p.get("client_name") or "Unknown")
+                p_type = _h(p.get("project_type") or "?")
+                veh = _h(p.get("target_vehicle") or "TBD")
+                stage = _h(p.get("current_stage") or p.get("stage") or "Intake & Onboarding")
                 created = _format_date(p.get("created_at"))
 
                 # Google Drive folder link
                 drive_str = ""
                 try:
                     from app.services.gdrive_service import create_customer_folder_structure
-                    struct = create_customer_folder_structure(c_name, str(p.get("id")))
+                    struct = create_customer_folder_structure(p.get("client_name", "Unknown"), str(p.get("id")))
                     cust_url = struct.get("customer_folder_url")
                     if cust_url:
-                        drive_str = f"\n  └ 📂 Drive: {cust_url}"
+                        drive_str = f"\n   • 📂 <a href=\"{cust_url}\">Google Drive Folder</a>"
                 except Exception:
                     drive_str = ""
 
                 lines.append(
-                    f"• *{c_name}* — {p_type} — *{veh}*\n"
-                    f"  └ Stage: _{stage}_ | 📅 Created: {created}{drive_str}"
+                    f"{_num_badge(idx)} <b>{c_name}</b> — {p_type} — <b>{veh}</b>\n"
+                    f"   • Stage: <i>{stage}</i> | 📅 Created: {created}{drive_str}"
                 )
-            if len(active) > 10:
-                lines.append(f"\n_...and {len(active) - 10} more_")
-            lines.append("\n💡 _Type `/stage [Customer] [Stage]` to update stage or `/customer [Name]` for full profile._")
+            if len(active) > 25:
+                lines.append(f"\n<i>...and {len(active) - 25} more</i>")
+            lines.append("\n💡 <i>Type <code>/stage [Customer] [Stage]</code> to update stage or <code>/customer [Name]</code> for full profile.</i>")
             reply = "\n".join(lines)
     except Exception as e:
         reply = f"❌ Error fetching projects: {str(e)}"
 
-    await send_telegram_message(reply, chat_id)
+    await send_telegram_message(reply, chat_id, parse_mode="HTML")
     return reply
 
 
@@ -470,8 +496,7 @@ async def _handle_convert_lead(text: str, chat_id: str) -> str:
             f"👤 *Client:* {match.get('name')}\n"
             f"🚗 *Vehicle:* {match.get('vehicle_interest') or 'TBD'}\n"
             f"📌 *Pipeline:* {match.get('pipeline_type')}\n"
-            f"🔄 *Stage:* Intake\n"
-            f"🆔 *Project ID:* `{project_id}`"
+            f"🔄 *Stage:* Intake"
             f"{folder_info}"
         )
     except Exception as e:
@@ -594,129 +619,161 @@ async def _handle_get_customers(text: str, chat_id: str) -> str:
             ]
 
         if not projects:
-            reply = f"👤 No active customers found{' matching *' + query + '*' if query else ''}."
+            reply = f"👤 No active customers found{' matching <b>' + _h(query) + '</b>' if query else ''}."
         else:
-            lines = [f"👤 *Active Customers ({len(projects)} found):*\n"]
-            for p in projects[:10]:
-                name = p.get("client_name", "Unknown")
-                p_type = p.get("project_type", "?")
-                veh = p.get("target_vehicle") or "TBD"
-                stage = p.get("current_stage") or p.get("stage") or "N/A"
-                phone = p.get("client_phone") or "N/A"
+            lines = [f"👤 <b>Active Customers ({len(projects)} found):</b>\n"]
+            for idx, p in enumerate(projects[:25], 1):
+                name = _h(p.get("client_name") or "Unknown")
+                p_type = _h(p.get("project_type") or "?")
+                veh = _h(p.get("target_vehicle") or "TBD")
+                stage = _h(p.get("current_stage") or p.get("stage") or "N/A")
+                phone = _h(p.get("client_phone") or "N/A")
                 created = _format_date(p.get("created_at"))
 
                 drive_str = ""
                 try:
                     from app.services.gdrive_service import create_customer_folder_structure
-                    struct = create_customer_folder_structure(name, str(p.get("id")))
+                    struct = create_customer_folder_structure(p.get("client_name", "Unknown"), str(p.get("id")))
                     cust_url = struct.get("customer_folder_url")
                     if cust_url:
-                        drive_str = f"\n  └ 📂 Drive: {cust_url}"
+                        drive_str = f"\n   • 📂 <a href=\"{cust_url}\">Google Drive Folder</a>"
                 except Exception:
                     drive_str = ""
 
-                lines.append(f"• *{name}* — {p_type} — {veh}\n  └ Stage: _{stage}_ | 📅 {created} | 📞 {phone}{drive_str}")
+                lines.append(
+                    f"{_num_badge(idx)} <b>{name}</b> — {p_type} — <b>{veh}</b>\n"
+                    f"   • Stage: <i>{stage}</i> | 📅 {created} | 📞 {phone}"
+                    f"{drive_str}"
+                )
 
-            if len(projects) > 10:
-                lines.append(f"\n_...and {len(projects) - 10} more_")
+            if len(projects) > 25:
+                lines.append(f"\n<i>...and {len(projects) - 25} more</i>")
             
-            lines.append("\n💡 _Type `/customer [Name]` to view full customer profile & Drive folder._")
+            lines.append("\n💡 <i>Type <code>/customer [Name]</code> to view full customer profile & Drive folder.</i>")
             reply = "\n".join(lines)
     except Exception as e:
         reply = f"❌ Error fetching customers: {str(e)}"
 
-    await send_telegram_message(reply, chat_id)
+    await send_telegram_message(reply, chat_id, parse_mode="HTML")
     return reply
 
 
 async def _handle_customer_detail(text: str, chat_id: str) -> str:
-    """Fetch full detailed customer card for a specific client name or project ID."""
+    """
+    Fetch full detailed customer card(s).
+    Supports finding multiple customers with the same/similar name and displaying all their projects simultaneously.
+    """
     parts = text.split(maxsplit=1)
     query = parts[1].strip() if len(parts) > 1 else ""
 
     if not query:
         reply = (
-            "👤 *Customer Profile Lookup — Usage:*\n"
-            "`/customer [Customer Name or ID]`\n\n"
-            "Example: `/customer Stefan Meier` or `/customers` to view all active customers."
+            "👤 <b>Customer Profile Lookup — Usage:</b>\n"
+            "<code>/customer [Customer Name, Phone, or ID]</code>\n\n"
+            "Example: <code>/customer Stefan</code> or <code>/customers</code> to view all active customers."
         )
-        await send_telegram_message(reply, chat_id)
+        await send_telegram_message(reply, chat_id, parse_mode="HTML")
         return reply
 
     try:
-        # Search in active projects/customers first
         projects = get_all_projects()
-        match = next(
-            (p for p in projects if query.lower() in (p.get("client_name") or "").lower() or str(p.get("id")) == query),
-            None
-        )
+        matching_projects = [
+            p for p in projects
+            if query.lower() in (p.get("client_name") or "").lower()
+            or query.lower() in (p.get("client_phone") or "").lower()
+            or query.lower() in (p.get("client_email") or "").lower()
+            or query.lower() in (p.get("target_vehicle") or "").lower()
+            or str(p.get("id")) == query
+        ]
 
-        if match:
-            c_name = match.get("client_name") or "Unknown"
-            c_phone = match.get("client_phone") or "Not provided"
-            c_email = match.get("client_email") or "Not provided"
-            p_type = match.get("project_type") or "N/A"
-            veh = match.get("target_vehicle") or "TBD"
-            stage = match.get("current_stage") or match.get("stage") or "Intake"
-            status = match.get("status") or "ACTIVE"
-            p_id = match.get("id") or "N/A"
-            notes = match.get("notes") or "No internal notes."
-            created = _format_date(match.get("created_at"))
-            updated = _format_date(match.get("updated_at"))
+        if matching_projects:
+            customer_groups = {}
+            for p in matching_projects:
+                c_name = p.get("client_name") or "Unknown"
+                phone = p.get("client_phone") or "N/A"
+                email = p.get("client_email") or "N/A"
+                group_key = f"{phone.strip().lower()}_{c_name.strip().lower()}" if phone != "N/A" else c_name.strip().lower()
+                if group_key not in customer_groups:
+                    customer_groups[group_key] = {
+                        "name": c_name,
+                        "phone": phone,
+                        "email": email,
+                        "projects": []
+                    }
+                customer_groups[group_key]["projects"].append(p)
 
-            # Drive folder link
-            drive_info = ""
-            try:
-                from app.services.gdrive_service import create_customer_folder_structure
-                folders = create_customer_folder_structure(c_name, str(p_id))
-                cust_url = folders.get("customer_folder_url")
-                if cust_url:
-                    drive_info = f"\n\n📂 *Google Drive Storage Folder:*\n🔗 {cust_url}"
-            except Exception as d_err:
-                logger.warning(f"Drive folder lookup error: {d_err}")
-                drive_info = ""
+            messages = []
+            for cust_key, cust_data in customer_groups.items():
+                c_name = _h(cust_data["name"])
+                phone = _h(cust_data["phone"])
+                email = _h(cust_data["email"])
+                projs = cust_data["projects"]
 
-            reply = (
-                f"👤 *Customer Full Profile — {c_name}*\n\n"
-                f"📞 *Phone:* {c_phone}\n"
-                f"📧 *Email:* {c_email}\n"
-                f"📌 *Deal Type:* {p_type} Brokerage\n"
-                f"🚗 *Target Vehicle:* {veh}\n"
-                f"🔄 *Sales Stage:* {stage}\n"
-                f"📊 *Project Status:* {status}\n"
-                f"📅 *Created Date:* {created}\n"
-                f"🔄 *Last Updated:* {updated}\n"
-                f"🆔 *Project ID:* `{p_id}`"
-                f"{drive_info}\n\n"
-                f"📝 *Notes:* {notes}"
-            )
+                lines = [
+                    f"👤 <b>Customer Profile — {c_name}</b>",
+                    f"📞 <b>Phone:</b> {phone} | 📧 <b>Email:</b> {email}",
+                    f"📁 <b>Associated Projects ({len(projs)}):</b>\n"
+                ]
+
+                for idx, p in enumerate(projs, 1):
+                    p_type = _h(p.get("project_type") or "N/A")
+                    veh = _h(p.get("target_vehicle") or "TBD")
+                    stage = _h(p.get("current_stage") or p.get("stage") or "Intake")
+                    status = _h(p.get("status") or "ACTIVE")
+                    p_id = p.get("id") or "N/A"
+                    notes = _h(p.get("notes") or "No internal notes.")
+                    created = _format_date(p.get("created_at"))
+                    updated = _format_date(p.get("updated_at"))
+
+                    drive_info = ""
+                    try:
+                        from app.services.gdrive_service import create_customer_folder_structure
+                        folders = create_customer_folder_structure(p.get("client_name", "Unknown"), str(p_id))
+                        cust_url = folders.get("customer_folder_url")
+                        if cust_url:
+                            drive_info = f"\n   • 📂 <a href=\"{cust_url}\">Google Drive Storage Folder</a>"
+                    except Exception:
+                        drive_info = ""
+
+                    lines.append(
+                        f"<b>Project #{idx}:</b> {p_type} Brokerage — <b>{veh}</b>\n"
+                        f"   • Stage: <i>{stage}</i> ({status}) | 📅 Created: {created}\n"
+                        f"   • 🔄 Last Updated: {updated}"
+                        f"{drive_info}\n"
+                        f"   • 📝 Notes: {notes}"
+                    )
+
+                messages.append("\n".join(lines))
+
+            reply = "\n\n────────────────\n\n".join(messages)
+
         else:
-            # Fallback to check leads if customer isn't converted yet
             leads = get_all_leads()
-            lead_match = next(
-                (l for l in leads if query.lower() in (l.get("name") or "").lower()),
-                None
-            )
-            if lead_match:
-                reply = (
-                    f"📋 *Customer Inquiry (Lead) — {lead_match.get('name')}*\n\n"
-                    f"📞 *Phone:* {lead_match.get('phone') or 'N/A'}\n"
-                    f"📧 *Email:* {lead_match.get('email') or 'N/A'}\n"
-                    f"📌 *Intent:* {lead_match.get('intent', 'N/A')} ({lead_match.get('pipeline_type', 'N/A')})\n"
-                    f"🚗 *Vehicle Interest:* {lead_match.get('vehicle_interest') or (lead_match.get('manufacturer', '') + ' ' + lead_match.get('model', '')).strip()}\n"
-                    f"📊 *Lead Status:* {lead_match.get('status')}\n"
-                    f"🆔 *Lead ID:* `{lead_match.get('id')}`\n\n"
-                    f"📝 *Notes:* {lead_match.get('notes') or 'No notes.'}\n\n"
-                    f"💡 _Use `/convert {lead_match.get('name')}` to upgrade this lead to an active customer project._"
-                )
+            lead_matches = [
+                l for l in leads
+                if query.lower() in (l.get("name") or "").lower()
+                or query.lower() in (l.get("phone") or "").lower()
+            ]
+            if lead_matches:
+                lines = [f"📋 <b>Customer Inquiries ({len(lead_matches)} found):</b>\n"]
+                for idx, l in enumerate(lead_matches[:5], 1):
+                    lines.append(
+                        f"{idx}️⃣ <b>{_h(l.get('name'))}</b>\n"
+                        f"   • 📞 Phone: {_h(l.get('phone'))} | 📧 Email: {_h(l.get('email'))}\n"
+                        f"   • 📌 Intent: {_h(l.get('intent'))} ({_h(l.get('pipeline_type'))})\n"
+                        f"   • 🚗 Vehicle: {_h(l.get('vehicle_interest') or 'TBD')}\n"
+                        f"   • 📊 Status: {_h(l.get('status'))}"
+                    )
+                lines.append(f"\n💡 <i>Use <code>/convert [Lead Name]</code> to upgrade lead into an active customer project.</i>")
+                reply = "\n".join(lines)
             else:
-                reply = f"❌ No customer or lead found matching *{query}*. Type `/customers` to view all active customers."
+                reply = f"❌ No customer or lead found matching <b>{_h(query)}</b>. Type <code>/customers</code> to view all active customers."
 
     except Exception as e:
         logger.error(f"Customer detail error: {e}")
         reply = f"❌ Error fetching customer details: {str(e)}"
 
-    await send_telegram_message(reply, chat_id)
+    await send_telegram_message(reply, chat_id, parse_mode="HTML")
     return reply
 
 
@@ -829,8 +886,7 @@ async def _handle_stage(text: str, chat_id: str) -> str:
                 f"👤 *Client:* {c_name}\n"
                 f"🚗 *Vehicle:* {match.get('target_vehicle') or 'TBD'}\n"
                 f"📌 *Pipeline:* {match.get('project_type')} Brokerage\n"
-                f"🔄 *New Stage:* {target_stage}\n"
-                f"🆔 *Project ID:* `{p_id}`"
+                f"🔄 *New Stage:* {target_stage}"
             )
         except Exception as e:
             logger.error(f"Stage update error: {e}")
