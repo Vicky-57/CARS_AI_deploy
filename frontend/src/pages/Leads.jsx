@@ -46,7 +46,7 @@ export default function Leads() {
     try {
       const vehicleName = getLeadVehicleDisplay(lead) || 'Vehicle TBD';
       const pType = (lead.intent || '').toUpperCase().includes('SELL') ? 'SELL' : 'BUY';
-      
+
       // 1. Create project in projects table
       await api.createProject({
         client_name: lead.name || 'Client Lead',
@@ -61,7 +61,7 @@ export default function Leads() {
       });
 
       // 2. Remove converted lead from leads table so client officially moves to Customers & Projects
-      await api.deleteLead(lead.id).catch(() => {});
+      await api.deleteLead(lead.id).catch(() => { });
 
       alert(`Successfully converted ${lead.name || 'Lead'} into an official Client & active Project!`);
       navigate('/projects');
