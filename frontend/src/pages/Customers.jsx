@@ -130,7 +130,6 @@ export default function Customers() {
         email: newCustomerForm.email || null,
         phone: newCustomerForm.phone || null,
         intent: newCustomerForm.intent,
-        vehicle: vehicleDesc || null,
         channel: 'DIRECT_CALL',
         status: 'NEW',
         notes: newCustomerForm.notes 
