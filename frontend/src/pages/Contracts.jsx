@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   FileText, Download, CheckCircle, Loader, Copy, ExternalLink,
   FolderKanban, RefreshCw, Save, X, ShieldCheck, Eye, Plus,
+  CheckCircle2, XCircle
 } from 'lucide-react';
 import { api, supabase } from '../api/api';
 
@@ -80,6 +81,13 @@ export default function Contracts() {
   const [previewing, setPreviewing] = useState(null);
   const [embedFormUrl, setEmbedFormUrl] = useState(null);
   const [busy, setBusy] = useState('');                 // busy action key
+  const [alertConfig, setAlertConfig] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'success',
+    onConfirm: null
+  });
 
   const loadAll = async () => {
     setLoading(true);
@@ -132,7 +140,13 @@ export default function Contracts() {
       });
       await loadAll();
     } catch (e) {
-      alert('Could not create session: ' + e.message);
+      setAlertConfig({
+        isOpen: true,
+        title: 'Error',
+        message: 'Could not create session: ' + e.message,
+        type: 'error',
+        onConfirm: null
+      });
     } finally {
       setCreating(false);
     }
@@ -142,9 +156,21 @@ export default function Contracts() {
     const link = publicLink(session);
     try {
       await navigator.clipboard.writeText(link);
-      alert(`Form link copied to clipboard:\n${link}`);
+      setAlertConfig({
+        isOpen: true,
+        title: 'Copied!',
+        message: `Form link copied to clipboard:\n${link}`,
+        type: 'success',
+        onConfirm: null
+      });
     } catch {
-      alert(`Form link:\n${link}`);
+      setAlertConfig({
+        isOpen: true,
+        title: 'Form Link',
+        message: `Form link:\n${link}`,
+        type: 'success',
+        onConfirm: null
+      });
     }
   };
 
@@ -178,9 +204,21 @@ export default function Contracts() {
         shared_core: editor.fieldData,
       });
       await loadAll();
-      alert('Template data saved. Now click Preview PDF.');
+      setAlertConfig({
+        isOpen: true,
+        title: 'Saved!',
+        message: 'Template data saved. Now click Preview PDF.',
+        type: 'success',
+        onConfirm: null
+      });
     } catch (e) {
-      alert('Save failed: ' + e.message);
+      setAlertConfig({
+        isOpen: true,
+        title: 'Save Failed',
+        message: 'Save failed: ' + e.message,
+        type: 'error',
+        onConfirm: null
+      });
     } finally {
       setBusy('');
     }
@@ -193,7 +231,13 @@ export default function Contracts() {
       setPreviewing({ url: api.downloadPdf(res.file_path), label: templateType, client: session.client_name });
       await loadAll();
     } catch (e) {
-      alert('Preview failed: ' + e.message);
+      setAlertConfig({
+        isOpen: true,
+        title: 'Preview Failed',
+        message: 'Preview failed: ' + e.message,
+        type: 'error',
+        onConfirm: null
+      });
     } finally {
       setBusy('');
     }
@@ -204,9 +248,21 @@ export default function Contracts() {
     try {
       const res = await api.approveTemplate(session.id, templateType);
       await loadAll();
-      alert(`Approved & saved to Google Drive:\n${res.folder_path || res.drive_url || 'Drive'}`);
+      setAlertConfig({
+        isOpen: true,
+        title: 'Success!',
+        message: `Approved & saved to Google Drive:\n${res.folder_path || res.drive_url || 'Drive'}`,
+        type: 'success',
+        onConfirm: null
+      });
     } catch (e) {
-      alert('Approval/upload failed: ' + e.message);
+      setAlertConfig({
+        isOpen: true,
+        title: 'Approval Failed',
+        message: 'Approval/upload failed: ' + e.message,
+        type: 'error',
+        onConfirm: null
+      });
     } finally {
       setBusy('');
     }
@@ -456,6 +512,96 @@ export default function Contracts() {
               </div>
             </div>
             <iframe src={embedFormUrl} title="Client Intake Form" style={{ flex: 1, border: 'none', width: '100%', background: 'var(--bg)' }} />
+          </div>
+        </div>
+      )}
+
+      {/* Custom Alert/Success Popup */}
+      {alertConfig.isOpen && (
+        <div className="modal-overlay" style={{ background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(6px)', zIndex: 1200 }}>
+          <div className="custom-alert-card" style={{
+            width: '90%',
+            maxWidth: 400,
+            borderRadius: 24,
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            boxShadow: 'var(--shadow-lg)',
+            textAlign: 'center',
+            padding: '32px 24px 24px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            animation: 'slideUp .2s ease'
+          }}>
+            {/* Icon */}
+            <div style={{
+              width: 60,
+              height: 60,
+              borderRadius: '50%',
+              background: alertConfig.type === 'success'
+                ? 'linear-gradient(135deg, #dcfce7, #bbf7d0)'
+                : 'linear-gradient(135deg, #fee2e2, #fecaca)',
+              color: alertConfig.type === 'success' ? '#10b981' : '#ef4444',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 20,
+              boxShadow: alertConfig.type === 'success'
+                ? '0 10px 15px -3px rgba(16, 185, 129, 0.2)'
+                : '0 10px 15px -3px rgba(239, 68, 68, 0.2)'
+            }}>
+              {alertConfig.type === 'success' ? (
+                <CheckCircle2 size={32} strokeWidth={2.5} />
+              ) : (
+                <XCircle size={32} strokeWidth={2.5} />
+              )}
+            </div>
+
+            {/* Content */}
+            <h3 style={{
+              fontSize: '1.25rem',
+              fontWeight: 800,
+              color: 'var(--text-primary)',
+              marginBottom: 8,
+              letterSpacing: '-0.3px'
+            }}>
+              {alertConfig.title}
+            </h3>
+            <p style={{
+              fontSize: '0.925rem',
+              color: 'var(--text-secondary)',
+              lineHeight: 1.5,
+              marginBottom: 24,
+              padding: '0 8px',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word'
+            }}>
+              {alertConfig.message}
+            </p>
+
+            {/* Buttons */}
+            <button
+              onClick={() => {
+                setAlertConfig(prev => ({ ...prev, isOpen: false }));
+                if (alertConfig.onConfirm) alertConfig.onConfirm();
+              }}
+              className="btn btn-primary"
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: 12,
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              OK
+            </button>
           </div>
         </div>
       )}

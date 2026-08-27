@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Plus, Search, RefreshCw, Mail, Phone, Car, Tag, ShoppingCart, Sparkles } from 'lucide-react';
+import { Users, Plus, Search, RefreshCw, Mail, Phone, Car, Tag, ShoppingCart, Sparkles, CheckCircle2, XCircle } from 'lucide-react';
 import { api } from '../api/api';
 import LeadModal from '../components/LeadModal';
 
@@ -27,6 +27,13 @@ export default function Leads() {
   const [intentFilter, setIntentFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [convertingId, setConvertingId] = useState(null);
+  const [alertConfig, setAlertConfig] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'success',
+    onConfirm: null
+  });
 
   const loadLeads = async () => {
     setLoading(true);
@@ -63,10 +70,23 @@ export default function Leads() {
       // 2. Remove converted lead from leads table so client officially moves to Customers & Projects
       await api.deleteLead(lead.id).catch(() => { });
 
-      alert(`Successfully converted ${lead.name || 'Lead'} into an official Client & active Project!`);
-      navigate('/projects');
+      setAlertConfig({
+        isOpen: true,
+        title: 'Success!',
+        message: `Successfully converted ${lead.name || 'Lead'} into an official Client & active Project!`,
+        type: 'success',
+        onConfirm: () => {
+          navigate('/projects');
+        }
+      });
     } catch (err) {
-      alert('Failed to convert lead to project: ' + err.message);
+      setAlertConfig({
+        isOpen: true,
+        title: 'Conversion Failed',
+        message: `Failed to convert lead to project: ${err.message}`,
+        type: 'error',
+        onConfirm: null
+      });
     } finally {
       setConvertingId(null);
     }
@@ -317,6 +337,94 @@ export default function Leads() {
         onClose={() => setIsModalOpen(false)}
         onLeadCreated={loadLeads}
       />
+
+      {/* Custom Alert/Success Popup */}
+      {alertConfig.isOpen && (
+        <div className="modal-overlay" style={{ background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(6px)', zIndex: 1200 }}>
+          <div className="custom-alert-card" style={{
+            width: '90%',
+            maxWidth: 400,
+            borderRadius: 24,
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            boxShadow: 'var(--shadow-lg)',
+            textAlign: 'center',
+            padding: '32px 24px 24px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            animation: 'slideUp .2s ease'
+          }}>
+            {/* Icon */}
+            <div style={{
+              width: 60,
+              height: 60,
+              borderRadius: '50%',
+              background: alertConfig.type === 'success'
+                ? 'linear-gradient(135deg, #dcfce7, #bbf7d0)'
+                : 'linear-gradient(135deg, #fee2e2, #fecaca)',
+              color: alertConfig.type === 'success' ? '#10b981' : '#ef4444',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 20,
+              boxShadow: alertConfig.type === 'success'
+                ? '0 10px 15px -3px rgba(16, 185, 129, 0.2)'
+                : '0 10px 15px -3px rgba(239, 68, 68, 0.2)'
+            }}>
+              {alertConfig.type === 'success' ? (
+                <CheckCircle2 size={32} strokeWidth={2.5} />
+              ) : (
+                <XCircle size={32} strokeWidth={2.5} />
+              )}
+            </div>
+
+            {/* Content */}
+            <h3 style={{
+              fontSize: '1.25rem',
+              fontWeight: 800,
+              color: 'var(--text-primary)',
+              marginBottom: 8,
+              letterSpacing: '-0.3px'
+            }}>
+              {alertConfig.title}
+            </h3>
+            <p style={{
+              fontSize: '0.925rem',
+              color: 'var(--text-secondary)',
+              lineHeight: 1.5,
+              marginBottom: 24,
+              padding: '0 8px'
+            }}>
+              {alertConfig.message}
+            </p>
+
+            {/* Buttons */}
+            <button
+              onClick={() => {
+                setAlertConfig(prev => ({ ...prev, isOpen: false }));
+                if (alertConfig.onConfirm) alertConfig.onConfirm();
+              }}
+              className="btn btn-primary"
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: 12,
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              {alertConfig.type === 'success' ? 'Go to Projects' : 'Close'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
