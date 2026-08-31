@@ -218,14 +218,14 @@ export const api = {
     if (filters.lead_id) q = q.eq('lead_id', filters.lead_id);
     const { data: commsData } = await q.limit(100);
 
-    // Also fetch email_conversations table
+    // Also fetch email_conversations table safely
     let emailItems = [];
     try {
       let eq = supabase.from('email_conversations').select('*').order('created_at', { ascending: false });
       if (filters.lead_id) eq = eq.eq('lead_id', filters.lead_id);
-      const { data: eData } = await eq.limit(100);
-      if (eData) {
-        emailItems = eData.map(ec => ({
+      const res = await eq.limit(100);
+      if (res && res.data && !res.error) {
+        emailItems = res.data.map(ec => ({
           id: ec.id,
           lead_id: ec.lead_id,
           channel: 'STRATO_EMAIL',
@@ -240,7 +240,7 @@ export const api = {
         }));
       }
     } catch (e) {
-      console.warn('Could not fetch email_conversations:', e);
+      // Ignore if table doesn't exist yet
     }
 
     const commsList = commsData || [];
