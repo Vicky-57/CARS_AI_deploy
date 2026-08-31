@@ -19,6 +19,8 @@ function getLeadVehicleDisplay(lead) {
   return null;
 }
 
+const PAGE_SIZE = 10;
+
 export default function Leads() {
   const navigate = useNavigate();
   const [leads, setLeads] = useState([]);
@@ -27,6 +29,7 @@ export default function Leads() {
   const [intentFilter, setIntentFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [convertingId, setConvertingId] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const [alertConfig, setAlertConfig] = useState({
     isOpen: false,
     title: '',
@@ -111,6 +114,21 @@ export default function Leads() {
     const vehicle = `${l.manufacturer || ''} ${l.model || ''}`.toLowerCase();
     return !search || name.includes(query) || email.includes(query) || vehicle.includes(query);
   });
+
+  // Reset to page 1 whenever search or filter changes
+  useEffect(() => { setCurrentPage(1); }, [search, intentFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  // Build page number array (max 5 buttons around current)
+  const getPageNumbers = () => {
+    const pages = [];
+    const start = Math.max(1, currentPage - 2);
+    const end = Math.min(totalPages, currentPage + 2);
+    for (let i = start; i <= end; i++) pages.push(i);
+    return pages;
+  };
 
   const intentBadge = (l) => {
     const i = l.intent || '';
@@ -234,6 +252,7 @@ export default function Leads() {
             </p>
           </div>
         ) : (
+          <>
           <div className="table-wrap" style={{ border: 'none', borderRadius: '0 0 var(--radius-lg) var(--radius-lg)', boxShadow: 'none' }}>
             <table style={{ margin: 0 }}>
               <thead>
@@ -248,7 +267,7 @@ export default function Leads() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(lead => (
+                {paginated.map(lead => (
                   <tr key={lead.id} style={{ transition: 'background-color 0.2s', cursor: 'pointer' }}>
                     <td style={{ paddingLeft: 24, paddingVertical: 16 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -285,8 +304,8 @@ export default function Leads() {
                       {(() => {
                         const vDisplay = getLeadVehicleDisplay(lead);
                         return vDisplay ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, color: '#1a1a1a' }}>
-                            <Car size={16} color="#f47c3c" />
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontWeight: 700, color: '#1a1a1a' }}>
+                            <Car size={16} color="#f47c3c" style={{ flexShrink: 0, marginTop: 3 }} />
                             <span>{vDisplay}</span>
                           </div>
                         ) : (
@@ -328,6 +347,101 @@ export default function Leads() {
               </tbody>
             </table>
           </div>
+
+          {/* ── Pagination Bar ── */}
+          {filtered.length > PAGE_SIZE && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '14px 24px',
+              borderTop: '1px solid var(--border)',
+              background: 'var(--surface)',
+              borderRadius: '0 0 var(--radius-lg) var(--radius-lg)',
+              flexWrap: 'wrap',
+              gap: 12
+            }}>
+              {/* Info text */}
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length} leads
+              </span>
+
+              {/* Page controls */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                {/* Previous */}
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: 8,
+                    border: '1px solid var(--border)',
+                    background: currentPage === 1 ? 'var(--gray-50)' : 'var(--surface)',
+                    color: currentPage === 1 ? 'var(--text-muted)' : 'var(--text-primary)',
+                    fontWeight: 600,
+                    fontSize: '0.8rem',
+                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >← Prev</button>
+
+                {/* First page shortcut */}
+                {getPageNumbers()[0] > 1 && (
+                  <>
+                    <button onClick={() => setCurrentPage(1)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>1</button>
+                    {getPageNumbers()[0] > 2 && <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', padding: '0 2px' }}>…</span>}
+                  </>
+                )}
+
+                {/* Page number buttons */}
+                {getPageNumbers().map(n => (
+                  <button
+                    key={n}
+                    onClick={() => setCurrentPage(n)}
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: 8,
+                      border: n === currentPage ? 'none' : '1px solid var(--border)',
+                      background: n === currentPage ? 'var(--brand-600)' : 'var(--surface)',
+                      color: n === currentPage ? '#ffffff' : 'var(--text-primary)',
+                      fontWeight: n === currentPage ? 700 : 600,
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
+                      minWidth: 32,
+                      transition: 'all 0.2s',
+                      boxShadow: n === currentPage ? '0 2px 8px rgba(226,106,44,0.25)' : 'none'
+                    }}
+                  >{n}</button>
+                ))}
+
+                {/* Last page shortcut */}
+                {getPageNumbers().at(-1) < totalPages && (
+                  <>
+                    {getPageNumbers().at(-1) < totalPages - 1 && <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', padding: '0 2px' }}>…</span>}
+                    <button onClick={() => setCurrentPage(totalPages)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>{totalPages}</button>
+                  </>
+                )}
+
+                {/* Next */}
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: 8,
+                    border: '1px solid var(--border)',
+                    background: currentPage === totalPages ? 'var(--gray-50)' : 'var(--surface)',
+                    color: currentPage === totalPages ? 'var(--text-muted)' : 'var(--text-primary)',
+                    fontWeight: 600,
+                    fontSize: '0.8rem',
+                    cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >Next →</button>
+              </div>
+            </div>
+          )}
+          </>
         )}
       </div>
 

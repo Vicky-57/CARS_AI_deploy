@@ -1283,6 +1283,11 @@ tbody tr:last-child td { border-bottom: none; }
   }
 
   /* Communications mobile chat layout */
+  .split-panel {
+    grid-template-columns: 1fr !important;
+    height: calc(100vh - 56px - 120px);
+    gap: 0;
+  }
   .split-panel.thread-active .split-left {
     display: none !important;
   }
@@ -1292,8 +1297,9 @@ tbody tr:last-child td { border-bottom: none; }
   .split-panel .split-left,
   .split-panel .split-right {
     max-height: none !important;
-    height: auto !important;
-    min-height: calc(100vh - 150px);
+    height: 100% !important;
+    min-height: 0;
+    border-radius: var(--radius-lg) !important;
   }
 
   /* Deals mobile adjustments */
@@ -1695,5 +1701,78 @@ div#goog-gt-vt,
 @media (max-width: 768px) {
   .advancing-card {
     transform: translateY(150px) scale(0.95) !important;
+  }
+}
+
+/* ─── COMMUNICATIONS PAGE — MOBILE RESPONSIVE ─────────────────────────────── */
+
+/* Email card header: let timestamp wrap below sender info on mobile */
+@media (max-width: 600px) {
+  .email-header-top {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 6px;
+  }
+  .email-time {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+  }
+  .email-thread-bg {
+    padding: 12px !important;
+  }
+  .wa-chat-bg {
+    padding: 12px !important;
+  }
+  .email-card {
+    padding: 14px !important;
+  }
+
+  /* Thread header: make convert button icon-only on very small screens */
+  .thread-header {
+    padding: 10px 12px !important;
+    flex-wrap: nowrap;
+    gap: 8px !important;
+  }
+  .thread-header .btn-sm {
+    padding: 7px 10px !important;
+    font-size: 0.75rem !important;
+    flex-shrink: 0;
+  }
+
+  /* Communications page header controls: stack vertically */
+  .comms-header-controls {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100%;
+    gap: 10px !important;
+  }
+  .comms-filter-group {
+    width: 100%;
+    justify-content: stretch !important;
+  }
+  .comms-filter-group button {
+    flex: 1;
+  }
+  .comms-action-btns {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+  }
+  .comms-action-btns .btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  /* WA bubble: allow full width on mobile */
+  .wa-bubble {
+    max-width: 88% !important;
+  }
+
+  /* Page header adjustments for comms */
+  .page-header-left h1 {
+    font-size: 1.4rem !important;
+  }
+  .page-header-left p {
+    font-size: 0.78rem !important;
   }
 }

@@ -138,8 +138,8 @@ export default function Communications() {
           <h1 style={{ fontSize: '1.85rem', fontWeight: 800, letterSpacing: '-0.5px', color: '#0f172a', margin: '0 0 6px 0' }}>Communications Inbox</h1>
           <p style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 500, margin: 0, lineHeight: 1.5 }}>Live Primary Inbox (Strato IMAP & Outlook) + WhatsApp Cloud API Integration</p>
         </div>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ display: 'inline-flex', gap: 4, background: '#f1f5f9', padding: 4, borderRadius: 12, flexShrink: 0 }}>
+        <div className="comms-header-controls" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="comms-filter-group" style={{ display: 'inline-flex', gap: 4, background: '#f1f5f9', padding: 4, borderRadius: 12, flexShrink: 0 }}>
             {['ALL', 'EMAIL', 'WHATSAPP'].map(f => (
               <button key={f} onClick={() => setFilter(f)} style={{
                 padding: '8px 20px', borderRadius: 8, fontWeight: 800, fontSize: '0.85rem',
@@ -151,33 +151,35 @@ export default function Communications() {
             ))}
           </div>
 
-          <button 
-            className="btn" 
-            onClick={handleSyncEmails} 
-            disabled={pollingEmail}
-            style={{ 
-              flexShrink: 0, 
-              padding: '10px 16px', 
-              background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', 
-              color: '#ffffff', 
-              border: 'none', 
-              borderRadius: 10, 
-              fontWeight: 700, 
-              fontSize: '0.85rem', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: 6, 
-              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
-              cursor: pollingEmail ? 'not-allowed' : 'pointer'
-            }}
-          >
-            <Mail size={14} /> 
-            {pollingEmail ? 'Syncing Strato Inbox…' : 'Sync Strato Email'}
-          </button>
+          <div className="comms-action-btns" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button 
+              className="btn" 
+              onClick={handleSyncEmails} 
+              disabled={pollingEmail}
+              style={{ 
+                flexShrink: 0, 
+                padding: '10px 16px', 
+                background: 'linear-gradient(135deg, #f47c3c, #e26a2c)', 
+                color: '#ffffff', 
+                border: 'none', 
+                borderRadius: 10, 
+                fontWeight: 700, 
+                fontSize: '0.85rem', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 6, 
+                boxShadow: '0 4px 12px rgba(244, 124, 60, 0.35)',
+                cursor: pollingEmail ? 'not-allowed' : 'pointer'
+              }}
+            >
+              <Mail size={14} /> 
+              {pollingEmail ? 'Syncing Strato Inbox…' : 'Sync Strato Email'}
+            </button>
 
-          <button className="btn" onClick={loadCommunications} style={{ flexShrink: 0, padding: '10px 16px', background: '#ffffff', color: '#0f172a', border: '1.5px solid #e2e8f0', borderRadius: 10, fontWeight: 700, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-            <RefreshCw size={14} /> Refresh
-          </button>
+            <button className="btn" onClick={loadCommunications} style={{ flexShrink: 0, padding: '10px 16px', background: '#ffffff', color: '#0f172a', border: '1.5px solid #e2e8f0', borderRadius: 10, fontWeight: 700, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+              <RefreshCw size={14} /> Refresh
+            </button>
+          </div>
         </div>
       </div>
 

@@ -66,6 +66,7 @@ export default function Projects() {
   const [pipelineFilter, setPipelineFilter] = useState('ALL'); // 'ALL' | 'BUY' | 'SELL'
   const [search, setSearch] = useState('');
   const [advancingCardId, setAdvancingCardId] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Selected detail drawer
   const [selectedProject, setSelectedProject] = useState(null);
@@ -302,6 +303,20 @@ export default function Projects() {
     );
     return matchesPipeline && matchesSearch;
   });
+
+  const PAGE_SIZE = 10;
+  useEffect(() => { setCurrentPage(1); }, [search, pipelineFilter, viewMode]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  const getPageNumbers = () => {
+    const pages = [];
+    const start = Math.max(1, currentPage - 2);
+    const end = Math.min(totalPages, currentPage + 2);
+    for (let i = start; i <= end; i++) pages.push(i);
+    return pages;
+  };
 
   return (
     <div>
@@ -594,7 +609,7 @@ export default function Projects() {
                     </td>
                   </tr>
                 ) : (
-                  filtered.map(p => {
+                  paginated.map(p => {
                     const totalExpenses = (p.project_expenses || []).reduce((s, x) => s + (parseFloat(x.amount) || 0), 0);
                     const totalLaborHours = (p.project_labor || []).reduce((s, x) => s + (parseFloat(x.hours_spent) || 0), 0);
                     const laborCost = totalLaborHours * (p.hourly_rate || 20);
@@ -709,6 +724,94 @@ export default function Projects() {
               </tbody>
             </table>
           </div>
+
+          {/* ── Pagination Bar ── */}
+          {filtered.length > PAGE_SIZE && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '14px 24px',
+              borderTop: '1px solid var(--border)',
+              background: 'var(--surface)',
+              flexWrap: 'wrap',
+              gap: 12
+            }}>
+              {/* Info text */}
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length} projects
+              </span>
+
+              {/* Page controls */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: 8,
+                    border: '1px solid var(--border)',
+                    background: currentPage === 1 ? 'var(--gray-50)' : 'var(--surface)',
+                    color: currentPage === 1 ? 'var(--text-muted)' : 'var(--text-primary)',
+                    fontWeight: 600,
+                    fontSize: '0.8rem',
+                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >← Prev</button>
+
+                {getPageNumbers()[0] > 1 && (
+                  <>
+                    <button onClick={() => setCurrentPage(1)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>1</button>
+                    {getPageNumbers()[0] > 2 && <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', padding: '0 2px' }}>…</span>}
+                  </>
+                )}
+
+                {getPageNumbers().map(n => (
+                  <button
+                    key={n}
+                    onClick={() => setCurrentPage(n)}
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: 8,
+                      border: n === currentPage ? 'none' : '1px solid var(--border)',
+                      background: n === currentPage ? 'var(--brand-600)' : 'var(--surface)',
+                      color: n === currentPage ? '#ffffff' : 'var(--text-primary)',
+                      fontWeight: n === currentPage ? 700 : 600,
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
+                      minWidth: 32,
+                      transition: 'all 0.2s',
+                      boxShadow: n === currentPage ? '0 2px 8px rgba(226,106,44,0.25)' : 'none'
+                    }}
+                  >{n}</button>
+                ))}
+
+                {getPageNumbers().at(-1) < totalPages && (
+                  <>
+                    {getPageNumbers().at(-1) < totalPages - 1 && <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', padding: '0 2px' }}>…</span>}
+                    <button onClick={() => setCurrentPage(totalPages)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>{totalPages}</button>
+                  </>
+                )}
+
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: 8,
+                    border: '1px solid var(--border)',
+                    background: currentPage === totalPages ? 'var(--gray-50)' : 'var(--surface)',
+                    color: currentPage === totalPages ? 'var(--text-muted)' : 'var(--text-primary)',
+                    fontWeight: 600,
+                    fontSize: '0.8rem',
+                    cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >Next →</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
