@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, User, Car, DollarSign, Tag, Search, Plus, CheckCircle2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { api } from '../api/api';
 
 export default function CreateProjectModal({ isOpen, onClose, onCreated, defaultStatus = 'ACTIVE', defaultType = 'SELL' }) {
@@ -122,11 +123,11 @@ export default function CreateProjectModal({ isOpen, onClose, onCreated, default
       };
 
       const created = await api.createProject(payload);
-      alert(`Successfully created ${formData.status === 'COMPLETED' ? 'Deal' : 'Project'} for ${formData.client_name}!`);
+      toast.success(`Successfully created ${formData.status === 'COMPLETED' ? 'Deal' : 'Project'} for ${formData.client_name}!`);
       if (onCreated) onCreated(created);
       onClose();
     } catch (err) {
-      alert('Error creating record: ' + err.message);
+      toast.error('Error creating record: ' + err.message);
     } finally {
       setSubmitting(false);
     }

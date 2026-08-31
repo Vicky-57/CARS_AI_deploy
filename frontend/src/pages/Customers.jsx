@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Users, Search, RefreshCw, Mail, Phone, Clock, Star, UserPlus, Repeat, Plus, X, Briefcase, Car, Eye, Trash2, Edit3 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { api, supabase } from '../api/api';
 import CreateProjectModal from '../components/CreateProjectModal';
 
@@ -129,7 +130,6 @@ export default function Customers() {
         email: newCustomerForm.email || null,
         phone: newCustomerForm.phone || null,
         intent: newCustomerForm.intent,
-        vehicle: vehicleDesc || null,
         channel: 'DIRECT_CALL',
         status: 'NEW',
         notes: newCustomerForm.notes 
@@ -137,7 +137,7 @@ export default function Customers() {
           : (vehicleDesc ? `Vehicle requested/offered: ${vehicleDesc}` : 'Added directly from Customers Directory')
       });
 
-      alert(`Customer ${newCustomerForm.name} successfully created!`);
+      toast.success(`Customer ${newCustomerForm.name} successfully created!`);
       setIsAddCustomerOpen(false);
       loadCustomers();
 
@@ -145,7 +145,7 @@ export default function Customers() {
         setIsCreateProjectOpen(true);
       }
     } catch (err) {
-      alert('Error creating customer: ' + err.message);
+      toast.error('Error creating customer: ' + err.message);
     } finally {
       setSavingCustomer(false);
     }
@@ -161,11 +161,11 @@ export default function Customers() {
         await supabase.from('leads').delete().eq('email', customer.email);
         await supabase.from('projects').delete().eq('client_email', customer.email);
       }
-      alert(`Customer ${name} successfully deleted.`);
+      toast.success(`Customer ${name} successfully deleted.`);
       if (selectedCustomerDetail?.id === customer.id) setSelectedCustomerDetail(null);
       loadCustomers();
     } catch (err) {
-      alert('Error deleting customer: ' + err.message);
+      toast.error('Error deleting customer: ' + err.message);
     }
   };
 
