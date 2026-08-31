@@ -181,12 +181,7 @@ export default function Communications() {
         </div>
       </div>
 
-      {/* Large Hero Card commented out per request
-      {contacts.length === 0 && !loading ? (
-        <div className="card" style={{ padding: '64px 40px', textAlign: 'center', maxWidth: 880, margin: '40px auto', borderRadius: 24, border: 'none', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0,0,0,0.02)' }}>
-          ...
-        </div>
-      ) : ( */}
+      {/* Large Hero Card commented out per request */}
 
       <div className={`split-panel ${selected ? 'thread-active' : ''}`}>
           {/* Contact list */}
@@ -320,7 +315,6 @@ export default function Communications() {
             )}
           </div>
         </div>
-      )}
     </div>
   );
 }
