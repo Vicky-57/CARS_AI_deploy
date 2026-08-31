@@ -216,9 +216,49 @@ export const api = {
     let q = supabase.from('communications').select('*').order('timestamp', { ascending: false });
     if (filters.channel) q = q.eq('channel', filters.channel);
     if (filters.lead_id) q = q.eq('lead_id', filters.lead_id);
-    const { data, error } = await q.limit(100);
-    if (error) throw error;
-    return data;
+    const { data: commsData } = await q.limit(100);
+
+    // Also fetch email_conversations table
+    let emailItems = [];
+    try {
+      let eq = supabase.from('email_conversations').select('*').order('created_at', { ascending: false });
+      if (filters.lead_id) eq = eq.eq('lead_id', filters.lead_id);
+      const { data: eData } = await eq.limit(100);
+      if (eData) {
+        emailItems = eData.map(ec => ({
+          id: ec.id,
+          lead_id: ec.lead_id,
+          channel: 'STRATO_EMAIL',
+          sender_name: ec.direction === 'inbound' ? (ec.from_email || 'Client') : 'CAR-AGENTS Team',
+          sender_contact: ec.direction === 'inbound' ? ec.from_email : ec.to_email,
+          subject: ec.subject,
+          body: ec.body_preview,
+          is_inbound: ec.direction === 'inbound',
+          intent: ec.intent,
+          ai_summary: `Qualification Stage: ${ec.qualification_stage || 'uncontacted'}`,
+          timestamp: ec.created_at || new Date().toISOString()
+        }));
+      }
+    } catch (e) {
+      console.warn('Could not fetch email_conversations:', e);
+    }
+
+    const commsList = commsData || [];
+    const combined = [...commsList, ...emailItems];
+
+    // Deduplicate by message body/subject/id
+    const seen = new Set();
+    const unique = [];
+    for (const item of combined) {
+      const key = `${(item.sender_contact || '').toLowerCase()}::${(item.subject || '').toLowerCase()}::${(item.body || '').slice(0, 30)}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(item);
+      }
+    }
+
+    unique.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    return unique;
   },
 
   // ── MEETINGS / CALENDAR ─────────────────────────────────────────────────────

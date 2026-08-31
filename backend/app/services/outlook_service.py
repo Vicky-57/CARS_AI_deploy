@@ -493,7 +493,7 @@ def _send_or_log_reply(
             logger.error(f"SMTP send failed for {to_email}: {e}")
             return False
 
-    # Record outbound in email_conversations
+    # Record outbound in email_conversations & communications tables
     try:
         sb = get_supabase()
         sb.table("email_conversations").insert({
@@ -508,6 +508,19 @@ def _send_or_log_reply(
             "qualification_stage": stage,
             "intent": intent,
             "is_dry_run": is_dry_run_flag,
+        }).execute()
+
+        sb.table("communications").insert({
+            "lead_id": lead_id,
+            "channel": "STRATO_EMAIL",
+            "sender_name": "CAR-AGENTS Team",
+            "sender_contact": smtp_user,
+            "subject": msg["Subject"],
+            "body": body_text,
+            "is_inbound": False,
+            "intent": intent,
+            "ai_summary": f"Automated Reply (Stage: {stage})",
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }).execute()
     except Exception as e:
         logger.warning(f"Could not save outbound email record: {e}")
@@ -639,7 +652,7 @@ async def poll_outlook_inbound_emails() -> List[Dict]:
                                 "name": sender_name or sender_email,
                                 "email": sender_email,
                                 "intent": f"{intent}_INTENT",
-                                "channel": "OUTLOOK_EMAIL",
+                                "channel": "STRATO_EMAIL",
                                 "status": "NEW",
                                 "qualification_stage": "uncontacted",
                                 "is_qualified": False,
@@ -673,7 +686,7 @@ async def poll_outlook_inbound_emails() -> List[Dict]:
                                 except Exception as te:
                                     logger.warning(f"Telegram new lead alert failed: {te}")
 
-                    # Save inbound email record
+                    # Save inbound email record in email_conversations & communications
                     try:
                         sb.table("email_conversations").insert({
                             "lead_id": lead_id,
@@ -687,6 +700,19 @@ async def poll_outlook_inbound_emails() -> List[Dict]:
                             "qualification_stage": current_stage or "uncontacted",
                             "intent": intent,
                             "is_dry_run": False,
+                        }).execute()
+
+                        sb.table("communications").insert({
+                            "lead_id": lead_id,
+                            "channel": "STRATO_EMAIL",
+                            "sender_name": sender_name or sender_email,
+                            "sender_contact": sender_email,
+                            "subject": subject,
+                            "body": body,
+                            "is_inbound": True,
+                            "intent": intent,
+                            "ai_summary": f"Stage: {current_stage or 'uncontacted'}",
+                            "timestamp": datetime.now(timezone.utc).isoformat()
                         }).execute()
                     except Exception as e:
                         logger.warning(f"Could not save inbound record: {e}")
