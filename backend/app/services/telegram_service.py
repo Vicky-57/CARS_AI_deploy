@@ -57,8 +57,9 @@ def _num_badge(n: int) -> str:
 MAIN_REPLY_KEYBOARD = {
     "keyboard": [
         [{"text": "📊 Summary"}, {"text": "📋 Leads"}],
-        [{"text": "💼 Active Deals"}, {"text": "👤 Customers"}],
-        [{"text": "📅 Schedule"}, {"text": "📰 Briefing"}, {"text": "🚗 Cars"}]
+        [{"text": "🌟 Qualified Leads"}, {"text": "💼 Active Deals"}],
+        [{"text": "👤 Customers"}, {"text": "📅 Schedule"}],
+        [{"text": "📰 Briefing"}, {"text": "🚗 Cars"}]
     ],
     "resize_keyboard": True,
     "one_time_keyboard": False
@@ -177,6 +178,9 @@ async def dispatch_telegram_command(message: dict) -> str:
     if text_lower.startswith("/customer") or text_lower.startswith("/getcustomer"):
         return await _handle_customer_detail(text, chat_id)
 
+    if text_lower.startswith("/qualified") or text_lower.startswith("/getqualified"):
+        return await _handle_get_qualified_leads(chat_id)
+
     if text_lower.startswith("/leads") or text_lower.startswith("/getlead"):
         return await _handle_get_lead(text, chat_id)
 
@@ -198,6 +202,9 @@ async def dispatch_telegram_command(message: dict) -> str:
 
     if text_lower == "📋 leads" or text_lower == "leads":
         return await _handle_get_lead(text, chat_id)
+
+    if "qualified" in text_lower or text_lower == "🌟 qualified leads":
+        return await _handle_get_qualified_leads(chat_id)
 
     if text_lower == "💼 active deals" or text_lower == "deals" or text_lower == "projects":
         return await _handle_get_projects(chat_id)
@@ -353,6 +360,59 @@ async def _handle_get_lead(text: str, chat_id: str) -> str:
 
     await send_telegram_message(reply, chat_id, parse_mode="HTML")
     return reply
+
+
+async def _handle_get_qualified_leads(chat_id: str) -> str:
+    """List all qualified leads with 1-click interactive action buttons for each."""
+    try:
+        leads = get_all_leads()
+        qualified = [
+            l for l in leads 
+            if l.get("is_qualified") is True 
+            or (l.get("status") or "").upper() == "QUALIFIED"
+            or (l.get("qualification_stage") or "").lower() == "qualified"
+        ]
+
+        if not qualified:
+            reply = "🌟 <b>No qualified leads pending conversion at the moment.</b>\n\nAll inbound inquiries are currently being processed."
+            await send_telegram_message(reply, chat_id, parse_mode="HTML", reply_markup=MAIN_REPLY_KEYBOARD)
+            return reply
+
+        reply_header = f"🌟 <b>Qualifizierte Leads ({len(qualified)} bereit für Konvertierung):</b>\n"
+        await send_telegram_message(reply_header, chat_id, parse_mode="HTML")
+
+        for idx, l in enumerate(qualified[:10], 1):
+            name = _h(l.get("name") or "Unbekannter Lead")
+            email = _h(l.get("email") or "N/A")
+            phone = _h(l.get("phone") or "N/A")
+            intent = _h(l.get("intent") or "INQUIRY")
+            veh = _h(l.get("vehicle_interest") or f"{l.get('manufacturer') or ''} {l.get('model') or ''}".strip() or "Fahrzeug TBD")
+            notes = _h(l.get("notes") or "Vollständig qualifiziert")
+
+            card = (
+                f"<b>{idx}. {name}</b> — <code>{intent}</code>\n"
+                f"   • 🚗 <b>Fahrzeug:</b> {veh}\n"
+                f"   • 📧 <b>E-Mail:</b> {email} | 📞 <b>Tel:</b> {phone}\n"
+                f"   • 📝 <b>Notizen:</b> {notes[:200]}"
+            )
+
+            inline_buttons = {
+                "inline_keyboard": [
+                    [
+                        {"text": "⚡ Convert to Project", "callback_data": f"/convert {name}"},
+                        {"text": "👤 Customer Profile", "callback_data": f"/customer {name}"}
+                    ]
+                ]
+            }
+
+            await send_telegram_message(card, chat_id, parse_mode="HTML", reply_markup=inline_buttons)
+
+        return f"Displayed {len(qualified)} qualified leads."
+    except Exception as e:
+        logger.error(f"Error fetching qualified leads: {e}")
+        reply = f"❌ Error fetching qualified leads: {str(e)}"
+        await send_telegram_message(reply, chat_id)
+        return reply
 
 
 async def _handle_get_cars(text: str, chat_id: str) -> str:
