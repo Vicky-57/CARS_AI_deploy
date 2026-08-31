@@ -100,13 +100,34 @@ export default function Communications() {
     }
   };
 
+  const [pollingEmail, setPollingEmail] = useState(false);
+
+  const handleSyncEmails = async () => {
+    setPollingEmail(true);
+    try {
+      const res = await api.triggerEmailPoll();
+      const count = res.new_leads_created || 0;
+      alert(`Strato Inbox Sync Complete! ${count} new email lead(s) processed.`);
+      loadCommunications();
+    } catch (err) {
+      alert('Error syncing Strato email inbox: ' + err.message);
+    } finally {
+      setPollingEmail(false);
+    }
+  };
+
   const filtered = contacts
-    .filter(c => filter === 'ALL' || c.channel === filter)
+    .filter(c => {
+      if (filter === 'ALL') return true;
+      if (filter === 'EMAIL') return c.channel === 'EMAIL' || c.channel === 'OUTLOOK_EMAIL' || c.channel === 'STRATO_EMAIL';
+      if (filter === 'WHATSAPP') return c.channel === 'WHATSAPP';
+      return c.channel === filter;
+    })
     .filter(c => !search || (c.sender_name || c.sender_contact || '').toLowerCase().includes(search.toLowerCase()));
 
   const channelBadge = (ch) => {
     if (ch === 'WHATSAPP') return <span className="badge badge-whatsapp" style={{ fontSize: '0.6rem' }}>WA</span>;
-    if (ch === 'EMAIL' || ch === 'OUTLOOK_EMAIL') return <span className="badge badge-email" style={{ fontSize: '0.6rem' }}>Email</span>;
+    if (ch === 'EMAIL' || ch === 'OUTLOOK_EMAIL' || ch === 'STRATO_EMAIL') return <span className="badge badge-email" style={{ fontSize: '0.6rem' }}>Email</span>;
     return null;
   };
 
@@ -118,7 +139,6 @@ export default function Communications() {
           <p style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 500, margin: 0, lineHeight: 1.5 }}>Live Primary Inbox (Strato IMAP & Outlook) + WhatsApp Cloud API Integration</p>
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Channels Filter — Disabled for now until channels are connected
           <div style={{ display: 'inline-flex', gap: 4, background: '#f1f5f9', padding: 4, borderRadius: 12, flexShrink: 0 }}>
             {['ALL', 'EMAIL', 'WHATSAPP'].map(f => (
               <button key={f} onClick={() => setFilter(f)} style={{
@@ -130,7 +150,31 @@ export default function Communications() {
               }}>{f === 'ALL' ? 'All' : f}</button>
             ))}
           </div>
-          */}
+
+          <button 
+            className="btn" 
+            onClick={handleSyncEmails} 
+            disabled={pollingEmail}
+            style={{ 
+              flexShrink: 0, 
+              padding: '10px 16px', 
+              background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', 
+              color: '#ffffff', 
+              border: 'none', 
+              borderRadius: 10, 
+              fontWeight: 700, 
+              fontSize: '0.85rem', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 6, 
+              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+              cursor: pollingEmail ? 'not-allowed' : 'pointer'
+            }}
+          >
+            <Mail size={14} /> 
+            {pollingEmail ? 'Syncing Strato Inbox…' : 'Sync Strato Email'}
+          </button>
+
           <button className="btn" onClick={loadCommunications} style={{ flexShrink: 0, padding: '10px 16px', background: '#ffffff', color: '#0f172a', border: '1.5px solid #e2e8f0', borderRadius: 10, fontWeight: 700, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
             <RefreshCw size={14} /> Refresh
           </button>

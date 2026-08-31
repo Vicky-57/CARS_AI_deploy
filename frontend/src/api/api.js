@@ -210,7 +210,8 @@ export const api = {
     return data;
   },
 
-  // ── COMMUNICATIONS ──────────────────────────────────────────────────────────
+  // ── COMMUNICATIONS & EMAIL ──────────────────────────────────────────────────
+  triggerEmailPoll: () => aiPost('/api/v1/outlook/poll-emails', {}),
   getCommunications: async (filters = {}) => {
     let q = supabase.from('communications').select('*').order('timestamp', { ascending: false });
     if (filters.channel) q = q.eq('channel', filters.channel);
