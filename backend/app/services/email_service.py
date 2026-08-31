@@ -30,12 +30,12 @@ async def poll_inbound_emails():
     Polls Gmail/IMAP inbox for unseen primary emails.
     Processes lead intent via Claude and logs into Supabase.
     """
-    imap_server = getattr(settings, "IMAP_SERVER", "imap.gmail.com")
-    email_user = getattr(settings, "EMAIL_USER", "") or settings.BRIEFING_EMAIL_RECIPIENT
-    email_pass = getattr(settings, "EMAIL_PASSWORD", "") or os.getenv("EMAIL_PASSWORD", "")
+    imap_server = getattr(settings, "IMAP_HOST", None) or getattr(settings, "IMAP_SERVER", "mail.strato.de")
+    email_user = getattr(settings, "IMAP_USER", None) or getattr(settings, "EMAIL_USER", "") or settings.BRIEFING_EMAIL_RECIPIENT
+    email_pass = getattr(settings, "IMAP_PASSWORD", None) or getattr(settings, "EMAIL_PASSWORD", "") or os.getenv("IMAP_PASSWORD", "")
 
     if not email_pass or not email_user:
-        logger.debug("IMAP EMAIL_USER or EMAIL_PASSWORD not set. Skipping IMAP poll.")
+        logger.debug("IMAP IMAP_USER or IMAP_PASSWORD not set. Skipping IMAP poll.")
         return
 
     try:
@@ -196,13 +196,13 @@ async def _process_email_lead(sender: str, subject: str, body: str):
 
 def send_email_briefing(to_email: str, subject: str, html_content: str):
     """Sends HTML email briefing via SMTP."""
-    smtp_server = getattr(settings, "SMTP_SERVER", "smtp.gmail.com")
+    smtp_server = getattr(settings, "SMTP_HOST", None) or getattr(settings, "SMTP_SERVER", "smtp.strato.de")
     smtp_port = getattr(settings, "SMTP_PORT", 465)
-    smtp_user = getattr(settings, "EMAIL_USER", "") or settings.BRIEFING_EMAIL_RECIPIENT
-    smtp_pass = getattr(settings, "EMAIL_PASSWORD", "") or os.getenv("EMAIL_PASSWORD", "")
+    smtp_user = getattr(settings, "SMTP_USER", None) or getattr(settings, "EMAIL_USER", "") or settings.BRIEFING_EMAIL_RECIPIENT
+    smtp_pass = getattr(settings, "SMTP_PASSWORD", None) or getattr(settings, "EMAIL_PASSWORD", "") or os.getenv("SMTP_PASSWORD", "")
 
     if not smtp_pass or not smtp_user:
-        logger.warning("SMTP EMAIL_USER or EMAIL_PASSWORD not configured. Email briefing skipped.")
+        logger.warning("SMTP SMTP_USER or SMTP_PASSWORD not configured. Email briefing skipped.")
         return
 
     try:

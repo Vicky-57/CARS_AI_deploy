@@ -5,7 +5,7 @@ import os
 class Settings(BaseSettings):
     # Supabase (PostgreSQL Schema v3.0)
     SUPABASE_URL: str = "https://wvzulyxzuntjnzdykstt.supabase.co"
-    SUPABASE_SECRET_KEY: str = "sb_secret_qM2kIa6iLOXbv_JAUEXNTA_YLbxemoo"
+    SUPABASE_SECRET_KEY: str = ""
 
     # Telegram Master Agent
     TELEGRAM_BOT_TOKEN: str = ""
@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     # Microsoft Outlook 365 & Strato Email Integration
     OUTLOOK_ICS_URL: str = ""
-    IMAP_HOST: str = "mail.strato.de"
+    IMAP_HOST: str = "imap.strato.de"
     IMAP_PORT: int = 993
     IMAP_USER: str = "info@car-agents.de"
     IMAP_PASSWORD: str = ""
@@ -38,8 +38,8 @@ class Settings(BaseSettings):
     WHISPER_MODEL_SIZE: str = "base"
 
     # Google OAuth2 (Strictly for Google Drive Cloud Storage)
-    GOOGLE_CLIENT_ID: str = "84319482531-ucitebq3ohngvast159nrtklbu2mngq7.apps.googleusercontent.com"
-    GOOGLE_CLIENT_SECRET: str = "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"
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
     GOOGLE_REDIRECT_URI: str = "http://localhost:9000/api/v1/auth/google/callback"
     GOOGLE_AUTH_URI: str = "https://accounts.google.com/o/oauth2/auth"
     GOOGLE_TOKEN_URI: str = "https://oauth2.googleapis.com/token"

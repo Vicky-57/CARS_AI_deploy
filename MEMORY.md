@@ -24,14 +24,19 @@ This file contains the complete system architecture, latest decisions, database 
 
 ---
 
-## 🛠️ Environment & Infrastructure Config
+### 🚀 Live Production Deployments
+* **Frontend (Vercel):** [https://car-agents-omega.vercel.app/](https://car-agents-omega.vercel.app/) (Configured with SPA client-side routing rewrites in `frontend/vercel.json`).
+* **Backend (Render):** [https://car-agents-backend.onrender.com](https://car-agents-backend.onrender.com) (FastAPI service with active Telegram Bot polling, Supabase PostgreSQL DB connection, and Google Drive / Outlook APIs running in production).
 
 ### Authentication System (`Auth.jsx` & `App.jsx`)
 * **Google 1-Click OAuth Sign-In:** Prominent "Continue with Google Account" button on login screen.
 * **Supabase Email/Password Auth:** Native Supabase authentication with fallback for quick local testing.
 * **Test Credentials Autofill:** 1-Click "Fill Test Account Credentials" pre-populating `vikaspurohit105@gmail.com` & password.
 * **Session Persistence:** Persistent login state stored in `localStorage` (`car_agents_user`) + Supabase Auth.
-* **Logout:** Sidebar footer popover supports 1-click logout returning to login screen.
+### 📧 Strato Email Integration Status
+* **Inbound IMAP Poller:** [`outlook_service.py`](file:///d:/CARS AI/backend/app/services/outlook_service.py) automatically polls `info@car-agents.de` via `mail.strato.de:993`, extracts inquiries, classifies `SELL_INTENT` / `BUY_INTENT`, and creates leads in Supabase.
+* **Outbound SMTP Engine:** [`email_service.py`](file:///d:/CARS AI/backend/app/services/email_service.py) sends HTML notifications & briefings via `smtp.strato.de:465`.
+* **Activation Requirements:** Simply add `IMAP_PASSWORD` and `SMTP_PASSWORD` to Render environment variables and local `backend/.env`.
 
 ---
 
@@ -106,4 +111,21 @@ npm run dev
     5. `Completed & Delivered`
   * **Stage Normalization (`getNormalizedStage`)**: Added `getNormalizedStage()` helper in [`Projects.jsx`](file:///d:/CARS AI/frontend/src/pages/Projects.jsx) so variant stage names (e.g. `Contract Signing`, `Payment & Settlement`, `Handover & Delivered`, `Vehicle Inspection`) automatically map to standard Kanban columns, preventing deal cards from vanishing when updated in Telegram. Cleaned up existing database records in Supabase.
 
+---
+
+## 🕒 Recent Updates & Log (Aug 27, 2026)
+
+### 🌐 Deployment & Environment Setup
+* **Vercel SPA Client Routing (`vercel.json`)**: Added `frontend/vercel.json` with wildcard rewrites (`/.*` -> `/index.html`) ensuring page reloads on sub-paths (`/projects`, `/leads`, `/contracts`) load cleanly without 404 errors.
+* **Render Backend Dependencies (`requirements.txt`)**: Included `python-jose`, `passlib`, `bcrypt`, and `apscheduler` in both `backend/requirements.txt` and root `requirements.txt` for JWT handling, password hashing, and background cron task execution on Render.
+* **API Base URL Fallback**: Updated `AI_URL` resolution in [`api.js`](file:///d:/CARS AI/frontend/src/api/api.js) to inspect `import.meta.env.VITE_API_BASE_URL` alongside `VITE_AI_URL`, supporting production Render backend URL connections.
+
+### 🎨 Frontend Glassmorphism Alert System & UX Refinements
+* **Custom Alert & Confirmation Modals**: Replaced native browser alerts in [`Contracts.jsx`](file:///d:/CARS AI/frontend/src/pages/Contracts.jsx) and [`Leads.jsx`](file:///d:/CARS AI/frontend/src/pages/Leads.jsx) with custom dark/glassmorphism alert cards using `CheckCircle2` / `XCircle` icons and `slideUp` animation.
+* **Lead-to-Project Conversion Flow**: Enhanced conversion callbacks so upon converting a lead, users see a styled success pop-up before being redirected to `/projects`.
+* **Projects View Adjustments**: Formatted table view icon containers and layout styling in [`Projects.jsx`](file:///d:/CARS AI/frontend/src/pages/Projects.jsx).
+
+### 🛠️ Backend 409 Conflict Fix & Live Auto-Render Engine
+* **Form Contract Approval Resiliency ([`forms.py`](file:///d:/CARS AI/backend/app/api/v1/endpoints/forms.py))**: Resolved `HTTP 409 (Conflict)` issue on `POST /api/v1/forms/sessions/{session_id}/approve/{template_type}` by introducing an auto-rendering fallback. If the PDF was not rendered beforehand or was purged from ephemeral container storage on Render, the backend dynamically merges session data, renders the PDF on the fly, updates Supabase `documents`, and uploads it to Google Drive seamlessly.
+* **Live Verification**: Successfully verified live on Render (`car-agents-backend.onrender.com`) returning `200 OK` with Google Drive URL for session `65bb5ae7-cf18-41de-b3c7-05fbac766668`.
 

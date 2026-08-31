@@ -17,6 +17,7 @@ Responsibilities:
 import imaplib
 import email as email_lib
 import logging
+import os
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional
@@ -251,15 +252,287 @@ async def check_calendar_conflict(
     }
 
 
-# ─── Email: IMAP Lead Poller ─────────────────────────────────────────────────
+# ─── Email: Lead Qualification Engine ────────────────────────────────────────
+
+# Activation cutoff: Only process emails received AFTER this date
+ACTIVATION_DATE = datetime(2026, 8, 31, 0, 0, 0, tzinfo=timezone.utc)
+
+# Dry run mode: read emails and log replies but NEVER actually send SMTP
+DRY_RUN = os.environ.get("DRY_RUN", "true").lower() == "true"
+
+# Max auto-replies per hour (rate limit to avoid Strato spam flags)
+_REPLY_TIMESTAMPS: List[datetime] = []
+MAX_REPLIES_PER_HOUR = 10
+
+# ── Intent keyword sets ────────────────────────────────────────────────────────
+_BUY_KEYWORDS = {
+    "kaufen", "kauf", "suche", "gesucht", "ankauf", "beschaffung",
+    "ich suche", "wir suchen", "auto kaufen", "fahrzeug kaufen",
+    "preisvorstellung", "buy", "purchase", "looking for", "want to buy",
+    "interested in buying", "budget", "angebot erhalten"
+}
+_SELL_KEYWORDS = {
+    "verkaufen", "verkauf", "verkaufe", "anbieten", "angebot",
+    "vermittlung", "ich biete", "ich verkaufe", "mein auto",
+    "fahrzeug verkaufen", "sell", "selling", "want to sell",
+    "my car", "mein fahrzeug", "loswerden", "zum verkauf"
+}
+_INQUIRY_KEYWORDS = {
+    "anfrage", "information", "beratung", "interesse", "interessiert",
+    "was kostet", "wie funktioniert", "inquiry", "question", "info"
+}
+_IGNORE_KEYWORDS = {
+    "rechnung", "zahlungsaufforderung", "newsletter", "unsubscribe",
+    "bewerbung", "jobangebot", "noreply", "no-reply", "do-not-reply",
+    "automated", "automatisch", "out of office", "abwesenheit",
+    "mailer-daemon", "delivery failed", "spam", "invoice"
+}
+
+# ── German qualification email templates ──────────────────────────────────────
+_Q1_TEMPLATE = """Sehr geehrte/r {name},
+
+vielen Dank für Ihre Nachricht bei CAR-AGENTS!
+
+Damit wir Ihnen optimal helfen können, eine kurze Frage:
+
+Suchen Sie ein Fahrzeug zum **Kauf**, oder möchten Sie Ihr Fahrzeug **verkaufen**?
+
+Mit freundlichen Grüßen,
+CAR-AGENTS Team
+info@car-agents.de | www.car-agents.de"""
+
+_Q2_BUY_TEMPLATE = """Vielen Dank für Ihre Rückmeldung!
+
+Um das passende Fahrzeug für Sie zu finden, benötige ich noch ein paar Details:
+
+- **Welche Marke und welches Modell** bevorzugen Sie?
+- **Wie hoch ist Ihr Budget** (in €)?
+
+Mit freundlichen Grüßen,
+CAR-AGENTS Team"""
+
+_Q2_SELL_TEMPLATE = """Vielen Dank für Ihre Rückmeldung!
+
+Um Ihr Fahrzeug optimal zu vermitteln, benötige ich noch folgende Informationen:
+
+- **Um welches Fahrzeug handelt es sich?** (Marke, Modell, Baujahr, Kilometerstand)
+- **Was ist Ihre Preisvorstellung** (in €)?
+
+Mit freundlichen Grüßen,
+CAR-AGENTS Team"""
+
+_Q3_TEMPLATE = """Vielen Dank für die Informationen!
+
+Eine letzte Frage: **Bis wann planen Sie den Kauf/Verkauf?**
+(z. B. sofort, innerhalb von 1 Monat, in 2–3 Monaten)
+
+Unser Team meldet sich dann persönlich bei Ihnen, um den nächsten Schritt zu besprechen.
+
+Mit freundlichen Grüßen,
+CAR-AGENTS Team
+info@car-agents.de | www.car-agents.de"""
+
+
+def _check_rate_limit() -> bool:
+    """Returns True if we are within the allowed reply rate (10/hour)."""
+    global _REPLY_TIMESTAMPS
+    now = datetime.now(timezone.utc)
+    _REPLY_TIMESTAMPS = [t for t in _REPLY_TIMESTAMPS if (now - t).total_seconds() < 3600]
+    if len(_REPLY_TIMESTAMPS) >= MAX_REPLIES_PER_HOUR:
+        logger.warning(f"Rate limit reached: {MAX_REPLIES_PER_HOUR} replies/hour. Skipping.")
+        return False
+    return True
+
+
+def _decode_header(raw_value) -> str:
+    """
+    Safely decode an email header value (Subject, From, etc.).
+    Handles RFC2047 encoded-words (=?UTF-8?Q?...?= or =?iso-8859-1?B?...?=).
+    Returns a plain Unicode string.
+    """
+    import email.header
+    if raw_value is None:
+        return ""
+    try:
+        parts = email.header.decode_header(str(raw_value))
+        decoded = []
+        for part, enc in parts:
+            if isinstance(part, bytes):
+                decoded.append(part.decode(enc or "utf-8", errors="ignore"))
+            else:
+                decoded.append(str(part))
+        return " ".join(decoded).strip()
+    except Exception:
+        return str(raw_value)
+
+
+def _detect_intent_keywords(subject: str, body: str) -> Optional[str]:
+    """
+    Layer 1: Fast keyword matching. Returns 'BUY', 'SELL', 'INQUIRY', or None.
+    None means the email is irrelevant and should be ignored.
+    """
+    # Ensure we always work with plain strings
+    combined = (str(subject) + " " + str(body)).lower()
+
+    # Hard ignore first
+    if any(kw in combined for kw in _IGNORE_KEYWORDS):
+        return None
+
+    if any(kw in combined for kw in _SELL_KEYWORDS):
+        return "SELL"
+    if any(kw in combined for kw in _BUY_KEYWORDS):
+        return "BUY"
+    if any(kw in combined for kw in _INQUIRY_KEYWORDS):
+        return "INQUIRY"
+    return None
+
+
+def _parse_email_date(msg) -> Optional[datetime]:
+    """Parse email Date header to a timezone-aware datetime."""
+    import email.utils
+    date_str = msg.get("Date", "")
+    if not date_str:
+        return None
+    try:
+        parsed = email.utils.parsedate_to_datetime(date_str)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed
+    except Exception:
+        return None
+
+
+def _extract_body(msg) -> str:
+    """Extract plain text body from email message."""
+    body = ""
+    if msg.is_multipart():
+        for part in msg.walk():
+            if part.get_content_type() == "text/plain":
+                try:
+                    body = part.get_payload(decode=True).decode("utf-8", errors="ignore")
+                except Exception:
+                    pass
+                break
+    else:
+        try:
+            body = msg.get_payload(decode=True).decode("utf-8", errors="ignore")
+        except Exception:
+            pass
+    return body.strip()
+
+
+def _send_or_log_reply(
+    to_email: str,
+    sender_name: str,
+    subject: str,
+    body_template: str,
+    in_reply_to: str,
+    references: str,
+    stage: str,
+    lead_id: Optional[str],
+    intent: str,
+) -> bool:
+    """
+    Send reply via SMTP or log it locally (DRY_RUN=true).
+    Always records the outbound message in email_conversations.
+    Returns True on success.
+    """
+    import smtplib
+    import os
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    import uuid
+
+    smtp_host = getattr(settings, "SMTP_HOST", "smtp.strato.de")
+    smtp_port = int(getattr(settings, "SMTP_PORT", 465))
+    smtp_user = getattr(settings, "SMTP_USER", "info@car-agents.de")
+    smtp_pass = getattr(settings, "SMTP_PASSWORD", "")
+
+    body_text = body_template.format(name=sender_name or "Interessent/in")
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"Re: {subject}" if not subject.startswith("Re:") else subject
+    msg["From"] = f"CAR-AGENTS Team <{smtp_user}>"
+    msg["To"] = to_email
+    msg["In-Reply-To"] = in_reply_to
+    msg["References"] = references
+    msg["Message-ID"] = f"<car-agents-{uuid.uuid4().hex}@car-agents.de>"
+    msg.attach(MIMEText(body_text, "plain", "utf-8"))
+
+    out_message_id = msg["Message-ID"]
+    is_dry_run_flag = DRY_RUN
+
+    if DRY_RUN:
+        # Log to local file — zero SMTP calls
+        dry_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "dry_run_emails")
+        os.makedirs(dry_dir, exist_ok=True)
+        fname = os.path.join(dry_dir, f"{stage}_{to_email.replace('@','_')}_{uuid.uuid4().hex[:6]}.txt")
+        with open(fname, "w", encoding="utf-8") as f:
+            f.write(f"[DRY RUN — NOT SENT]\n")
+            f.write(f"To: {to_email}\n")
+            f.write(f"Subject: {msg['Subject']}\n")
+            f.write(f"Stage: {stage}\n")
+            f.write(f"Intent: {intent}\n")
+            f.write(f"In-Reply-To: {in_reply_to}\n\n")
+            f.write(body_text)
+        logger.info(f"[DRY RUN] Reply saved to: {fname}")
+    else:
+        # Real send
+        if not smtp_pass:
+            logger.warning("SMTP_PASSWORD not set. Cannot send reply.")
+            return False
+        if not _check_rate_limit():
+            return False
+        try:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port) as server:
+                server.login(smtp_user, smtp_pass)
+                server.sendmail(smtp_user, [to_email], msg.as_string())
+            _REPLY_TIMESTAMPS.append(datetime.now(timezone.utc))
+            logger.info(f"Reply sent to {to_email} (stage={stage})")
+        except Exception as e:
+            logger.error(f"SMTP send failed for {to_email}: {e}")
+            return False
+
+    # Record outbound in email_conversations
+    try:
+        sb = get_supabase()
+        sb.table("email_conversations").insert({
+            "lead_id": lead_id,
+            "message_id": out_message_id,
+            "thread_id": in_reply_to,
+            "direction": "outbound",
+            "from_email": smtp_user,
+            "to_email": to_email,
+            "subject": msg["Subject"],
+            "body_preview": body_text[:2000],
+            "qualification_stage": stage,
+            "intent": intent,
+            "is_dry_run": is_dry_run_flag,
+        }).execute()
+    except Exception as e:
+        logger.warning(f"Could not save outbound email record: {e}")
+
+    return True
+
 
 async def poll_outlook_inbound_emails() -> List[Dict]:
     """
-    Polls the Strato IMAP inbox (info@car-agents.de) for new unread emails.
-    Auto-creates leads in Supabase for new inquiries.
-    Replaces the old Gmail-based polling workflow.
+    Polls the Strato IMAP inbox (info@car-agents.de) for new emails.
+
+    Safety guarantees:
+    - ONLY marks emails as Seen. Zero deletions. Zero archiving. Zero expunge.
+    - Skips all emails before ACTIVATION_DATE (2026-08-31).
+    - Skips emails already recorded in email_conversations (deduplication).
+    - In DRY_RUN mode: reads and logs, never sends SMTP.
+
+    Qualification flow (German, conversational):
+    - New genuine inquiry → create lead → send Q1 (intent confirm)
+    - Reply to Q1 → send Q2 (budget/vehicle details)
+    - Reply to Q2 → send Q3 (timeline)
+    - Reply to Q3 → mark lead is_qualified=True → Telegram alert
     """
-    imap_host = getattr(settings, "IMAP_HOST", "mail.strato.de")
+    import os
+    imap_host = getattr(settings, "IMAP_HOST", "imap.strato.de")
     imap_port = int(getattr(settings, "IMAP_PORT", 993))
     imap_user = getattr(settings, "IMAP_USER", "info@car-agents.de")
     imap_pass = getattr(settings, "IMAP_PASSWORD", "")
@@ -268,72 +541,229 @@ async def poll_outlook_inbound_emails() -> List[Dict]:
         logger.warning("IMAP_PASSWORD not configured. Skipping email poll.")
         return []
 
-    created_leads = []
+    mode = "DRY_RUN" if DRY_RUN else "LIVE"
+    logger.info(f"Email poll starting [mode={mode}, cutoff={ACTIVATION_DATE.date()}]")
+
+    sb = get_supabase()
+    processed = []
 
     try:
         with imaplib.IMAP4_SSL(imap_host, imap_port) as mail:
             mail.login(imap_user, imap_pass)
             mail.select("INBOX")
             _, msg_ids = mail.search(None, "UNSEEN")
-            ids = msg_ids[0].split()[-20:]  # Process up to 20 new emails
+            all_ids = msg_ids[0].split() if msg_ids[0] else []
 
-            for msg_id in ids:
-                _, msg_data = mail.fetch(msg_id, "(RFC822)")
-                raw = msg_data[0][1]
-                msg = email_lib.message_from_bytes(raw)
+            logger.info(f"Found {len(all_ids)} unread emails in inbox")
 
-                sender = msg.get("From", "")
-                subject = msg.get("Subject", "")
-                body = ""
-
-                if msg.is_multipart():
-                    for part in msg.walk():
-                        if part.get_content_type() == "text/plain":
-                            try:
-                                body = part.get_payload(decode=True).decode("utf-8", errors="ignore")
-                            except Exception:
-                                pass
-                            break
-                else:
-                    try:
-                        body = msg.get_payload(decode=True).decode("utf-8", errors="ignore")
-                    except Exception:
-                        pass
-
-                # Basic intent detection
-                body_lower = body.lower()
-                subject_lower = subject.lower()
-                intent = "SELL_INTENT" if any(w in body_lower + subject_lower for w in ["verkaufen", "verkauf", "sell", "anbieten"]) else "BUY_INTENT"
-                pipeline = "SELL" if intent == "SELL_INTENT" else "BUY"
-
-                # Extract sender name & email
-                sender_email = sender.split("<")[-1].replace(">", "").strip() if "<" in sender else sender
-                sender_name = sender.split("<")[0].strip().strip('"') if "<" in sender else sender_email
-
-                # Create lead in Supabase
+            for msg_id in all_ids[-30:]:  # Process at most 30 per run
                 try:
-                    sb = get_supabase()
-                    lead_data = {
-                        "name": sender_name or sender_email,
-                        "email": sender_email,
-                        "intent": intent,
-                        "channel": "OUTLOOK_EMAIL",
-                        "status": "NEW",
-                        "notes": f"Subject: {subject}\n\n{body[:500]}",
-                    }
-                    sb.table("leads").insert(lead_data).execute()
-                    created_leads.append(lead_data)
-                    logger.info(f"New lead created from Outlook email: {sender_name}")
-                except Exception as db_err:
-                    logger.error(f"Lead creation error for email from {sender}: {db_err}")
+                    _, msg_data = mail.fetch(msg_id, "(RFC822)")
+                    raw = msg_data[0][1]
+                    msg = email_lib.message_from_bytes(raw)
 
-                # Mark as read
-                mail.store(msg_id, "+FLAGS", "\\Seen")
+                    # ── 1. Date cutoff check ──────────────────────────────────
+                    email_date = _parse_email_date(msg)
+                    if email_date and email_date < ACTIVATION_DATE:
+                        mail.store(msg_id, "+FLAGS", "\\Seen")
+                        continue  # Skip old emails silently
+
+                    # ── 2. Extract metadata ───────────────────────────────────
+                    message_id = _decode_header(msg.get("Message-ID", "")).strip()
+                    in_reply_to = _decode_header(msg.get("In-Reply-To", "")).strip()
+                    references = _decode_header(msg.get("References", "")).strip()
+                    sender_raw = _decode_header(msg.get("From", ""))
+                    subject = _decode_header(msg.get("Subject", ""))
+                    body = _extract_body(msg)
+
+                    sender_email = sender_raw.split("<")[-1].replace(">", "").strip() if "<" in sender_raw else sender_raw.strip()
+                    sender_name = sender_raw.split("<")[0].strip().strip('"') if "<" in sender_raw else sender_email
+
+                    # Skip our own outbound emails if they land in inbox
+                    if sender_email.lower() == imap_user.lower():
+                        mail.store(msg_id, "+FLAGS", "\\Seen")
+                        continue
+
+                    # ── 3. Deduplication check ────────────────────────────────
+                    if message_id:
+                        existing = sb.table("email_conversations").select("id").eq("message_id", message_id).execute()
+                        if existing.data:
+                            mail.store(msg_id, "+FLAGS", "\\Seen")
+                            continue
+
+                    # ── 4. Thread detection — is this a reply to a Q we sent? ─
+                    thread_lead = None
+                    current_stage = None
+                    if in_reply_to:
+                        prior = sb.table("email_conversations") \
+                            .select("lead_id, qualification_stage") \
+                            .eq("message_id", in_reply_to) \
+                            .eq("direction", "outbound") \
+                            .execute()
+                        if prior.data:
+                            thread_lead = prior.data[0].get("lead_id")
+                            current_stage = prior.data[0].get("qualification_stage")
+
+                    # ── 5. Intent detection (Layer 1: keywords) ───────────────
+                    intent = _detect_intent_keywords(subject, body)
+                    if intent is None and current_stage is None:
+                        # Not a car inquiry and not part of our thread → ignore
+                        mail.store(msg_id, "+FLAGS", "\\Seen")
+                        logger.debug(f"Ignored non-car email from {sender_email}")
+                        continue
+
+                    # If it's a thread reply (already talking to us), keep intent from lead
+                    if intent is None and thread_lead:
+                        lead_rec = sb.table("leads").select("intent").eq("id", thread_lead).execute()
+                        if lead_rec.data:
+                            raw_intent = lead_rec.data[0].get("intent", "INQUIRY")
+                            intent = raw_intent.replace("_INTENT", "")
+
+                    if not intent:
+                        intent = "INQUIRY"
+
+                    # ── 6. Record inbound email ───────────────────────────────
+                    pipeline = "SELL" if intent == "SELL" else "BUY"
+
+                    # Create or find lead
+                    lead_id = thread_lead
+                    if not lead_id:
+                        # Check if lead exists for this email address
+                        existing_lead = sb.table("leads").select("id, qualification_stage") \
+                            .eq("email", sender_email).execute()
+                        if existing_lead.data:
+                            lead_id = existing_lead.data[0]["id"]
+                            current_stage = existing_lead.data[0].get("qualification_stage", "uncontacted")
+                        else:
+                            new_lead = sb.table("leads").insert({
+                                "name": sender_name or sender_email,
+                                "email": sender_email,
+                                "intent": f"{intent}_INTENT",
+                                "channel": "OUTLOOK_EMAIL",
+                                "status": "NEW",
+                                "qualification_stage": "uncontacted",
+                                "is_qualified": False,
+                                "notes": f"Subject: {subject}\n\n{body[:500]}",
+                            }).execute()
+                            if new_lead.data:
+                                lead_id = new_lead.data[0]["id"]
+                                logger.info(f"New lead created: {sender_name} <{sender_email}>")
+
+                    # Save inbound email record
+                    try:
+                        sb.table("email_conversations").insert({
+                            "lead_id": lead_id,
+                            "message_id": message_id or f"<no-id-{msg_id.decode()}>",
+                            "thread_id": in_reply_to or None,
+                            "direction": "inbound",
+                            "from_email": sender_email,
+                            "to_email": imap_user,
+                            "subject": subject,
+                            "body_preview": body[:2000],
+                            "qualification_stage": current_stage or "uncontacted",
+                            "intent": intent,
+                            "is_dry_run": False,
+                        }).execute()
+                    except Exception as e:
+                        logger.warning(f"Could not save inbound record: {e}")
+
+                    # ── 7. Conversation state machine ─────────────────────────
+                    ref_chain = f"{references} {message_id}".strip()
+
+                    if not current_stage or current_stage == "uncontacted":
+                        # Q1: Intent confirmation
+                        ok = _send_or_log_reply(
+                            to_email=sender_email,
+                            sender_name=sender_name,
+                            subject=subject,
+                            body_template=_Q1_TEMPLATE,
+                            in_reply_to=message_id,
+                            references=ref_chain,
+                            stage="q1_sent",
+                            lead_id=lead_id,
+                            intent=intent,
+                        )
+                        if ok and lead_id:
+                            sb.table("leads").update({"qualification_stage": "q1_sent"}).eq("id", lead_id).execute()
+
+                    elif current_stage == "q1_sent":
+                        # Q2: Budget/vehicle details
+                        template = _Q2_SELL_TEMPLATE if intent == "SELL" else _Q2_BUY_TEMPLATE
+                        ok = _send_or_log_reply(
+                            to_email=sender_email,
+                            sender_name=sender_name,
+                            subject=subject,
+                            body_template=template,
+                            in_reply_to=message_id,
+                            references=ref_chain,
+                            stage="q2_sent",
+                            lead_id=lead_id,
+                            intent=intent,
+                        )
+                        if ok and lead_id:
+                            # Update lead notes with Q1 reply
+                            sb.table("leads").update({
+                                "qualification_stage": "q2_sent",
+                                "notes": f"Q1 reply: {body[:300]}",
+                            }).eq("id", lead_id).execute()
+
+                    elif current_stage == "q2_sent":
+                        # Q3: Timeline
+                        ok = _send_or_log_reply(
+                            to_email=sender_email,
+                            sender_name=sender_name,
+                            subject=subject,
+                            body_template=_Q3_TEMPLATE,
+                            in_reply_to=message_id,
+                            references=ref_chain,
+                            stage="q3_sent",
+                            lead_id=lead_id,
+                            intent=intent,
+                        )
+                        if ok and lead_id:
+                            sb.table("leads").update({
+                                "qualification_stage": "q3_sent",
+                                "notes": f"Q2 reply: {body[:300]}",
+                            }).eq("id", lead_id).execute()
+
+                    elif current_stage == "q3_sent":
+                        # Lead is fully qualified!
+                        if lead_id:
+                            sb.table("leads").update({
+                                "is_qualified": True,
+                                "qualification_stage": "qualified",
+                                "status": "QUALIFIED",
+                                "notes": f"Q3 reply (timeline): {body[:300]}",
+                            }).eq("id", lead_id).execute()
+                            logger.info(f"Lead QUALIFIED: {sender_name} <{sender_email}> ({intent})")
+                            # Telegram alert
+                            try:
+                                from app.services.telegram_service import send_telegram_message
+                                await send_telegram_message(
+                                    f"<b>Neuer qualifizierter Lead!</b>\n\n"
+                                    f"<b>Name:</b> {sender_name}\n"
+                                    f"<b>E-Mail:</b> {sender_email}\n"
+                                    f"<b>Intent:</b> {intent}\n"
+                                    f"<b>Zeitplan:</b> {body[:200]}\n\n"
+                                    f"Lead ist bereit fuer persoenliche Beratung."
+                                )
+                            except Exception as te:
+                                logger.warning(f"Telegram alert failed: {te}")
+
+                        processed.append({"email": sender_email, "stage": "qualified"})
+
+                    # ── 8. Mark as read (ONLY safe operation) ─────────────────
+                    mail.store(msg_id, "+FLAGS", "\\Seen")
+                    processed.append({"email": sender_email, "stage": current_stage or "q1_sent"})
+
+                except Exception as inner_e:
+                    logger.error(f"Error processing message {msg_id}: {inner_e}")
+                    continue
 
     except Exception as e:
         logger.error(f"IMAP poll error: {e}")
 
-    if created_leads:
-        logger.info(f"Outlook email poll: {len(created_leads)} new lead(s) created.")
+    logger.info(f"Email poll complete [{mode}]: {len(processed)} email(s) processed")
+    return processed
 
-    return created_leads
+

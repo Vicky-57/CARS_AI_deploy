@@ -208,3 +208,43 @@ CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
 CREATE INDEX IF NOT EXISTS idx_expenses_project ON project_expenses(project_id);
 CREATE INDEX IF NOT EXISTS idx_labor_project ON project_labor(project_id);
 CREATE INDEX IF NOT EXISTS idx_meetings_start ON meetings(start_time);
+
+-- ====================================================================
+-- SCHEMA v3.1 — EMAIL LEAD QUALIFICATION (Strato IMAP Integration)
+-- Added: 2026-08-31
+-- ====================================================================
+
+-- 15. EXTEND LEADS TABLE — Qualification tracking
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS is_qualified BOOLEAN DEFAULT FALSE;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS qualification_stage TEXT DEFAULT 'uncontacted';
+-- qualification_stage values:
+--   'uncontacted'  → lead exists, no email sent yet
+--   'q1_sent'      → first qualification question sent (intent confirmation)
+--   'q2_sent'      → second question sent (budget/vehicle details)
+--   'q3_sent'      → third question sent (timeline)
+--   'qualified'    → all questions answered, lead is fully qualified
+--   'ignored'      → email was not car-related, no reply sent
+
+-- 16. EMAIL CONVERSATIONS TABLE — Full email thread tracking
+CREATE TABLE IF NOT EXISTS email_conversations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    lead_id UUID REFERENCES leads(id) ON DELETE SET NULL,
+    message_id TEXT UNIQUE,           -- RFC822 Message-ID header (deduplication key)
+    thread_id TEXT,                   -- In-Reply-To / References header (groups thread)
+    direction TEXT NOT NULL,          -- 'inbound' | 'outbound'
+    from_email TEXT NOT NULL,
+    to_email TEXT NOT NULL,
+    subject TEXT,
+    body_preview TEXT,                -- First 2000 chars of plain text body only
+    qualification_stage TEXT,         -- stage at the time this email was sent/received
+    intent TEXT,                      -- 'BUY' | 'SELL' | 'INQUIRY' | 'IGNORE'
+    is_dry_run BOOLEAN DEFAULT FALSE, -- TRUE during local testing, email was NOT actually sent
+    sent_at TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_conv_lead ON email_conversations(lead_id);
+CREATE INDEX IF NOT EXISTS idx_email_conv_thread ON email_conversations(thread_id);
+CREATE INDEX IF NOT EXISTS idx_email_conv_msgid ON email_conversations(message_id);
+CREATE INDEX IF NOT EXISTS idx_email_conv_direction ON email_conversations(direction);
+

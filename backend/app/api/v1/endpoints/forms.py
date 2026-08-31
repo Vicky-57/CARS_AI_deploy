@@ -323,12 +323,40 @@ async def approve_and_upload(session_id: str, template_type: str):
 
     sb = get_supabase()
     doc = sb.table("documents").select("*").eq("session_id", session_id) \
-        .eq("template_type", template_type).single().execute()
-    if not doc.data or not doc.data.get("file_path") or not os.path.exists(doc.data["file_path"]):
-        raise HTTPException(status_code=409, detail="No rendered PDF yet. Please Preview first.")
+        .eq("template_type", template_type).execute()
 
-    file_path = doc.data["file_path"]
-    client_name = session.get("client_name") or doc.data.get("client_name") or "General Clients"
+    doc_data = doc.data[0] if (doc.data and len(doc.data) > 0) else None
+    file_path = doc_data.get("file_path") if (doc_data and doc_data.get("file_path")) else None
+
+    # Auto-render if PDF was not yet generated or if temp file expired/disappeared from ephemeral storage
+    if not file_path or not os.path.exists(file_path):
+        merged = _merge_session_data(session, template_type)
+        try:
+            file_path = _render_temp(template_type, merged)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Auto-render failed before approval: {str(e)}")
+
+        client_name = session.get("client_name") or merged.get("full_name") or "General Clients"
+        doc_payload = {
+            "session_id": session_id,
+            "project_id": session.get("project_id"),
+            "pipeline": session["pipeline"],
+            "template_type": template_type,
+            "client_name": client_name,
+            "status": "draft",
+            "file_path": file_path,
+            "updated_at": _now(),
+        }
+        if doc_data and doc_data.get("id"):
+            sb.table("documents").update(doc_payload).eq("id", doc_data["id"]).execute()
+        else:
+            res_ins = sb.table("documents").insert(doc_payload).execute()
+            if res_ins.data:
+                doc_data = res_ins.data[0]
+            else:
+                doc_data = doc_payload
+
+    client_name = session.get("client_name") or (doc_data.get("client_name") if doc_data else None) or "General Clients"
     pipeline = session["pipeline"]
     filename = os.path.basename(file_path)
 
@@ -343,13 +371,14 @@ async def approve_and_upload(session_id: str, template_type: str):
     if not res.get("success"):
         raise HTTPException(status_code=500, detail=res.get("error", "Drive upload failed"))
 
-    sb.table("documents").update({
-        "status": "saved",
-        "drive_url": res.get("drive_url"),
-        "drive_file_id": res.get("drive_file_id"),
-        "approved_at": _now(),
-        "updated_at": _now(),
-    }).eq("id", doc.data["id"]).execute()
+    if doc_data and doc_data.get("id"):
+        sb.table("documents").update({
+            "status": "saved",
+            "drive_url": res.get("drive_url"),
+            "drive_file_id": res.get("drive_file_id"),
+            "approved_at": _now(),
+            "updated_at": _now(),
+        }).eq("id", doc_data["id"]).execute()
 
     return {**res, "session_id": session_id, "template_type": template_type}
 

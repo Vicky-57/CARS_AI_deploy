@@ -4,8 +4,8 @@ test_supabase_crud.py — Inserts a test lead & project into Supabase
 import os
 import httpx
 
-SUPABASE_URL = "https://wvzulyxzuntjnzdykstt.supabase.co"
-SUPABASE_SECRET_KEY = "sb_secret_qM2kIa6iLOXbv_JAUEXNTA_YLbxemoo"
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://wvzulyxzuntjnzdykstt.supabase.co")
+SUPABASE_SECRET_KEY = os.getenv("SUPABASE_SECRET_KEY", "")
 
 headers = {
     "apikey": SUPABASE_SECRET_KEY,
