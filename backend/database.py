@@ -7,5 +7,6 @@ _supabase_client: Client | None = None
 def get_supabase() -> Client:
     global _supabase_client
     if _supabase_client is None:
-        _supabase_client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SECRET_KEY)
+        key = getattr(settings, "SUPABASE_PUBLISHABLE_KEY", None) or getattr(settings, "SUPABASE_SECRET_KEY", "")
+        _supabase_client = create_client(settings.SUPABASE_URL, key)
     return _supabase_client
