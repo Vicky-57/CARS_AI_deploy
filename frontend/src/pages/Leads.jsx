@@ -113,19 +113,18 @@ export default function Leads() {
   });
 
   const intentBadge = (l) => {
-    const i = l.intent || '';
+    const i = (l.intent || '').toUpperCase();
     const notes = l.notes || '';
     const isRepeat = notes.includes('REPEAT CLIENT') || notes.includes('Repeat Client');
     const isFollowup = notes.includes('Follow-up Message');
+    const isSell = i.includes('SELL');
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
-        {i === 'BUY' || i === 'BUY_INTENT' ? (
-          <span className="badge badge-buy">Buy Intent</span>
-        ) : i === 'SELL' || i === 'SELL_INTENT' ? (
+        {isSell ? (
           <span className="badge badge-sell">Sell Intent</span>
         ) : (
-          <span className="badge badge-new">New Inquiry</span>
+          <span className="badge badge-buy">Buy Intent</span>
         )}
         {isRepeat && (
           <span className="badge" style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', fontWeight: 700 }}>
@@ -139,6 +138,16 @@ export default function Leads() {
         )}
       </div>
     );
+  };
+
+  const getInquiryDetailsDisplay = (l) => {
+    if (l.subject) return l.subject;
+    if (l.notes) {
+      const line = l.notes.split('\n')[0].replace(/^Subject:\s*/i, '').trim();
+      if (line) return line;
+    }
+    if (l.message) return l.message.slice(0, 60);
+    return 'Direct Vehicle Inquiry';
   };
 
   const getInitials = (name) => {
@@ -242,6 +251,7 @@ export default function Leads() {
                   <th>Contact Info</th>
                   <th>Vehicle</th>
                   <th>Pipeline Intent</th>
+                  <th>Inquiry Details</th>
                   <th>Channel</th>
                   <th>Created</th>
                   <th style={{ textAlign: 'right', paddingRight: 24 }}>Actions</th>
@@ -300,6 +310,11 @@ export default function Leads() {
                       )}
                     </td>
                     <td>{intentBadge(lead)}</td>
+                    <td>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={getInquiryDetailsDisplay(lead)}>
+                        {getInquiryDetailsDisplay(lead)}
+                      </div>
+                    </td>
                     <td>
                       <span className={`badge ${lead.channel === 'WHATSAPP' ? 'badge-whatsapp' : lead.channel === 'EMAIL' ? 'badge-email' : 'badge-manual'}`}>
                         {lead.channel || 'Manual'}

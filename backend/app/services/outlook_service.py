@@ -632,8 +632,10 @@ async def poll_outlook_inbound_emails() -> List[Dict]:
                             raw_intent = lead_rec.data[0].get("intent", "INQUIRY")
                             intent = raw_intent.replace("_INTENT", "")
 
-                    if not intent:
-                        intent = "INQUIRY"
+                    if not intent or intent == "INQUIRY":
+                        intent = "BUY"
+
+                    strict_intent_str = "SELL_INTENT" if intent == "SELL" else "BUY_INTENT"
 
                     # ── 6. Record inbound email ───────────────────────────────
                     pipeline = "SELL" if intent == "SELL" else "BUY"
@@ -651,7 +653,7 @@ async def poll_outlook_inbound_emails() -> List[Dict]:
                             new_lead = sb.table("leads").insert({
                                 "name": sender_name or sender_email,
                                 "email": sender_email,
-                                "intent": f"{intent}_INTENT",
+                                "intent": strict_intent_str,
                                 "channel": "STRATO_EMAIL",
                                 "status": "NEW",
                                 "qualification_stage": "uncontacted",
