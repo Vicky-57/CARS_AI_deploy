@@ -44,11 +44,14 @@ function getInitials(name) {
   return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 }
 
+const PAGE_SIZE = 10;
+
 export default function Deals() {
   const [deals, setDeals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDeal, setSelectedDeal] = useState(null);
   const [search, setSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Modals state
   const [showTimeModal, setShowTimeModal] = useState(false);
@@ -160,6 +163,21 @@ export default function Deals() {
     (d.target_vehicle || '').toLowerCase().includes(search.toLowerCase())
   );
 
+  // Reset to page 1 whenever search changes
+  useEffect(() => { setCurrentPage(1); }, [search]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  // Build page number array (max 5 buttons around current)
+  const getPageNumbers = () => {
+    const pages = [];
+    const start = Math.max(1, currentPage - 2);
+    const end = Math.min(totalPages, currentPage + 2);
+    for (let i = start; i <= end; i++) pages.push(i);
+    return pages;
+  };
+
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div className="page-header" style={{ alignItems: 'flex-end', marginBottom: 32 }}>
@@ -204,7 +222,7 @@ export default function Deals() {
                 <div style={{ fontWeight: 500, fontSize: '0.9rem' }}>No deals found</div>
               </div>
             ) : (
-              filtered.map(deal => {
+              paginated.map(deal => {
                 const isSelected = selectedDeal?.id === deal.id;
                 return (
                   <div 
@@ -239,6 +257,74 @@ export default function Deals() {
               })
             )}
           </div>
+
+          {/* ── Pagination Bar ── */}
+          {filtered.length > PAGE_SIZE && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '12px 16px',
+              borderTop: '1px solid var(--border)',
+              background: 'var(--surface)',
+              flexWrap: 'wrap',
+              gap: 8
+            }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length}
+              </span>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  style={{
+                    padding: '4px 8px',
+                    borderRadius: 6,
+                    border: '1px solid var(--border)',
+                    background: currentPage === 1 ? 'var(--gray-50)' : 'var(--surface)',
+                    color: currentPage === 1 ? 'var(--text-muted)' : 'var(--text-primary)',
+                    fontWeight: 600,
+                    fontSize: '0.75rem',
+                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                  }}
+                >←</button>
+
+                {getPageNumbers().map(n => (
+                  <button
+                    key={n}
+                    onClick={() => setCurrentPage(n)}
+                    style={{
+                      padding: '4px 8px',
+                      borderRadius: 6,
+                      border: n === currentPage ? 'none' : '1px solid var(--border)',
+                      background: n === currentPage ? 'var(--brand-600)' : 'var(--surface)',
+                      color: n === currentPage ? '#ffffff' : 'var(--text-primary)',
+                      fontWeight: n === currentPage ? 700 : 600,
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                      minWidth: 28,
+                    }}
+                  >{n}</button>
+                ))}
+
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  style={{
+                    padding: '4px 8px',
+                    borderRadius: 6,
+                    border: '1px solid var(--border)',
+                    background: currentPage === totalPages ? 'var(--gray-50)' : 'var(--surface)',
+                    color: currentPage === totalPages ? 'var(--text-muted)' : 'var(--text-primary)',
+                    fontWeight: 600,
+                    fontSize: '0.75rem',
+                    cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                  }}
+                >→</button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* RIGHT: Deal Details & Logging */}
