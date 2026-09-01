@@ -33,7 +33,7 @@ export default function Communications() {
         api.getCommunications().catch(() => []),
         api.getLeads().catch(() => [])
       ]);
-      
+
       const leadEmailSet = new Set(existingLeads.map(l => (l.email || '').toLowerCase()));
       const initialConvertedMap = {};
 
@@ -68,9 +68,9 @@ export default function Communications() {
   const selectContact = async (c) => {
     setSelected(c);
     if (!c.lead_id) { setThread([c]); return; }
-    
+
     setThreadLoading(true);
-    try { 
+    try {
       const messages = await api.getCommunications({ lead_id: c.lead_id });
       setThread(messages.reverse());
     }
@@ -152,27 +152,27 @@ export default function Communications() {
           </div>
 
           <div className="comms-action-btns" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button 
-              className="btn" 
-              onClick={handleSyncEmails} 
+            <button
+              className="btn"
+              onClick={handleSyncEmails}
               disabled={pollingEmail}
-              style={{ 
-                flexShrink: 0, 
-                padding: '10px 16px', 
-                background: 'linear-gradient(135deg, #f47c3c, #e26a2c)', 
-                color: '#ffffff', 
-                border: 'none', 
-                borderRadius: 10, 
-                fontWeight: 700, 
-                fontSize: '0.85rem', 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 6, 
+              style={{
+                flexShrink: 0,
+                padding: '10px 16px',
+                background: 'linear-gradient(135deg, #f47c3c, #e26a2c)',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: 10,
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
                 boxShadow: '0 4px 12px rgba(244, 124, 60, 0.35)',
                 cursor: pollingEmail ? 'not-allowed' : 'pointer'
               }}
             >
-              <Mail size={14} /> 
+              <Mail size={14} />
               {pollingEmail ? 'Syncing Strato Inbox…' : 'Sync Strato Email'}
             </button>
 
@@ -186,137 +186,137 @@ export default function Communications() {
       {/* Large Hero Card commented out per request */}
 
       <div className={`split-panel ${selected ? 'thread-active' : ''}`}>
-          {/* Contact list */}
-          <div className="split-left">
-            <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 10, background: 'var(--surface)' }}>
-              <div className="search-bar" style={{ maxWidth: '100%' }}>
-                <Search size={13} />
-                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search messages & contacts…" />
-              </div>
+        {/* Contact list */}
+        <div className="split-left">
+          <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 10, background: 'var(--surface)' }}>
+            <div className="search-bar" style={{ maxWidth: '100%' }}>
+              <Search size={13} />
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search messages & contacts…" />
             </div>
+          </div>
 
-            {loading ? (
-              <div className="loading-spinner"><div className="spinner" /></div>
-            ) : filtered.length === 0 ? (
-              <div className="empty-state">
-                <MessageSquare size={24} />
-                <h3>No messages match filter</h3>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Try selecting another filter or clear search.</p>
-              </div>
-            ) : (
-              filtered.map(c => {
-                const av = getAvatar(c);
-                const isActive = selected?.id === c.id;
-                return (
-                  <div key={c.id} className={`contact-item${isActive ? ' active' : ''}`} onClick={() => selectContact(c)}>
-                    <div className={`contact-avatar ${av.cls}`}>{av.icon}</div>
-                    <div className="contact-info">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
-                        <span className="contact-name">{c.sender_name || c.sender_contact || 'Unknown'}</span>
-                        {channelBadge(c.channel)}
-                      </div>
-                      <div className="contact-preview">{c.body?.slice(0, 60) || c.subject || '—'}</div>
+          {loading ? (
+            <div className="loading-spinner"><div className="spinner" /></div>
+          ) : filtered.length === 0 ? (
+            <div className="empty-state">
+              <MessageSquare size={24} />
+              <h3>No messages match filter</h3>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Try selecting another filter or clear search.</p>
+            </div>
+          ) : (
+            filtered.map(c => {
+              const av = getAvatar(c);
+              const isActive = selected?.id === c.id;
+              return (
+                <div key={c.id} className={`contact-item${isActive ? ' active' : ''}`} onClick={() => selectContact(c)}>
+                  <div className={`contact-avatar ${av.cls}`}>{av.icon}</div>
+                  <div className="contact-info">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                      <span className="contact-name">{c.sender_name || c.sender_contact || 'Unknown'}</span>
+                      {channelBadge(c.channel)}
                     </div>
-                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', flexShrink: 0 }}>{formatTs(c.timestamp)}</div>
+                    <div className="contact-preview">{c.body?.slice(0, 60) || c.subject || '—'}</div>
                   </div>
-                );
-              })
-            )}
-          </div>
-
-          {/* Thread panel */}
-          <div className="split-right">
-            {!selected ? (
-              <div className="empty-state" style={{ height: '100%', justifyContent: 'center' }}>
-                <MessageSquare size={36} style={{ opacity: .2 }} />
-                <h3>Select a conversation</h3>
-                <p>Click a message thread to view full details & convert to Lead.</p>
-              </div>
-            ) : (
-              <>
-                <div className="thread-header">
-                  <button className="btn-icon show-on-mobile" style={{ marginRight: 8, padding: 4 }} onClick={() => setSelected(null)}>
-                    <ChevronLeft size={20} />
-                  </button>
-                  <div className={`contact-avatar ${getAvatar(selected).cls}`} style={{ width: 32, height: 32, fontSize: '0.72rem' }}>
-                    {getAvatar(selected).icon}
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{selected.sender_name || selected.sender_contact}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{selected.sender_contact}</div>
-                  </div>
-                  
-                  <button
-                    className={`btn ${convertedMap[selected.id] ? 'btn-success' : 'btn-primary'} btn-sm`}
-                    style={{ marginLeft: 'auto' }}
-                    onClick={() => handleConvertToLead(selected)}
-                    disabled={converting || convertedMap[selected.id]}
-                  >
-                    {convertedMap[selected.id] ? <CheckCircle2 size={13} /> : <Sparkles size={13} />}
-                    <span className="hide-on-mobile">{convertedMap[selected.id] ? 'Auto-Converted to Lead' : 'Convert to Lead (AI)'}</span>
-                    <span className="show-on-mobile">{convertedMap[selected.id] ? 'Converted' : 'Convert'}</span>
-                  </button>
+                  <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', flexShrink: 0 }}>{formatTs(c.timestamp)}</div>
                 </div>
-
-                <div className={selected.channel === 'WHATSAPP' ? 'wa-chat-bg' : 'email-thread-bg'}>
-                  {threadLoading ? (
-                    <div className="loading-spinner"><div className="spinner" /></div>
-                  ) : selected.channel === 'WHATSAPP' ? (
-                    thread.map(msg => (
-                      <div key={msg.id} className={`wa-bubble ${msg.is_inbound !== false ? 'inbound' : 'outbound'}`}>
-                        <div style={{ whiteSpace: 'pre-wrap' }}>{msg.body}</div>
-                        <div className="wa-time">
-                          {format(new Date(msg.timestamp), 'HH:mm')}
-                        </div>
-                        {msg.ai_summary && msg.is_inbound !== false && (
-                          <div style={{ fontSize: '0.7rem', color: 'var(--brand-600)', marginTop: 4, borderTop: '1px solid #f0f0f0', paddingTop: 6, fontWeight: 500 }}>
-                            ✨ {msg.ai_summary}
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    thread.map(msg => (
-                      <div key={msg.id} className="email-card" style={{ background: 'white', borderRadius: 12, padding: 20, marginBottom: 16, border: '1px solid var(--border)' }}>
-                        <div className="email-header-top" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
-                          <div>
-                            <div className="email-subject" style={{ fontWeight: 700, fontSize: '1rem' }}>{msg.subject || selected.subject || 'No Subject'}</div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, fontSize: '0.8rem' }}>
-                              <span className="email-sender" style={{ fontWeight: 600 }}>{msg.is_inbound !== false ? (msg.sender_name || 'Client') : 'CAR-AGENTS Assistant'}</span>
-                              <span className="email-contact" style={{ color: 'var(--text-muted)' }}>&lt;{msg.is_inbound !== false ? (msg.sender_contact || '') : 'info@car-agents.de'}&gt;</span>
-                            </div>
-                          </div>
-                          <div className="email-time" style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                            {format(new Date(msg.timestamp), 'MMM d, yyyy, h:mm a')}
-                          </div>
-                        </div>
-                        <div className="email-body-text" style={{ fontSize: '0.875rem', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{msg.body}</div>
-                        
-                        {(msg.ai_summary || selected.ai_summary || selected.summary) && msg.is_inbound !== false && (
-                          <div style={{
-                            marginTop: 16,
-                            padding: '12px 16px',
-                            background: 'rgba(59, 130, 246, 0.05)',
-                            borderRadius: 8,
-                            fontSize: '0.8rem',
-                            color: '#1e40af',
-                            border: '1px solid rgba(59, 130, 246, 0.2)',
-                            lineHeight: 1.5
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, marginBottom: 4, color: '#1e3a8a' }}>
-                              <Sparkles size={14} color="#1e3a8a" /> ✨ Internal AI Intent Summary:
-                            </div>
-                            {msg.ai_summary || selected.ai_summary || selected.summary}
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </>
-            )}
-          </div>
+              );
+            })
+          )}
         </div>
+
+        {/* Thread panel */}
+        <div className="split-right">
+          {!selected ? (
+            <div className="empty-state" style={{ height: '100%', justifyContent: 'center' }}>
+              <MessageSquare size={36} style={{ opacity: .2 }} />
+              <h3>Select a conversation</h3>
+              <p>Click a message thread to view full details & convert to Lead.</p>
+            </div>
+          ) : (
+            <>
+              <div className="thread-header">
+                <button className="btn-icon show-on-mobile" style={{ marginRight: 8, padding: 4 }} onClick={() => setSelected(null)}>
+                  <ChevronLeft size={20} />
+                </button>
+                <div className={`contact-avatar ${getAvatar(selected).cls}`} style={{ width: 32, height: 32, fontSize: '0.72rem' }}>
+                  {getAvatar(selected).icon}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{selected.sender_name || selected.sender_contact}</div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{selected.sender_contact}</div>
+                </div>
+
+                <button
+                  className={`btn ${convertedMap[selected.id] ? 'btn-success' : 'btn-primary'} btn-sm`}
+                  style={{ marginLeft: 'auto' }}
+                  onClick={() => handleConvertToLead(selected)}
+                  disabled={converting || convertedMap[selected.id]}
+                >
+                  {convertedMap[selected.id] ? <CheckCircle2 size={13} /> : <Sparkles size={13} />}
+                  <span className="hide-on-mobile">{convertedMap[selected.id] ? 'Auto-Converted to Lead' : 'Convert to Lead (AI)'}</span>
+                  <span className="show-on-mobile">{convertedMap[selected.id] ? 'Converted' : 'Convert'}</span>
+                </button>
+              </div>
+
+              <div className={selected.channel === 'WHATSAPP' ? 'wa-chat-bg' : 'email-thread-bg'}>
+                {threadLoading ? (
+                  <div className="loading-spinner"><div className="spinner" /></div>
+                ) : selected.channel === 'WHATSAPP' ? (
+                  thread.map(msg => (
+                    <div key={msg.id} className={`wa-bubble ${msg.is_inbound !== false ? 'inbound' : 'outbound'}`}>
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{msg.body}</div>
+                      <div className="wa-time">
+                        {format(new Date(msg.timestamp), 'HH:mm')}
+                      </div>
+                      {msg.ai_summary && msg.is_inbound !== false && (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--brand-600)', marginTop: 4, borderTop: '1px solid #f0f0f0', paddingTop: 6, fontWeight: 500 }}>
+                          ✨ {msg.ai_summary}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  thread.map(msg => (
+                    <div key={msg.id} className="email-card" style={{ background: 'white', borderRadius: 12, padding: 20, marginBottom: 16, border: '1px solid var(--border)' }}>
+                      <div className="email-header-top" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
+                        <div>
+                          <div className="email-subject" style={{ fontWeight: 700, fontSize: '1rem' }}>{msg.subject || selected.subject || 'No Subject'}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, fontSize: '0.8rem' }}>
+                            <span className="email-sender" style={{ fontWeight: 600 }}>{msg.is_inbound !== false ? (msg.sender_name || 'Client') : 'CAR-AGENTS Assistant'}</span>
+                            <span className="email-contact" style={{ color: 'var(--text-muted)' }}>&lt;{msg.is_inbound !== false ? (msg.sender_contact || '') : 'info@car-agents.de'}&gt;</span>
+                          </div>
+                        </div>
+                        <div className="email-time" style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                          {format(new Date(msg.timestamp), 'MMM d, yyyy, h:mm a')}
+                        </div>
+                      </div>
+                      <div className="email-body-text" style={{ fontSize: '0.875rem', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{msg.body}</div>
+
+                      {(msg.ai_summary || selected.ai_summary || selected.summary) && msg.is_inbound !== false && (
+                        <div style={{
+                          marginTop: 16,
+                          padding: '12px 16px',
+                          background: 'rgba(59, 130, 246, 0.05)',
+                          borderRadius: 8,
+                          fontSize: '0.8rem',
+                          color: '#1e40af',
+                          border: '1px solid rgba(59, 130, 246, 0.2)',
+                          lineHeight: 1.5
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, marginBottom: 4, color: '#1e3a8a' }}>
+                            <Sparkles size={14} color="#1e3a8a" /> ✨ Internal AI Intent Summary:
+                          </div>
+                          {msg.ai_summary || selected.ai_summary || selected.summary}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
