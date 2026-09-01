@@ -1,0 +1,18 @@
+[DRY RUN — NOT SENT]
+To: no-reply@business.amazon.de
+Subject: Re: Die Tech Week ist da: Sparen Sie kräftig bei Technikbedarf.
+Stage: q1_sent
+Intent: SELL
+In-Reply-To: <010201a05afb2ded-5a71123c-ee2f-4fe2-8afc-f42f9bc2277d-000000@eu-west-1.amazonses.com>
+
+Sehr geehrte/r Amazon Business,
+
+vielen Dank für Ihre Nachricht bei CAR-AGENTS!
+
+Damit wir Ihnen optimal helfen können, eine kurze Frage:
+
+Suchen Sie ein Fahrzeug zum **Kauf**, oder möchten Sie Ihr Fahrzeug **verkaufen**?
+
+Mit freundlichen Grüßen,
+CAR-AGENTS Team
+info@car-agents.de | www.car-agents.de
