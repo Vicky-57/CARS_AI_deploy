@@ -171,6 +171,17 @@ def _get_valid_access_token() -> Optional[str]:
         data["refresh_token"] = tokens["refresh_token"]
         _store_tokens(data)
         return data.get("access_token")
+    except urllib.error.HTTPError as he:
+        if he.code == 400:
+            logger.info("Google Drive refresh token is invalid or revoked. Resetting stored credentials.")
+            try:
+                sb = get_supabase()
+                sb.table("google_auth").delete().eq("id", AUTH_ROW_ID).execute()
+            except Exception:
+                pass
+        else:
+            logger.warning(f"Google Drive token refresh returned HTTP {he.code}: {he}")
+        return None
     except Exception as e:
-        logger.error(f"Error refreshing Google Drive access token: {str(e)}")
+        logger.warning(f"Could not refresh Google Drive token: {e}")
         return None

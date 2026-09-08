@@ -19,6 +19,7 @@ import email as email_lib
 import logging
 import os
 import urllib.request
+from html import escape as _h
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional
 from config import settings

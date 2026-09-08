@@ -6,12 +6,61 @@ import { format } from 'date-fns';
 function getAvatar(contact) {
   const ch = (contact.channel || '').toUpperCase();
   if (ch === 'WHATSAPP') return { cls: 'avatar-whatsapp', icon: <MessageCircle size={16} /> };
-  if (ch === 'EMAIL' || ch === 'OUTLOOK_EMAIL') return { cls: 'avatar-email', icon: <Mail size={16} /> };
+  if (ch === 'EMAIL' || ch === 'OUTLOOK_EMAIL' || ch === 'STRATO_EMAIL') return { cls: 'avatar-email', icon: <Mail size={16} /> };
   return { cls: 'avatar-default', icon: <User size={16} /> };
 }
 
 function formatTs(iso) {
   try { return format(new Date(iso), 'HH:mm'); } catch { return ''; }
+}
+
+const SPAM_PATTERNS = [
+  'facebookmail.com', 'service.tiktok.com', 'stripe.com', 'skool.com',
+  'amazon.de', 'business.amazon.de', 'commerzbank.com', 'paypal.de',
+  'rtm.autoscout24.com', 'trit.io', 'custcomm.dhl.de', 'service@strato.com',
+  'support@finanzcheckpro.de', 'edpvovo7.fqj', 'doctolib'
+];
+
+function isSpamMessage(c) {
+  const email = (c.sender_contact || '').toLowerCase();
+  const name = (c.sender_name || '').toLowerCase();
+  return SPAM_PATTERNS.some(p => email.includes(p) || name.includes(p));
+}
+
+function cleanText(raw) {
+  if (!raw) return '';
+  let str = String(raw).replace(/[\ufffd\uFFFD\u0000-\u0008\u000B\u000C\u000E-\u001F]+/g, ' ');
+  if (/<[a-z][\s\S]*>/i.test(str)) {
+    try {
+      const doc = new DOMParser().parseFromString(str, 'text/html');
+      doc.querySelectorAll('style, script, head, meta, link, noscript, svg').forEach(s => s.remove());
+      str = doc.body.textContent || doc.body.innerText || '';
+    } catch {
+      str = str.replace(/<style[\s\S]*?<\/style>/gi, '')
+               .replace(/<script[\s\S]*?<\/script>/gi, '')
+               .replace(/<[^>]+>/g, ' ');
+    }
+  }
+  return str.replace(/\s+/g, ' ').trim();
+}
+
+function cleanBodyDisplay(raw) {
+  if (!raw) return '—';
+  let str = String(raw).replace(/[\ufffd\uFFFD]+/g, ' ');
+  if (/<[a-z][\s\S]*>/i.test(str)) {
+    try {
+      const doc = new DOMParser().parseFromString(str, 'text/html');
+      doc.querySelectorAll('style, script, head, meta, link, noscript, svg').forEach(s => s.remove());
+      const clean = doc.body.innerText || doc.body.textContent || '';
+      return clean.replace(/\n\s*\n\s*\n+/g, '\n\n').trim();
+    } catch {
+      return str.replace(/<style[\s\S]*?<\/style>/gi, '')
+                .replace(/<script[\s\S]*?<\/script>/gi, '')
+                .replace(/<[^>]+>/g, ' ')
+                .replace(/\s+/g, ' ').trim();
+    }
+  }
+  return str.trim();
 }
 
 export default function Communications() {
@@ -23,6 +72,7 @@ export default function Communications() {
   const [converting, setConverting] = useState(false);
   const [convertedMap, setConvertedMap] = useState({});
   const [filter, setFilter] = useState('ALL');
+  const [showSpam, setShowSpam] = useState(false);
   const [search, setSearch] = useState('');
 
   const loadCommunications = async () => {
@@ -116,14 +166,29 @@ export default function Communications() {
     }
   };
 
+  const spamCount = contacts.filter(c => isSpamMessage(c)).length;
+
   const filtered = contacts
     .filter(c => {
+      const isSpam = isSpamMessage(c);
+      if (showSpam) {
+        if (!isSpam) return false;
+      } else {
+        if (isSpam) return false;
+      }
       if (filter === 'ALL') return true;
       if (filter === 'EMAIL') return c.channel === 'EMAIL' || c.channel === 'OUTLOOK_EMAIL' || c.channel === 'STRATO_EMAIL';
       if (filter === 'WHATSAPP') return c.channel === 'WHATSAPP';
       return c.channel === filter;
     })
-    .filter(c => !search || (c.sender_name || c.sender_contact || '').toLowerCase().includes(search.toLowerCase()));
+    .filter(c => {
+      if (!search) return true;
+      const q = search.toLowerCase();
+      const name = (cleanText(c.sender_name) || c.sender_contact || '').toLowerCase();
+      const subj = (cleanText(c.subject) || '').toLowerCase();
+      const body = (cleanText(c.body) || '').toLowerCase();
+      return name.includes(q) || subj.includes(q) || body.includes(q);
+    });
 
   const channelBadge = (ch) => {
     if (ch === 'WHATSAPP') return <span className="badge badge-whatsapp" style={{ fontSize: '0.6rem' }}>WA</span>;
@@ -150,6 +215,23 @@ export default function Communications() {
               }}>{f === 'ALL' ? 'All' : f}</button>
             ))}
           </div>
+
+          <button
+            onClick={() => setShowSpam(!showSpam)}
+            style={{
+              padding: '8px 14px',
+              borderRadius: 10,
+              fontWeight: 700,
+              fontSize: '0.82rem',
+              background: showSpam ? '#fee2e2' : '#f8fafc',
+              color: showSpam ? '#dc2626' : '#64748b',
+              border: showSpam ? '1px solid #fca5a5' : '1.5px solid #e2e8f0',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            {showSpam ? '← Back to Active Inbox' : `Filtered Spam (${spamCount})`}
+          </button>
 
           <div className="comms-action-btns" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button
@@ -183,8 +265,6 @@ export default function Communications() {
         </div>
       </div>
 
-      {/* Large Hero Card commented out per request */}
-
       <div className={`split-panel ${selected ? 'thread-active' : ''}`}>
         {/* Contact list */}
         <div className="split-left">
@@ -200,22 +280,26 @@ export default function Communications() {
           ) : filtered.length === 0 ? (
             <div className="empty-state">
               <MessageSquare size={24} />
-              <h3>No messages match filter</h3>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Try selecting another filter or clear search.</p>
+              <h3>{showSpam ? 'No filtered spam messages' : 'No messages match filter'}</h3>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                {showSpam ? 'Spam folder is clean.' : 'Try selecting another filter or clear search.'}
+              </p>
             </div>
           ) : (
             filtered.map(c => {
               const av = getAvatar(c);
               const isActive = selected?.id === c.id;
+              const displayName = cleanText(c.sender_name) || c.sender_contact || 'Unknown';
+              const preview = cleanText(c.body).slice(0, 65) || cleanText(c.subject) || '—';
               return (
                 <div key={c.id} className={`contact-item${isActive ? ' active' : ''}`} onClick={() => selectContact(c)}>
                   <div className={`contact-avatar ${av.cls}`}>{av.icon}</div>
                   <div className="contact-info">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
-                      <span className="contact-name">{c.sender_name || c.sender_contact || 'Unknown'}</span>
+                      <span className="contact-name">{displayName}</span>
                       {channelBadge(c.channel)}
                     </div>
-                    <div className="contact-preview">{c.body?.slice(0, 60) || c.subject || '—'}</div>
+                    <div className="contact-preview">{preview}</div>
                   </div>
                   <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', flexShrink: 0 }}>{formatTs(c.timestamp)}</div>
                 </div>
@@ -242,7 +326,7 @@ export default function Communications() {
                   {getAvatar(selected).icon}
                 </div>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{selected.sender_name || selected.sender_contact}</div>
+                  <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{cleanText(selected.sender_name) || selected.sender_contact}</div>
                   <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{selected.sender_contact}</div>
                 </div>
 
@@ -264,7 +348,7 @@ export default function Communications() {
                 ) : selected.channel === 'WHATSAPP' ? (
                   thread.map(msg => (
                     <div key={msg.id} className={`wa-bubble ${msg.is_inbound !== false ? 'inbound' : 'outbound'}`}>
-                      <div style={{ whiteSpace: 'pre-wrap' }}>{msg.body}</div>
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{cleanBodyDisplay(msg.body)}</div>
                       <div className="wa-time">
                         {format(new Date(msg.timestamp), 'HH:mm')}
                       </div>
@@ -280,9 +364,9 @@ export default function Communications() {
                     <div key={msg.id} className="email-card" style={{ background: 'white', borderRadius: 12, padding: 20, marginBottom: 16, border: '1px solid var(--border)' }}>
                       <div className="email-header-top" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
                         <div>
-                          <div className="email-subject" style={{ fontWeight: 700, fontSize: '1rem' }}>{msg.subject || selected.subject || 'No Subject'}</div>
+                          <div className="email-subject" style={{ fontWeight: 700, fontSize: '1rem' }}>{cleanText(msg.subject || selected.subject) || 'No Subject'}</div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, fontSize: '0.8rem' }}>
-                            <span className="email-sender" style={{ fontWeight: 600 }}>{msg.is_inbound !== false ? (msg.sender_name || 'Client') : 'CAR-AGENTS Assistant'}</span>
+                            <span className="email-sender" style={{ fontWeight: 600 }}>{msg.is_inbound !== false ? (cleanText(msg.sender_name) || 'Client') : 'CAR-AGENTS Assistant'}</span>
                             <span className="email-contact" style={{ color: 'var(--text-muted)' }}>&lt;{msg.is_inbound !== false ? (msg.sender_contact || '') : 'info@car-agents.de'}&gt;</span>
                           </div>
                         </div>
@@ -290,7 +374,7 @@ export default function Communications() {
                           {format(new Date(msg.timestamp), 'MMM d, yyyy, h:mm a')}
                         </div>
                       </div>
-                      <div className="email-body-text" style={{ fontSize: '0.875rem', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{msg.body}</div>
+                      <div className="email-body-text" style={{ fontSize: '0.875rem', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{cleanBodyDisplay(msg.body)}</div>
 
                       {(msg.ai_summary || selected.ai_summary || selected.summary) && msg.is_inbound !== false && (
                         <div style={{

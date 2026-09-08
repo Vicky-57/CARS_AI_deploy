@@ -22,7 +22,7 @@ import urllib.request
 import urllib.parse
 from typing import Dict, Optional
 
-from app.services.google_service import _get_valid_access_token
+from app.services.google_service import _get_valid_access_token, is_connected
 
 logger = logging.getLogger("gdrive_service")
 
@@ -85,6 +85,9 @@ def _get_or_create_root_folder() -> str:
 
 def get_customer_folder_url(customer_name: str, project_id: str) -> Optional[str]:
     """Fast, cached lookup of a customer's main Google Drive folder URL."""
+    if not is_connected():
+        return None
+
     cache_key = f"{str(project_id)[:8]}_{customer_name.strip().lower()}"
     if cache_key in _DRIVE_FOLDER_CACHE:
         return _DRIVE_FOLDER_CACHE[cache_key].get("customer_folder_url")
@@ -93,7 +96,7 @@ def get_customer_folder_url(customer_name: str, project_id: str) -> Optional[str
         struct = create_customer_folder_structure(customer_name, str(project_id), create_subfolders=False)
         return struct.get("customer_folder_url")
     except Exception as e:
-        logger.warning(f"Failed to fetch Drive folder for {customer_name}: {e}")
+        logger.debug(f"Could not fetch Drive folder for {customer_name}: {e}")
         return None
 
 
