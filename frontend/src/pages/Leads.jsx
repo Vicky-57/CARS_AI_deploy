@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Plus, Search, RefreshCw, Mail, Phone, Car, Tag, ShoppingCart, Sparkles, CheckCircle2, XCircle } from 'lucide-react';
+import { Users, Plus, Search, RefreshCw, Mail, Phone, Car, Tag, ShoppingCart, Sparkles, CheckCircle2, XCircle, ShieldAlert, RotateCcw, Trash2 } from 'lucide-react';
 import { api } from '../api/api';
 import LeadModal from '../components/LeadModal';
 
@@ -29,6 +29,7 @@ export default function Leads() {
   const [intentFilter, setIntentFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [convertingId, setConvertingId] = useState(null);
+  const [actioningId, setActioningId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [alertConfig, setAlertConfig] = useState({
     isOpen: false,
@@ -41,13 +42,38 @@ export default function Leads() {
   const loadLeads = async () => {
     setLoading(true);
     try {
-      const filters = intentFilter ? { intent: intentFilter } : {};
-      const data = await api.getLeads(filters);
+      const data = await api.getLeads({});
       setLeads(data || []);
     } catch (err) {
       console.error('Failed to load leads:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRestoreLead = async (lead) => {
+    setActioningId(lead.id);
+    try {
+      const cleanedNotes = (lead.notes || '').replace(/\[AUTO-FLAGGED:.*?\]/g, '').trim();
+      await api.updateLead(lead.id, { status: 'NEW', notes: cleanedNotes || null });
+      await loadLeads();
+    } catch (err) {
+      console.error('Failed to restore lead:', err);
+    } finally {
+      setActioningId(null);
+    }
+  };
+
+  const handleDeleteSpamLead = async (lead) => {
+    if (!window.confirm(`Permanently remove "${lead.name || lead.email}" from DB?`)) return;
+    setActioningId(lead.id);
+    try {
+      await api.deleteLead(lead.id);
+      await loadLeads();
+    } catch (err) {
+      console.error('Failed to delete spam lead:', err);
+    } finally {
+      setActioningId(null);
     }
   };
 
@@ -105,9 +131,20 @@ export default function Leads() {
     return () => {
       if (sub) sub.unsubscribe();
     };
-  }, [intentFilter]);
+  }, []);
+
+  const spamCount = leads.filter(l => l.status === 'SPAM').length;
 
   const filtered = leads.filter(l => {
+    const isSpam = l.status === 'SPAM';
+    if (intentFilter === 'SPAM') {
+      if (!isSpam) return false;
+    } else {
+      if (isSpam) return false;
+      if (intentFilter === 'SELL' && !(l.intent || '').toUpperCase().includes('SELL')) return false;
+      if (intentFilter === 'BUY' && !(l.intent || '').toUpperCase().includes('BUY')) return false;
+    }
+
     const query = search.toLowerCase();
     const name = (l.name || '').toLowerCase();
     const email = (l.email || '').toLowerCase();
@@ -187,11 +224,12 @@ export default function Leads() {
       </div>
 
       {/* Folder Tabs */}
-      <div style={{ display: 'flex', paddingLeft: 0, position: 'relative', zIndex: 10, marginBottom: 0 }}>
+      <div style={{ display: 'flex', paddingLeft: 0, position: 'relative', zIndex: 10, marginBottom: 0, overflowX: 'auto' }}>
         {[
           { id: '', label: 'All Inquiries', icon: Users },
           { id: 'SELL', label: 'Sell Intent', icon: Tag },
-          { id: 'BUY', label: 'Buy Intent', icon: ShoppingCart }
+          { id: 'BUY', label: 'Buy Intent', icon: ShoppingCart },
+          { id: 'SPAM', label: `Filtered (${spamCount})`, icon: ShieldAlert, badge: spamCount }
         ].map((tab) => {
           const isActive = intentFilter === tab.id;
           const Icon = tab.icon;
@@ -205,7 +243,7 @@ export default function Leads() {
                 border: 'none',
                 borderTopLeftRadius: 16,
                 borderTopRightRadius: 16,
-                color: isActive ? 'var(--brand-600)' : 'var(--text-secondary)',
+                color: isActive ? (tab.id === 'SPAM' ? '#ef4444' : 'var(--brand-600)') : 'var(--text-secondary)',
                 fontWeight: isActive ? 700 : 600,
                 cursor: 'pointer',
                 transition: 'all 0.2s',
@@ -214,7 +252,9 @@ export default function Leads() {
                 boxShadow: isActive ? '0 -4px 6px -4px rgba(0,0,0,0.05)' : 'none',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 8
+                gap: 8,
+                padding: '10px 18px',
+                whiteSpace: 'nowrap'
               }}
             >
               <Icon size={16} />
@@ -227,7 +267,9 @@ export default function Leads() {
       {/* Leads Table */}
       <div className="card" style={{ border: 'none', borderTopLeftRadius: intentFilter === '' ? 0 : 16, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)' }}>
         <div className="card-header customers-header-mobile" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
-          <span className="card-title" style={{ fontSize: '1.05rem', fontWeight: 700 }}>Inquiries ({filtered.length})</span>
+          <span className="card-title" style={{ fontSize: '1.05rem', fontWeight: 700 }}>
+            {intentFilter === 'SPAM' ? 'Auto-Filtered Newsletters & Spam' : 'Inquiries'} ({filtered.length})
+          </span>
 
           <div className="customers-actions-mobile" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <div className="search-bar customers-search-mobile" style={{ padding: '4px 12px', borderRadius: 24, background: 'var(--surface)', border: '1px solid var(--border)' }}>
@@ -255,9 +297,13 @@ export default function Leads() {
             <div style={{ width: 64, height: 64, background: 'var(--gray-50)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
               <Users size={32} color="var(--gray-400)" />
             </div>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>No leads found</h3>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
+              {intentFilter === 'SPAM' ? 'No spam or filtered items found' : 'No leads found'}
+            </h3>
             <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', maxWidth: 300, margin: '0 auto' }}>
-              Click "+ New Lead" to create a record or upload a document to auto-fill.
+              {intentFilter === 'SPAM'
+                ? 'Your inbox and database are completely clean.'
+                : 'Click "+ New Lead" to create a record or upload a document to auto-fill.'}
             </p>
           </div>
         ) : (
@@ -269,7 +315,7 @@ export default function Leads() {
                   <th style={{ paddingLeft: 24, paddingTop: 16, paddingBottom: 16 }}>Client</th>
                   <th>Contact Info</th>
                   <th>Vehicle</th>
-                  <th>Pipeline Intent</th>
+                  <th>{intentFilter === 'SPAM' ? 'Flag Reason' : 'Pipeline Intent'}</th>
                   <th>Inquiry Details</th>
                   <th>Channel</th>
                   <th>Created</th>
@@ -283,15 +329,20 @@ export default function Leads() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                         <div className="notranslate" style={{
                           width: 44, height: 44, borderRadius: '50%',
-                          background: 'linear-gradient(135deg, #fff3ec, #ffe4d6)',
-                          border: '1px solid #fed7aa',
+                          background: lead.status === 'SPAM' ? 'linear-gradient(135deg, #fee2e2, #fecaca)' : 'linear-gradient(135deg, #fff3ec, #ffe4d6)',
+                          border: lead.status === 'SPAM' ? '1px solid #fca5a5' : '1px solid #fed7aa',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '0.9rem', fontWeight: 800, color: '#ea580c',
+                          fontSize: '0.9rem', fontWeight: 800, color: lead.status === 'SPAM' ? '#dc2626' : '#ea580c',
                           boxShadow: '0 2px 8px rgba(234, 88, 12, 0.1)', flexShrink: 0
                         }}>
                           {getInitials(lead.name || lead.email)}
                         </div>
-                        <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>{lead.name || 'Unknown Lead'}</div>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>{lead.name || 'Unknown Lead'}</div>
+                          {lead.status === 'SPAM' && (
+                            <span style={{ fontSize: '0.72rem', color: '#dc2626', fontWeight: 600 }}>[Auto-Filtered Spam]</span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td>
@@ -328,14 +379,24 @@ export default function Leads() {
                         </div>
                       )}
                     </td>
-                    <td>{intentBadge(lead)}</td>
+                    <td>
+                      {lead.status === 'SPAM' ? (
+                        <span className="badge" style={{ background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', fontWeight: 600, fontSize: '0.75rem' }}>
+                          {lead.notes?.includes('[AUTO-FLAGGED:')
+                            ? lead.notes.match(/\[AUTO-FLAGGED:\s*([^\]]+)\]/)?.[1] || 'Spam Filter'
+                            : 'Filtered Spam'}
+                        </span>
+                      ) : (
+                        intentBadge(lead)
+                      )}
+                    </td>
                     <td>
                       <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={getInquiryDetailsDisplay(lead)}>
                         {getInquiryDetailsDisplay(lead)}
                       </div>
                     </td>
                     <td>
-                      <span className={`badge ${lead.channel === 'WHATSAPP' ? 'badge-whatsapp' : lead.channel === 'EMAIL' ? 'badge-email' : 'badge-manual'}`}>
+                      <span className={`badge ${lead.channel === 'WHATSAPP' ? 'badge-whatsapp' : lead.channel === 'EMAIL' || lead.channel === 'STRATO_EMAIL' ? 'badge-email' : 'badge-manual'}`}>
                         {lead.channel || 'Manual'}
                       </span>
                     </td>
@@ -348,14 +409,37 @@ export default function Leads() {
                       })() : '—'}
                     </td>
                     <td style={{ textAlign: 'right', paddingRight: 24 }}>
-                      <button
-                        className="btn btn-primary btn-sm"
-                        onClick={() => handleConvertLeadToProject(lead)}
-                        disabled={convertingId === lead.id}
-                        style={{ padding: '6px 12px', fontSize: '0.78rem', gap: 6 }}
-                      >
-                        <Sparkles size={13} /> Convert to Project
-                      </button>
+                      {lead.status === 'SPAM' ? (
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => handleRestoreLead(lead)}
+                            disabled={actioningId === lead.id}
+                            style={{ padding: '6px 10px', fontSize: '0.75rem', gap: 4 }}
+                            title="Restore to active leads"
+                          >
+                            <RotateCcw size={12} /> Restore
+                          </button>
+                          <button
+                            className="btn btn-sm"
+                            onClick={() => handleDeleteSpamLead(lead)}
+                            disabled={actioningId === lead.id}
+                            style={{ padding: '6px 10px', fontSize: '0.75rem', gap: 4, background: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5' }}
+                            title="Permanently remove from DB"
+                          >
+                            <Trash2 size={12} /> Delete
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          className="btn btn-primary btn-sm"
+                          onClick={() => handleConvertLeadToProject(lead)}
+                          disabled={convertingId === lead.id}
+                          style={{ padding: '6px 12px', fontSize: '0.78rem', gap: 6 }}
+                        >
+                          <Sparkles size={13} /> Convert to Project
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

@@ -51,14 +51,6 @@ def _validate_config() -> bool:
         print("   → Create a bot via @BotFather and add the token to Render env vars.")
         ok = False
 
-    # TELEGRAM_CHAT_ID is optional for polling but needed for outbound messages
-    chat_id = getattr(settings, "TELEGRAM_CHAT_ID", "")
-    if not chat_id:
-        print("⚠️  WARNING: TELEGRAM_CHAT_ID is not set.")
-        print("   → Bot can receive messages but CANNOT send proactive alerts (briefings, lead notifications).")
-        print("   → Add TELEGRAM_CHAT_ID to Render env vars to enable outbound messaging.")
-        print("   → To find your chat ID: send any message to @userinfobot on Telegram.")
-
     return ok
 
 
