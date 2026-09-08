@@ -62,7 +62,8 @@ MAIN_REPLY_KEYBOARD = {
         [{"text": "📰 Briefing"}, {"text": "🚗 Cars"}]
     ],
     "resize_keyboard": True,
-    "one_time_keyboard": False
+    "one_time_keyboard": False,
+    "is_persistent": True
 }
 
 

@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     # Supabase (PostgreSQL Schema v3.0)
     SUPABASE_URL: str = "https://wvzulyxzuntjnzdykstt.supabase.co"
     SUPABASE_SECRET_KEY: str = ""
+    SUPABASE_PUBLISHABLE_KEY: str = "sb_publishable_s5EKZcMXdOb6LBSF-I758A_-cS8v1Zm"
 
     # Telegram Master Agent
     TELEGRAM_BOT_TOKEN: str = ""
