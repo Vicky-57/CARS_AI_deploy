@@ -41,6 +41,8 @@ services:
         sync: false
       - key: GROQ_API_KEY
         sync: false
+      - key: OUTLOOK_ICS_URL
+        sync: false
 
   # ─── 2. Telegram Bot 24/7 Poller Worker ────────────────────────────────────
   - type: worker

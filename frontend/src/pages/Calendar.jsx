@@ -533,6 +533,31 @@ export default function CalendarPage() {
         </div>
       </div>
 
+      {/* Outlook Calendar not-configured banner */}
+      {!outlookConnected && !loading && (
+        <div style={{
+          background: 'linear-gradient(135deg, #fffbeb, #fef3c7)',
+          border: '1px solid #fcd34d',
+          borderRadius: 14,
+          padding: '14px 20px',
+          marginBottom: 20,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          boxShadow: '0 2px 8px rgba(251, 191, 36, 0.15)'
+        }}>
+          <AlertTriangle size={20} color="#d97706" style={{ flexShrink: 0 }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, color: '#92400e', fontSize: '0.9rem' }}>
+              Outlook Calendar is offline — ICS URL not configured
+            </div>
+            <div style={{ color: '#b45309', fontSize: '0.8rem', marginTop: 2 }}>
+              To sync Maxim's Outlook calendar: open Outlook Web → Calendar → Settings → Shared Calendars → Publish → copy the ICS link → add it as <code style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 5px', borderRadius: 4 }}>OUTLOOK_ICS_URL</code> in Render environment variables. Portal meetings still work normally.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Today's meetings strip */}
       {todayMeetings.length > 0 && (
         <div style={{ background: '#fffaf5', border: '1px solid #fed7aa', borderRadius: 16, padding: '16px 24px', marginBottom: 24, display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', boxShadow: '0 4px 12px rgba(234, 88, 12, 0.05)' }}>

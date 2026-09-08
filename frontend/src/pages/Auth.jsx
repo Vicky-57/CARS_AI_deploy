@@ -146,7 +146,7 @@ export default function Auth({ onLogin }) {
                     type="text"
                     value={userId}
                     onChange={e => setUserId(e.target.value)}
-                    placeholder="car01"
+                    placeholder="Enter User ID"
                     autoComplete="username"
                     autoFocus
                     style={{
@@ -226,10 +226,7 @@ export default function Auth({ onLogin }) {
               </button>
             </form>
 
-            {/* Hint */}
-            <div style={{ marginTop: 24, textAlign: 'center', fontSize: '0.78rem', color: '#64748b', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 20 }}>
-              Default: <span style={{ color: '#94a3b8', fontFamily: 'monospace' }}>car01</span> / <span style={{ color: '#94a3b8', fontFamily: 'monospace' }}>12345678</span>
-            </div>
+            {/* Hint removed for security */}
           </div>
         </div>
       </div>

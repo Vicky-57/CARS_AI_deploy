@@ -281,11 +281,74 @@ _INQUIRY_KEYWORDS = {
     "anfrage", "information", "beratung", "interesse", "interessiert",
     "was kostet", "wie funktioniert", "inquiry", "question", "info"
 }
+
+# ─── Comprehensive spam/automated email ignore list ───────────────────────────
 _IGNORE_KEYWORDS = {
+    # System / automated
     "rechnung", "zahlungsaufforderung", "newsletter", "unsubscribe",
     "bewerbung", "jobangebot", "noreply", "no-reply", "do-not-reply",
     "automated", "automatisch", "out of office", "abwesenheit",
-    "mailer-daemon", "delivery failed", "spam", "invoice"
+    "mailer-daemon", "delivery failed", "spam", "invoice",
+    "auto-reply", "autoreply", "automatic reply", "auto response",
+    "bounce", "undeliverable", "mail delivery",
+    # Social media notifications
+    "linkedin", "xing", "facebook", "instagram", "twitter", "tiktok",
+    "youtube", "whatsapp notification", "telegram notification",
+    "neue verbindung", "hat ihr profil", "jemand hat", "network update",
+    "hat eine anfrage", "hat kommentiert", "hat reagiert",
+    "someone viewed", "new connection", "mentioned you",
+    # Logistics / delivery
+    "dhl", "dpd", "hermes", "fedex", "ups", "gls", "post ag",
+    "sendungsverfolgung", "tracking", "paket", "sendung", "lieferung",
+    "liefertermin", "zugestellt", "abholbereit", "versandt",
+    "your order", "your shipment", "shipment confirmation",
+    "delivery notification", "package",
+    # Financial / banking
+    "kontoauszug", "lastschrift", "überweisung", "kontobewegung",
+    "paypal", "klarna", "stripe", "mollie", "sepa", "iban",
+    "kreditkarte", "abbuchung", "gutschrift", "mahnungen",
+    "payment received", "transaction", "billing", "statement",
+    # Booking / travel
+    "buchung", "reservierung", "booking.com", "airbnb", "check-in",
+    "hotel", "flug", "reise", "urlaub", "mietwagen",
+    "reservation confirmed", "booking confirmation",
+    # Marketing / promotional
+    "rabatt", "% rabatt", "% off", "promo", "coupon", "gutschein",
+    "sonderangebot", "sale", "black friday", "cyber monday",
+    "exklusiv für sie", "nur heute", "jetzt sparen", "limited offer",
+    "special offer", "flash sale", "angebote der woche",
+    # Subscriptions / SaaS
+    "your subscription", "ihre bestellung", "abo", "abonnement",
+    "trial expires", "free trial", "upgrade your plan",
+    # Notifications / confirmations (non-car)
+    "bestätigung", "verifizierung", "verify your", "confirm your email",
+    "passwort zurücksetzen", "password reset", "sicherheitscode",
+    "two-factor", "2fa", "einmalpasswort",
+    # Google / platform alerts
+    "google alerts", "google play", "google store", "app store",
+    "github", "jira", "confluence", "slack notification",
+    # Job / HR
+    "stellenangebot", "jobanfrage", "karriere", "recruiting",
+    "headhunter", "personalvermittlung", "job offer", "apply now",
+    # Real estate (not car-related)
+    "immobilien", "wohnung", "miete", "haus kaufen",
+}
+
+# ─── Known automated-only sender domains to always skip ──────────────────────
+_BLOCKED_SENDER_DOMAINS = {
+    "linkedin.com", "facebook.com", "instagram.com", "twitter.com",
+    "x.com", "xing.com", "youtube.com", "tiktok.com",
+    "paypal.com", "klarna.com", "stripe.com", "mollie.com",
+    "dhl.de", "dhl.com", "dpd.de", "hermes.de", "fedex.com", "ups.com",
+    "gls-group.eu", "deutschepost.de",
+    "booking.com", "airbnb.com", "expedia.com",
+    "google.com", "googlealerts.com", "accounts.google.com",
+    "github.com", "notifications.github.com",
+    "slack.com", "notion.so", "atlassian.com",
+    "mailchimp.com", "sendgrid.net", "constantcontact.com",
+    "hubspot.com", "salesforce.com",
+    "amazon.com", "amazon.de", "ebay.de", "ebay.com",
+    "noreply.de", "no-reply.de",
 }
 
 # ── German qualification email templates ──────────────────────────────────────
@@ -402,23 +465,70 @@ def _parse_email_date(msg) -> Optional[datetime]:
         return None
 
 
+def _strip_html(html_str: str) -> str:
+    """Strip HTML tags and decode HTML entities to plain text."""
+    import html
+    import re
+    # Replace common block-level tags with newlines
+    html_str = re.sub(r'<br\s*/?>', '\n', html_str, flags=re.IGNORECASE)
+    html_str = re.sub(r'</(p|div|tr|li|h[1-6])>', '\n', html_str, flags=re.IGNORECASE)
+    # Remove all remaining tags
+    html_str = re.sub(r'<[^>]+>', '', html_str)
+    # Decode HTML entities (e.g., &amp; &nbsp; &uuml; etc.)
+    html_str = html.unescape(html_str)
+    # Collapse multiple blank lines
+    html_str = re.sub(r'\n{3,}', '\n\n', html_str)
+    return html_str.strip()
+
+
+def _decode_part(part) -> str:
+    """Decode an email part with proper charset detection (handles UTF-8, latin-1, etc.)."""
+    raw = part.get_payload(decode=True)
+    if not raw:
+        return ""
+    charset = part.get_content_charset() or "utf-8"
+    # Normalise common charset aliases
+    charset = charset.lower().replace("windows-1252", "cp1252")
+    try:
+        return raw.decode(charset, errors="replace")
+    except (LookupError, UnicodeDecodeError):
+        # Fallback chain: try utf-8 → latin-1
+        for fallback in ("utf-8", "latin-1"):
+            try:
+                return raw.decode(fallback, errors="replace")
+            except Exception:
+                continue
+    return raw.decode("utf-8", errors="ignore")
+
+
 def _extract_body(msg) -> str:
-    """Extract plain text body from email message."""
-    body = ""
+    """
+    Extract readable plain text body from email message.
+    Priority: text/plain → strip(text/html) → fallback to raw payload.
+    Handles charset detection for German umlauts (latin-1 / iso-8859-1).
+    """
+    plain_body = ""
+    html_body = ""
+
     if msg.is_multipart():
         for part in msg.walk():
-            if part.get_content_type() == "text/plain":
-                try:
-                    body = part.get_payload(decode=True).decode("utf-8", errors="ignore")
-                except Exception:
-                    pass
-                break
+            ct = part.get_content_type()
+            if ct == "text/plain" and not plain_body:
+                plain_body = _decode_part(part)
+            elif ct == "text/html" and not html_body:
+                html_body = _decode_part(part)
     else:
-        try:
-            body = msg.get_payload(decode=True).decode("utf-8", errors="ignore")
-        except Exception:
-            pass
-    return body.strip()
+        ct = msg.get_content_type()
+        if ct == "text/html":
+            html_body = _decode_part(msg)
+        else:
+            plain_body = _decode_part(msg)
+
+    if plain_body.strip():
+        return plain_body.strip()
+    if html_body.strip():
+        return _strip_html(html_body).strip()
+    return ""
 
 
 def _send_or_log_reply(
@@ -595,6 +705,40 @@ async def poll_outlook_inbound_emails() -> List[Dict]:
                     # Skip our own outbound emails if they land in inbox
                     if sender_email.lower() == imap_user.lower():
                         mail.store(msg_id, "+FLAGS", "\\Seen")
+                        continue
+
+                    # ── 2b. Header-based spam detection ──────────────────────
+                    # Check industry-standard newsletter/bulk headers
+                    list_unsub = msg.get("List-Unsubscribe", "")
+                    precedence = msg.get("Precedence", "").lower()
+                    auto_submitted = msg.get("Auto-Submitted", "").lower()
+                    x_mailer = msg.get("X-Mailer", "").lower()
+                    x_bulk = msg.get("X-Bulk-Unsubscribe", "")
+
+                    is_bulk = (
+                        bool(list_unsub) or  # newsletters always have this
+                        precedence in ("bulk", "list", "junk") or
+                        (auto_submitted and auto_submitted != "no") or
+                        bool(x_bulk) or
+                        any(m in x_mailer for m in ("mailchimp", "sendinblue", "hubspot",
+                                                     "klaviyo", "constantcontact", "brevo"))
+                    )
+                    if is_bulk:
+                        mail.store(msg_id, "+FLAGS", "\\Seen")
+                        logger.debug(f"Skipped bulk/newsletter email from {sender_email} (header check)")
+                        continue
+
+                    # Check blocked sender domains
+                    sender_domain = sender_email.split("@")[-1].lower() if "@" in sender_email else ""
+                    if sender_domain in _BLOCKED_SENDER_DOMAINS:
+                        mail.store(msg_id, "+FLAGS", "\\Seen")
+                        logger.debug(f"Skipped blocked domain: {sender_domain}")
+                        continue
+
+                    # Skip very short bodies (automated pings / delivery receipts)
+                    if body and len(body.strip()) < 30:
+                        mail.store(msg_id, "+FLAGS", "\\Seen")
+                        logger.debug(f"Skipped too-short body email from {sender_email}")
                         continue
 
                     # ── 3. Deduplication check ────────────────────────────────
