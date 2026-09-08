@@ -1,0 +1,20 @@
+id,name,email,channel,created_at,status,intent,reason
+cb76bae8-aefe-4151-86bb-ce0cce776358,SIXT,no-reply@sixt.com,STRATO_EMAIL,2026-09-01,NEW,BUY_INTENT,Auto email address pattern: 'no-reply'
+3ee8abe1-85d9-490e-b2e9-39245a4ec563,Oliver auf Facebook,friendupdates@facebookmail.com,STRATO_EMAIL,2026-08-29,NEW,BUY_INTENT,Spam name pattern: 'facebook'
+9b95cf87-965f-428d-82d4-8222866fb7b5,TikTok,notification@service.tiktok.com,STRATO_EMAIL,2026-08-29,NEW,BUY_INTENT,Contains raw HTML email template
+d1e82f4b-b0d5-41f9-a864-d31339f5563c,Facebook,reminders@facebookmail.com,STRATO_EMAIL,2026-08-27,NEW,BUY_INTENT,Spam name pattern: 'facebook'
+77adafe5-0114-4607-9175-69d1b87b4530,Stripe,support@stripe.com,STRATO_EMAIL,2026-08-24,NEW,BUY_INTENT,Blocked domain: stripe.com
+0e0bcc03-bed1-40df-891a-fdf0ba6ee7d9,KI Creator Akademie (Skool),noreply@skool.com,STRATO_EMAIL,2026-08-12,NEW,BUY_INTENT,Auto email address pattern: 'noreply'
+d9e2e317-f432-4f2e-b4c5-b4afb1f99ef7,amazon.de,no-reply@amazon.de,STRATO_EMAIL,2026-08-06,NEW,BUY_INTENT,Blocked domain: amazon.de
+50035a68-1047-4ee0-9f20-24124204ac3d,Commerzbank AG,news@meinebank.commerzbank.com,STRATO_EMAIL,2026-08-06,NEW,SELL_INTENT,Contains raw HTML email template
+18f952b2-f47c-4329-b4ed-34b2dd79f264,mobile.de Parkplatz,noreply@dein.mobile.de,STRATO_EMAIL,2026-08-05,NEW,BUY_INTENT,Auto email address pattern: 'noreply'
+573683ca-7936-4e02-a194-f3999b3ac4b3,mobile.de,noreply@team.mobile.de,STRATO_EMAIL,2026-08-03,NEW,SELL_INTENT,Auto email address pattern: 'noreply'
+dec25d6c-920c-462d-a420-c9c0dd74f5ad,Google,no-reply@accounts.google.com,STRATO_EMAIL,2026-08-03,NEW,BUY_INTENT,Blocked domain: accounts.google.com
+d1290c3f-c448-4726-a75b-7563d5f27674,Amazon Business,no-reply@business.amazon.de,STRATO_EMAIL,2026-08-03,NEW,SELL_INTENT,Auto email address pattern: 'no-reply'
+fb982755-6402-46db-a0bc-4f9300f724c3,PayPal,service@paypal.de,STRATO_EMAIL,2026-07-31,NEW,SELL_INTENT,Auto email address pattern: 'service@'
+ce9f0d97-0820-4a4a-85a0-238045693eac,AutoScout24,no-reply@rtm.autoscout24.com,STRATO_EMAIL,2026-07-31,NEW,SELL_INTENT,Auto email address pattern: 'no-reply'
+c15aa2e4-b510-4b31-bd2e-286024beae99,Kleinanzeigen,noreply@kleinanzeigen.de,STRATO_EMAIL,2026-07-29,NEW,SELL_INTENT,Auto email address pattern: 'noreply'
+1457ae47-ccbe-4132-a890-eedc08bed2bb,no-reply@trit.io,no-reply@trit.io,STRATO_EMAIL,2026-07-29,NEW,SELL_INTENT,Blocked domain: trit.io
+c63e1e47-bd31-4699-845c-c6c384d0d610,DHL Paket,noreply@dhl.de,STRATO_EMAIL,2026-07-29,NEW,BUY_INTENT,Blocked domain: dhl.de
+657fce89-93fd-4a1b-9636-3b09681c3a2f,STRATO Service,service@strato.com,STRATO_EMAIL,2026-07-29,NEW,BUY_INTENT,Blocked domain: strato.com
+f41613b6-13b9-45c9-bc1e-f749d4bb1095,finanzcheckPRO,support@finanzcheckpro.de,STRATO_EMAIL,2026-07-29,NEW,SELL_INTENT,Blocked domain: finanzcheckpro.de
