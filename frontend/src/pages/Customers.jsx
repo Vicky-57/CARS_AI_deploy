@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Search, RefreshCw, Mail, Phone, Plus, X, Briefcase, Car, Trash2, Eye } from 'lucide-react';
+import { Users, UserPlus, Search, RefreshCw, Mail, Phone, Plus, X, Briefcase, Car, Trash2, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { api, supabase } from '../api/api';
 import CreateProjectModal from '../components/CreateProjectModal';
@@ -55,12 +55,12 @@ export default function Customers() {
 
       const addInteraction = (email, phone, name, type, item) => {
         // Normalize keys, prioritize email, then phone, then name
-        const key = (email || '').toLowerCase().trim() || 
-                    (phone || '').trim() || 
-                    (name || '').toLowerCase().trim();
-        
+        const key = (email || '').toLowerCase().trim() ||
+          (phone || '').trim() ||
+          (name || '').toLowerCase().trim();
+
         if (!key) return; // Skip if no identifiable info
-        
+
         if (!customerMap.has(key)) {
           customerMap.set(key, {
             id: key,
@@ -71,13 +71,13 @@ export default function Customers() {
             created_at: item.created_at
           });
         }
-        
+
         const customer = customerMap.get(key);
         // Fill in missing details if this interaction has them
         if (!customer.name && name) customer.name = name;
         if (!customer.email && email) customer.email = email;
         if (!customer.phone && phone) customer.phone = phone;
-        
+
         customer.interactions.push({ type, date: item.created_at || item.updated_at, details: item });
       };
 
@@ -151,7 +151,7 @@ export default function Customers() {
         intent: newCustomerForm.intent,
         channel: 'DIRECT_CALL',
         status: 'NEW',
-        notes: newCustomerForm.notes 
+        notes: newCustomerForm.notes
           ? `${newCustomerForm.notes}${vehicleDesc ? ` | Vehicle: ${vehicleDesc}` : ''}`
           : (vehicleDesc ? `Vehicle requested/offered: ${vehicleDesc}` : 'Added directly from Customers Directory')
       });
@@ -194,14 +194,30 @@ export default function Customers() {
       {selectedCustomerDetail && (
         <ContactDetailPanel
           customer={selectedCustomerDetail}
+          getCustomerCar={getCustomerCar}
           onClose={() => setSelectedCustomerDetail(null)}
+          onDelete={(e) => handleDeleteCustomer(selectedCustomerDetail, e)}
+          onLaunchProject={() => {
+            const c = selectedCustomerDetail;
+            setSelectedCustomerDetail(null);
+            setNewCustomerForm({
+              name: c.name || '',
+              email: c.email || '',
+              phone: c.phone || '',
+              intent: 'BUY',
+              vehicle: getCustomerCar(c) || '',
+              year: '',
+              notes: ''
+            });
+            setIsCreateProjectOpen(true);
+          }}
         />
       )}
 
       {/* Frappe Header */}
       <div className="page-header">
         <div className="page-header-left">
-          <h1 className="page-title">Contacts</h1>
+          <h1 className="page-title">Customers</h1>
           <p className="page-subtitle">Manage client relationships, contact records, and active deal histories.</p>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
@@ -496,138 +512,7 @@ export default function Customers() {
         defaultType={newCustomerForm.intent}
       />
 
-      {/* Customer Details / View Modal */}
-      {selectedCustomerDetail && (
-        <div className="modal-overlay" onClick={() => setSelectedCustomerDetail(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 640 }}>
-            <div className="modal-header" style={{ borderBottom: '1px solid var(--border)', paddingBottom: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <div className="notranslate" style={{
-                  width: 56, height: 56, borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #fff3ec, #ffe4d6)',
-                  border: '1px solid #fed7aa',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '1.2rem', fontWeight: 800, color: '#ea580c',
-                  boxShadow: '0 4px 12px rgba(234, 88, 12, 0.15)', flexShrink: 0
-                }}>
-                  {getInitials(selectedCustomerDetail.name, selectedCustomerDetail.email)}
-                </div>
-                <div>
-                  <h3 className="modal-title" style={{ margin: 0, fontSize: '1.25rem' }}>{selectedCustomerDetail.name || 'Unknown Client'}</h3>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2, display: 'flex', gap: 8, alignItems: 'center' }}>
-                    {selectedCustomerDetail.interactions.length > 1 ? (
-                      <span className="badge" style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', boxShadow: '0 2px 4px rgba(180, 83, 9, 0.05)' }}>
-                        <Star size={12} fill="currentColor" /> REPEAT CLIENT
-                      </span>
-                    ) : (
-                      <span className="badge badge-new" style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                        <UserPlus size={12} /> NEW CLIENT
-                      </span>
-                    )}
-                    <span>• {selectedCustomerDetail.interactions.length} Total Interaction(s)</span>
-                  </div>
-                </div>
-              </div>
-              <button className="btn-icon" onClick={() => setSelectedCustomerDetail(null)}><X size={18} /></button>
-            </div>
 
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 20, padding: 24 }}>
-              
-              {/* Contact Info Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div style={{ padding: '16px 20px', background: '#ffffff', borderRadius: 12, border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.5px' }}>Email Contact</div>
-                  <div style={{ fontSize: '0.95rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 10, wordBreak: 'break-all', color: '#0f172a' }}>
-                    <Mail size={16} color="#f47c3c" flexShrink={0} />
-                    {selectedCustomerDetail.email || '—'}
-                  </div>
-                </div>
-                <div style={{ padding: '16px 20px', background: '#ffffff', borderRadius: 12, border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.5px' }}>Phone Contact</div>
-                  <div style={{ fontSize: '0.95rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 10, color: '#0f172a' }}>
-                    <Phone size={16} color="#f47c3c" flexShrink={0} />
-                    {selectedCustomerDetail.phone || '—'}
-                  </div>
-                </div>
-              </div>
-
-              {/* Vehicle Interest Banner */}
-              {getCustomerCar(selectedCustomerDetail) && (
-                <div style={{ padding: '20px', background: 'linear-gradient(to right, #fff7ed, #ffffff)', borderRadius: 12, border: '1px solid #ffedd5', display: 'flex', alignItems: 'center', gap: 16, boxShadow: '0 2px 8px rgba(249, 115, 22, 0.05)' }}>
-                  <div style={{ padding: 12, background: '#ffedd5', borderRadius: 12 }}>
-                    <Car size={24} color="#ea580c" />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#ea580c', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Target Vehicle / Car Interest</div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1a1a1a', marginTop: 4 }}>{getCustomerCar(selectedCustomerDetail)}</div>
-                  </div>
-                </div>
-              )}
-
-              {/* Interaction Timeline History */}
-              <div>
-                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 12 }}>Client Interaction History</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 220, overflowY: 'auto', paddingRight: 4 }}>
-                  {selectedCustomerDetail.interactions.map((inter, idx) => {
-                    const isProject = inter.type === 'Project' || inter.type === 'PROJECT';
-                    const Icon = isProject ? Briefcase : UserPlus;
-                    const badgeClass = isProject ? 'badge-email' : 'badge-whatsapp';
-                    return (
-                      <div key={idx} style={{ padding: '14px 16px', background: '#ffffff', borderRadius: 12, border: '1px solid #e5e7eb', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
-                          <span className={`badge ${badgeClass}`} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                            <Icon size={12} /> {inter.type}
-                          </span>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8' }}>{(() => {
-                          const d = new Date(inter.date || Date.now());
-                          const day = String(d.getDate()).padStart(2, '0');
-                          const month = String(d.getMonth() + 1).padStart(2, '0');
-                          return `${day}/${month}/${d.getFullYear()}`;
-                        })()}</span>
-                      </div>
-                      <div style={{ color: '#334155', fontSize: '0.85rem', fontWeight: 500, lineHeight: 1.5 }}>{inter.details?.subject || inter.details?.notes || inter.details?.message?.slice(0, 100) || 'Inquiry logged'}</div>
-                    </div>
-                  )})}
-                </div>
-              </div>
-
-            </div>
-
-            <div className="modal-footer" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <button
-                className="btn btn-secondary"
-                onClick={(e) => handleDeleteCustomer(selectedCustomerDetail, e)}
-                style={{ color: '#ef4444', borderColor: '#fca5a5', gap: 6 }}
-              >
-                <Trash2 size={14} /> Delete Customer
-              </button>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button className="btn btn-secondary" onClick={() => setSelectedCustomerDetail(null)}>Close</button>
-                <button
-                  className="btn btn-primary"
-                  onClick={() => {
-                    const c = selectedCustomerDetail;
-                    setSelectedCustomerDetail(null);
-                    setNewCustomerForm({
-                      name: c.name || '',
-                      email: c.email || '',
-                      phone: c.phone || '',
-                      intent: 'BUY',
-                      vehicle: getCustomerCar(c) || '',
-                      year: '',
-                      notes: ''
-                    });
-                    setIsCreateProjectOpen(true);
-                  }}
-                  style={{ gap: 6 }}
-                >
-                  <Briefcase size={15} /> Launch Project / Deal
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

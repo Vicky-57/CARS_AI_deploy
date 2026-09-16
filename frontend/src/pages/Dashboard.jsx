@@ -134,84 +134,97 @@ export default function Dashboard() {
       {/* Main 2-Column Frappe Workspace Layout */}
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: 20 }}>
         
-        {/* Left: Recent Inbound Leads Table */}
-        <div className="table-container">
-          <div className="table-toolbar">
-            <div className="table-toolbar-left">
-              <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary)' }}>
-                Recent Inbound Inquiries
-              </span>
+        {/* Left: Recent Inbound Leads */}
+        <div className="card" style={{ overflow: 'hidden' }}>
+          {/* Header */}
+          <div className="card-header">
+            <div className="card-title">
+              <MessageSquare size={15} color="var(--text-secondary)" /> Recent Inbound Inquiries
             </div>
-            <div className="table-toolbar-right">
-              <NavLink to="/leads" className="btn btn-ghost btn-sm">
-                View all leads <ChevronRight size={13} />
-              </NavLink>
-            </div>
+            <NavLink to="/leads" className="btn btn-ghost btn-sm">
+              View all leads <ChevronRight size={13} />
+            </NavLink>
           </div>
 
           {loading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
               Loading recent inquiries...
             </div>
           ) : leads.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
-              <Users size={32} style={{ margin: '0 auto 10px', opacity: 0.4 }} />
-              <div style={{ fontWeight: 500 }}>No inquiries logged yet</div>
-              <div style={{ fontSize: '0.75rem', marginTop: 4 }}>Inbound emails from Strato and WhatsApp will appear here automatically.</div>
+              <Users size={32} style={{ margin: '0 auto 10px', opacity: 0.3 }} />
+              <div style={{ fontWeight: 500, fontSize: '0.85rem' }}>No inquiries logged yet</div>
+              <div style={{ fontSize: '0.75rem', marginTop: 4 }}>Inbound emails and WhatsApp messages will appear here.</div>
             </div>
           ) : (
-            <table className="frappe-table">
-              <thead>
-                <tr>
-                  <th>Client / Contact</th>
-                  <th>Intent</th>
-                  <th>Vehicle / Inquiry</th>
-                  <th style={{ textAlign: 'right' }}>Received</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leads.map((lead) => (
-                  <tr key={lead.id}>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: 'var(--radius-sm)',
-                          background: 'var(--bg-surface-subtle)',
-                          border: '1px solid var(--border)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                          color: 'var(--text-primary)'
-                        }}>
-                          {getInitials(lead.name || lead.email)}
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                            {lead.name || 'Anonymous Lead'}
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                            {lead.email || lead.phone || 'No direct contact'}
-                          </div>
-                        </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {leads.map((lead, idx) => {
+                // Truncate notes — strip HTML tags first
+                const rawNote = lead.car_details || lead.notes || '';
+                const cleanNote = rawNote.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+                const shortNote = cleanNote.length > 80 ? cleanNote.slice(0, 80) + '…' : cleanNote;
+
+                return (
+                  <div
+                    key={lead.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 14,
+                      padding: '13px 18px',
+                      borderBottom: idx < leads.length - 1 ? '1px solid var(--border)' : 'none',
+                      transition: 'background 0.12s',
+                      cursor: 'default',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    {/* Avatar */}
+                    <div style={{
+                      width: 36, height: 36, borderRadius: '50%',
+                      background: 'var(--bg-surface-subtle)',
+                      border: '1px solid var(--border)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '0.72rem', fontWeight: 700,
+                      color: 'var(--text-primary)', flexShrink: 0,
+                    }}>
+                      {getInitials(lead.name || lead.email)}
+                    </div>
+
+                    {/* Name + contact */}
+                    <div style={{ flex: '0 0 180px', minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {lead.name || 'Anonymous Lead'}
                       </div>
-                    </td>
-                    <td>{intentBadge(lead.intent)}</td>
-                    <td>
-                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-                        {lead.car_details || lead.notes || '—'}
-                      </span>
-                    </td>
-                    <td style={{ textAlign: 'right', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 2 }}>
+                        {lead.email || lead.phone || 'No contact info'}
+                      </div>
+                    </div>
+
+                    {/* Intent badge */}
+                    <div style={{ flex: '0 0 90px' }}>
+                      {intentBadge(lead.intent)}
+                    </div>
+
+                    {/* Vehicle / Inquiry note */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {shortNote ? (
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                          {shortNote}
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>—</span>
+                      )}
+                    </div>
+
+                    {/* Time */}
+                    <div style={{ flex: '0 0 72px', textAlign: 'right', fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                       {timeAgo(lead.created_at)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
 

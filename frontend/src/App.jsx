@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, FolderKanban, MessageSquare,
   FileText, Calendar, Car, User, Briefcase, Search,
   ChevronsUpDown, LogOut, Settings, Menu, PanelLeftClose, PanelLeft,
-  ChevronRight, Command, Bell, HelpCircle
+  ChevronRight, ChevronLeft, Command, Bell, HelpCircle
 } from 'lucide-react';
 
 import Dashboard from './pages/Dashboard';
@@ -20,7 +20,7 @@ import Profile from './pages/Profile';
 import SellForm from './pages/SellForm';
 import BuyForm from './pages/BuyForm';
 import { api, supabase } from './api/api';
-import GoogleTranslate from './components/GoogleTranslate';
+// import GoogleTranslate from './components/GoogleTranslate';
 
 const NAV = [
   {
@@ -173,6 +173,21 @@ function Sidebar({ online, onLogout, userProfile, isOpen, onClose, isCollapsed, 
         )}
       </div>
 
+      {/* Floating edge collapse/expand toggle */}
+      <button
+        className="sidebar-edge-toggle"
+        onClick={() => {
+          if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+            onClose();
+          } else {
+            onToggleCollapse();
+          }
+        }}
+        title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+      >
+        {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+      </button>
+
       <nav className="sidebar-nav">
         {NAV.map(({ section, items }) => (
           <div key={section}>
@@ -188,6 +203,7 @@ function Sidebar({ online, onLogout, userProfile, isOpen, onClose, isCollapsed, 
                   if (isCollapsed && onExpand) onExpand();
                 }}
                 title={isCollapsed ? label : undefined}
+                data-tooltip={label}
               >
                 <Icon size={16} className="nav-icon" />
                 <span className="nav-item-text">{label}</span>
@@ -200,34 +216,47 @@ function Sidebar({ online, onLogout, userProfile, isOpen, onClose, isCollapsed, 
       <div className="sidebar-footer" style={{ position: 'relative' }}>
         <button
           className="nav-item user-profile-btn"
-          style={{ background: showProfileMenu ? 'var(--sidebar-hover)' : 'transparent' }}
+          style={{ background: showProfileMenu ? 'var(--sidebar-hover)' : 'transparent', gap: 10 }}
           onClick={() => setShowProfileMenu(!showProfileMenu)}
         >
-          <div style={{
-            width: 28,
-            height: 28,
-            borderRadius: 6,
-            background: 'rgba(255,255,255,0.12)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0
-          }}>
-            {userProfile?.picture ? (
-              <img src={userProfile.picture} alt="User" style={{ width: 24, height: 24, borderRadius: '50%' }} />
-            ) : (
-              <User size={15} color="#f1f5f9" />
-            )}
-          </div>
+          {/* Avatar: photo if available, else initials circle */}
+          {userProfile?.picture ? (
+            <img
+              src={userProfile.picture}
+              alt="User"
+              style={{ width: 34, height: 34, borderRadius: '50%', flexShrink: 0, objectFit: 'cover' }}
+            />
+          ) : (
+            <div style={{
+              width: 34,
+              height: 34,
+              borderRadius: '50%',
+              background: '#D4EDDA',
+              color: '#2E7D52',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700,
+              fontSize: '0.78rem',
+              flexShrink: 0,
+              letterSpacing: '0.02em',
+            }}>
+              {(() => {
+                const name = userProfile?.name || (userProfile?.email ? userProfile.email.split('@')[0] : 'VB');
+                return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+              })()}
+            </div>
+          )}
+
           <div className="user-info-text" style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
-            <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
+            <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.3 }}>
               {userProfile?.name || (userProfile?.email ? userProfile.email.split('@')[0] : 'Vikas Broker')}
             </div>
-            <div style={{ fontSize: '0.72rem', color: '#9ca3af', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.3 }}>
               {userProfile?.email || 'vikaspurohit105@gmail.com'}
             </div>
           </div>
-          <ChevronsUpDown size={14} color="#94a3b8" className="user-dropdown-icon" />
+          <ChevronsUpDown size={14} color="var(--text-muted)" className="user-dropdown-icon" />
         </button>
 
         {showProfileMenu && (
@@ -350,7 +379,7 @@ function AppRoutes({ isAuthenticated, online, userProfile, onLogin, onLogout }) 
     return (
       <>
         <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 9999 }}>
-          <GoogleTranslate />
+          {/* <GoogleTranslate /> */}
         </div>
         <Auth onLogin={onLogin} />
       </>
@@ -360,7 +389,7 @@ function AppRoutes({ isAuthenticated, online, userProfile, onLogin, onLogout }) 
   return (
     <>
       <div style={{ position: 'fixed', top: 14, right: 16, zIndex: 9999 }}>
-        <GoogleTranslate />
+        {/* <GoogleTranslate /> */}
       </div>
       <div className="portal-layout">
         <Sidebar 

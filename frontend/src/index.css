@@ -8,91 +8,91 @@
 /* ─── FRAPPE ESPRESSO DESIGN TOKENS ───────────────────────────────────────── */
 :root {
   /* Canvas & Surfaces */
-  --bg:              #f8f9fa; /* Frappe Desk neutral background */
-  --bg-canvas:       #f8f9fa;
-  --surface:         #ffffff; /* Clean white card surfaces */
-  --bg-surface:      #ffffff;
-  --surface-hover:   #fcfcfd;
-  --bg-surface-subtle: #f3f4f6; /* Secondary card background */
-  --bg-hover:        #f1f5f9; /* Subtle row hover */
-  --bg-active:       #e2e8f0;
+  --bg:              #FFFFFF;
+  --bg-canvas:       #FFFFFF;
+  --surface:         #FFFFFF;
+  --bg-surface:      #FFFFFF;
+  --surface-hover:   #EFEFEF;
+  --bg-surface-subtle: #F5F5F5;
+  --bg-hover:        #EFEFEF;
+  --bg-active:       #E9E9E9;
 
   /* Frappe Monochrome Neutral Palette */
-  --gray-50:         #f9fafb;
-  --gray-100:        #f3f4f6;
-  --gray-200:        #e5e7eb; /* Crisp 1px border */
-  --gray-300:        #d1d5db;
-  --gray-400:        #9ca3af;
-  --gray-500:        #6b7280; /* Secondary text */
-  --gray-600:        #4b5563; /* Subtitle / metadata text */
-  --gray-700:        #374151;
-  --gray-800:        #1f2937;
-  --gray-900:        #111827; /* Near black headlines */
+  --gray-50:         #FFFFFF;
+  --gray-100:        #F5F5F5;
+  --gray-200:        #E8E8E8;
+  --gray-300:        #E5E5E5;
+  --gray-400:        #B5B5B5;
+  --gray-500:        #999999;
+  --gray-600:        #999999;
+  --gray-700:        #666666;
+  --gray-800:        #333333;
+  --gray-900:        #333333;
 
   /* Text Typography */
-  --text-primary:    #111827;
-  --text-secondary:  #4b5563;
-  --text-muted:      #9ca3af;
-  --text-inverse:    #ffffff;
+  --text-primary:    #333333;
+  --text-secondary:  #666666;
+  --text-muted:      #999999;
+  --text-inverse:    #FFFFFF;
 
   /* Primary Accent & Action Colors (Frappe Solid Slate / Blue) */
-  --primary:         #18181b; /* Solid dark primary button */
-  --primary-hover:   #27272a;
-  --primary-text:    #ffffff;
-  --accent-blue:     #1754cf; /* Frappe signature blue */
-  --accent-blue-hover:#1244ab;
+  --primary:         #171717;
+  --primary-hover:   #333333;
+  --primary-text:    #FFFFFF;
+  --accent-blue:     #D900FF;
+  --accent-blue-hover:#B000CF;
 
   /* Frappe Status Badges (Desaturated Pastels) */
-  --success:         #047857;
-  --warning:         #b45309;
-  --danger:          #b91c1c;
-  --info:            #1d4ed8;
+  --success:         #22A06B;
+  --warning:         #D99000;
+  --danger:          #D64545;
+  --info:            #D900FF;
 
-  --status-green-bg:     #ecfdf5;
-  --status-green-text:   #047857;
-  --status-green-border: #a7f3d0;
+  --status-green-bg:     #E8F5EE;
+  --status-green-text:   #22A06B;
+  --status-green-border: #C1E6D3;
 
-  --status-blue-bg:      #eff6ff;
-  --status-blue-text:    #1d4ed8;
-  --status-blue-border:  #bfdbfe;
+  --status-blue-bg:      #FBE6FF;
+  --status-blue-text:    #D900FF;
+  --status-blue-border:  #F0B3FF;
 
-  --status-amber-bg:     #fffbeb;
-  --status-amber-text:   #b45309;
-  --status-amber-border: #fde68a;
+  --status-amber-bg:     #FFF8E6;
+  --status-amber-text:   #D99000;
+  --status-amber-border: #FBE099;
 
-  --status-purple-bg:    #faf5ff;
-  --status-purple-text:  #7e22ce;
-  --status-purple-border:#e9d5ff;
+  --status-purple-bg:    #FBE6FF;
+  --status-purple-text:  #D900FF;
+  --status-purple-border:#F0B3FF;
 
-  --status-red-bg:       #fef2f2;
-  --status-red-text:     #b91c1c;
-  --status-red-border:   #fecaca;
+  --status-red-bg:       #FAECEC;
+  --status-red-text:     #D64545;
+  --status-red-border:   #F0C4C4;
 
-  --status-gray-bg:      #f3f4f6;
-  --status-gray-text:    #4b5563;
-  --status-gray-border:  #e5e7eb;
+  --status-gray-bg:      #F5F5F5;
+  --status-gray-text:    #666666;
+  --status-gray-border:  #E8E8E8;
 
   /* Borders & Dividers */
-  --border:          #e5e7eb; /* Standard 1px crisp border */
-  --border-light:    #f3f4f6;
-  --border-dark:     #d1d5db;
-  --border-focus:    #18181b;
+  --border:          #E8E8E8;
+  --border-light:    #E8E8E8;
+  --border-dark:     #E5E5E5;
+  --border-focus:    #171717;
 
-  /* Sidebar (Frappe Desk Dark/Slate Sidebar) */
-  --sidebar-bg:      #111827;
-  --sidebar-border:  #1f2937;
-  --sidebar-text:    #9ca3af;
-  --sidebar-text-hover: #ffffff;
-  --sidebar-hover:   rgba(255, 255, 255, 0.08);
-  --sidebar-active-bg:  #1f2937;
-  --sidebar-active-text:#ffffff;
-  --sidebar-active:  #1f2937;
+  /* Sidebar (Frappe Desk Light Sidebar) */
+  --sidebar-bg:      #F7F7F7;
+  --sidebar-border:  #E5E5E5;
+  --sidebar-text:    #666666;
+  --sidebar-text-hover: #333333;
+  --sidebar-hover:   #EFEFEF;
+  --sidebar-active-bg:  #FFFFFF;
+  --sidebar-active-text:#333333;
+  --sidebar-active:  #E8E8E8;
   --sidebar-width:   240px;
 
   /* Desk Topbar */
   --topbar-height:   52px;
-  --topbar-bg:       #ffffff;
-  --topbar-border:   #e5e7eb;
+  --topbar-bg:       #FFFFFF;
+  --topbar-border:   #E8E8E8;
 
   /* Spacing & Radius */
   --radius-xs:       4px;
@@ -312,10 +312,41 @@ input, textarea, select {
   flex-shrink: 0;
   transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 30;
+  position: relative;
 }
 
 .sidebar.collapsed {
   --sidebar-width: 64px;
+}
+
+/* Floating edge toggle button */
+.sidebar-edge-toggle {
+  position: absolute;
+  right: -12px;
+  bottom: 80px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  border: 1px solid #E8E8E8;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666666;
+  cursor: pointer;
+  z-index: 50;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sidebar:hover .sidebar-edge-toggle {
+  opacity: 1;
+}
+
+.sidebar-edge-toggle:hover {
+  color: #171717;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
 }
 
 .sidebar-brand {
@@ -324,7 +355,6 @@ input, textarea, select {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--sidebar-border);
 }
 
 .sidebar-brand-logo {
@@ -336,7 +366,7 @@ input, textarea, select {
 .sidebar-brand-icon {
   width: 28px;
   height: 28px;
-  background: #2563eb;
+  background: #D900FF;
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
@@ -351,27 +381,27 @@ input, textarea, select {
 .sidebar-brand-name {
   font-size: 0.9rem;
   font-weight: 700;
-  color: #ffffff;
+  color: #333333;
   letter-spacing: -0.01em;
 }
 
 .sidebar-brand-sub {
   font-size: 0.68rem;
-  color: #9ca3af;
+  color: #999999;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .collapse-toggle {
-  color: #9ca3af;
+  color: #999999;
   padding: 4px;
   border-radius: var(--radius-sm);
   transition: color var(--transition), background-color var(--transition);
 }
 
 .collapse-toggle:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.08);
+  color: #333333;
+  background: #EFEFEF;
 }
 
 .sidebar-nav {
@@ -414,6 +444,7 @@ input, textarea, select {
   color: var(--sidebar-active-text);
   background: var(--sidebar-active-bg);
   font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 0 0 1px var(--border-light);
 }
 
 .nav-icon {
@@ -436,7 +467,7 @@ input, textarea, select {
 }
 
 .user-profile-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: #f3f4f6;
 }
 
 /* ─── BUTTONS (FRAPPE STYLE) ──────────────────────────────────────────────── */
@@ -1001,7 +1032,7 @@ select.form-select, select.select {
 }
 
 .stat-card {
-  background: var(--bg-surface);
+  background: var(--bg-surface-subtle);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 16px;
@@ -2030,4 +2061,257 @@ select.form-select, select.select {
 .show-on-mobile { display: none; }
 @media (max-width: 768px) {
   .show-on-mobile { display: flex; }
+}
+
+/* ─── COLLAPSED SIDEBAR TOOLTIPS ──────────────────────────────────────────── */
+.sidebar.collapsed .nav-item {
+  position: relative;
+  overflow: visible;
+}
+
+.sidebar.collapsed .nav-item[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: #171717;
+  color: #FFFFFF;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 9999;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  animation: tooltipFadeIn 0.12s ease forwards;
+}
+
+.sidebar.collapsed .nav-item[data-tooltip]:hover::before {
+  content: '';
+  position: absolute;
+  left: calc(100% + 4px);
+  top: 50%;
+  transform: translateY(-50%);
+  border-width: 5px 6px 5px 0;
+  border-style: solid;
+  border-color: transparent #171717 transparent transparent;
+  pointer-events: none;
+  z-index: 9999;
+  animation: tooltipFadeIn 0.12s ease forwards;
+}
+
+@keyframes tooltipFadeIn {
+  from { opacity: 0; transform: translateY(-50%) translateX(-4px); }
+  to   { opacity: 1; transform: translateY(-50%) translateX(0); }
+}
+
+/* ─── CONTACT DETAIL PANEL (Frappe CRM right-side) ────────────────────────── */
+.panel-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.15);
+  z-index: 200;
+  animation: backdropFadeIn 0.2s ease;
+}
+
+@keyframes backdropFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.crm-detail-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 440px;
+  background: #FFFFFF;
+  border-left: 1px solid var(--border);
+  box-shadow: -4px 0 24px rgba(0,0,0,0.08);
+  z-index: 201;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: panelSlideIn 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes panelSlideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+/* ── Panel top bar ── */
+.crm-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  background: #FFFFFF;
+}
+
+.crm-detail-header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.crm-detail-name {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.crm-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.crm-detail-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* ── Scrollable body ── */
+.crm-detail-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+/* ── Profile header block ── */
+.contact-profile-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-canvas);
+}
+
+.contact-profile-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #D4EDDA;
+  color: #2E7D52;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+
+.contact-profile-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.contact-profile-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.contact-profile-contact {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+/* ── Section blocks ── */
+.crm-section {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.crm-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 12px;
+}
+
+/* ── Fields grid ── */
+.crm-field-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.crm-field {
+  display: flex;
+  align-items: baseline;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border-light);
+  gap: 10px;
+}
+
+.crm-field:last-child {
+  border-bottom: none;
+}
+
+.crm-field-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  width: 130px;
+  flex-shrink: 0;
+}
+
+.crm-field-value {
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.crm-field-value.muted {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* ── Related list ── */
+.crm-related-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.crm-related-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  background: var(--bg-surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: background var(--transition);
+}
+
+.crm-related-item:hover {
+  background: var(--bg-hover);
+}
+
+@media (max-width: 640px) {
+  .crm-detail-panel {
+    width: 100vw;
+  }
 }
