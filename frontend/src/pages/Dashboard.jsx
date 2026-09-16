@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { NavLink } from 'react-router-dom';
 import {
   Users, FolderKanban, MessageSquare, Calendar,
-  ArrowUpRight, ArrowRight, Clock, TrendingUp, FileText, AlertTriangle, CheckCircle, ChevronRight
+  ArrowUpRight, ArrowRight, Clock, TrendingUp, FileText,
+  AlertTriangle, CheckCircle, ChevronRight, Plus, ExternalLink
 } from 'lucide-react';
 import { api } from '../api/api';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -17,12 +19,12 @@ export default function Dashboard() {
       try {
         const [summaryRes, leadsRes, meetingsRes] = await Promise.allSettled([
           api.getPipelineSummary(),
-          api.getLeads({}, 5),
-          api.getMeetings({}, 5),
+          api.getLeads({}, 6),
+          api.getMeetings({}, 4),
         ]);
 
         if (summaryRes.status === 'fulfilled') setSummary(summaryRes.value);
-        if (leadsRes.status === 'fulfilled') setLeads(leadsRes.value.slice(0, 5));
+        if (leadsRes.status === 'fulfilled') setLeads(leadsRes.value.slice(0, 6));
         if (meetingsRes.status === 'fulfilled') setMeetings(meetingsRes.value.slice(0, 4));
       } finally {
         setLoading(false);
@@ -31,58 +33,53 @@ export default function Dashboard() {
     fetchAll();
   }, []);
 
-  const stats = summary ? [
+  const stats = [
     {
-      label: 'New Leads',
-      value: summary.new_leads_24h,
-      icon: '/assets/customer.png',
-      color: 'orange',
-      trendValue: '12%',
-      trendText: '',
-      trend: 'up'
+      label: 'New Inquiries (24h)',
+      value: summary?.new_leads_24h ?? '—',
+      icon: Users,
+      trend: '+12%',
+      trendUp: true,
+      sub: 'vs last week'
     },
     {
       label: 'Active SELL Deals',
-      value: summary.active_sell_deals,
-      icon: '/assets/price-tag.png',
-      color: 'green',
-      trendValue: '4.5%',
-      trendText: 'this month',
-      trend: 'up'
+      value: summary?.active_sell_deals ?? '—',
+      icon: FolderKanban,
+      trend: '+4.5%',
+      trendUp: true,
+      sub: 'Vermittlung B2C'
     },
     {
       label: 'Active BUY Deals',
-      value: summary.active_buy_deals,
-      icon: '/assets/buy-button.png',
-      color: 'purple',
-      trendValue: '2.1%',
-      trendText: 'this month',
-      trend: 'neutral'
+      value: summary?.active_buy_deals ?? '—',
+      icon: FolderKanban,
+      trend: 'Steady',
+      trendUp: false,
+      sub: 'Beschaffung Passiv'
     },
     {
       label: 'Total Active Projects',
-      value: (summary.active_sell_deals || 0) + (summary.active_buy_deals || 0),
-      icon: '/assets/briefing.png',
-      color: 'amber',
-      trendValue: '8.4%',
-      trendText: 'this year',
-      trend: 'up'
+      value: summary ? ((summary.active_sell_deals || 0) + (summary.active_buy_deals || 0)) : '—',
+      icon: TrendingUp,
+      trend: '+8.4%',
+      trendUp: true,
+      sub: 'Active portfolio'
     },
-  ] : [
-    { label: 'New Leads', value: '—', icon: '/assets/customer.png', color: 'orange', trendValue: '', trendText: '', trend: 'neutral' },
-    { label: 'Active SELL Deals', value: '—', icon: '/assets/price-tag.png', color: 'green', trendValue: '', trendText: '', trend: 'neutral' },
-    { label: 'Active BUY Deals', value: '—', icon: '/assets/buy-button.png', color: 'purple', trendValue: '', trendText: '', trend: 'neutral' },
-    { label: 'Total Active Projects', value: '—', icon: '/assets/briefing.png', color: 'amber', trendValue: '', trendText: '', trend: 'neutral' },
   ];
 
   const intentBadge = (intent) => {
-    if (intent === 'BUY_INTENT' || intent === 'BUY') return <span className="badge badge-buy">Buy</span>;
-    if (intent === 'SELL_INTENT' || intent === 'SELL') return <span className="badge badge-sell">Sell</span>;
-    return <span className="badge badge-new">New</span>;
+    if (intent === 'BUY_INTENT' || intent === 'BUY') {
+      return <span className="badge badge-purple">Buy Intent</span>;
+    }
+    if (intent === 'SELL_INTENT' || intent === 'SELL') {
+      return <span className="badge badge-emerald">Sell Intent</span>;
+    }
+    return <span className="badge badge-blue">New Lead</span>;
   };
 
   const formatTime = (iso) => {
-    try { return format(new Date(iso), 'h:mm a'); } catch { return ''; }
+    try { return format(new Date(iso), 'HH:mm'); } catch { return '—'; }
   };
 
   const timeAgo = (iso) => {
@@ -95,218 +92,185 @@ export default function Dashboard() {
   };
 
   return (
-    <div style={{ paddingBottom: 40 }}>
-      <div className="page-header" style={{ alignItems: 'flex-end' }}>
-        <div className="page-header-left">
-          <h1 style={{ fontSize: '1.85rem', fontWeight: 800, letterSpacing: '-0.5px', color: '#0f172a', margin: '0 0 6px 0' }}>Overview</h1>
-          <p style={{ fontSize: '0.9rem' }}>Here's what's happening in your brokerage today.</p>
+    <div style={{ maxWidth: 1280, margin: '0 auto' }}>
+      {/* Frappe Workspace Header */}
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Executive Workspace</h1>
+          <p className="page-subtitle">Real-time status overview of CAR-AGENTS brokerage operations.</p>
         </div>
-        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-          {format(new Date(), 'EEEE, dd/MM/yyyy')}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', background: 'var(--bg-surface)', padding: '6px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+            {format(new Date(), 'EEEE, dd. MMMM yyyy')}
+          </div>
+          <NavLink to="/leads" className="btn btn-primary">
+            <Plus size={14} /> New Lead
+          </NavLink>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="stats-grid" style={{ gap: 24, marginBottom: 40 }}>
-        {stats.map(({ label, value, icon: Icon, color, trendValue, trendText, trend }) => (
+      {/* Frappe Number Cards (Stats Grid) */}
+      <div className="stats-grid">
+        {stats.map(({ label, value, icon: Icon, trend, trendUp, sub }) => (
           <div key={label} className="stat-card">
-            {/* Top row: Label and Icon */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
-              <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: 4 }}>{label}</span>
-              <span className={`stat-icon ${color}`}>
-                {typeof Icon === 'string' ? <img src={Icon} alt="" /> : <Icon size={20} />}
-              </span>
-            </div>
-
-            {/* Middle row: Value */}
-            <div className="stat-value">
-              {loading
-                ? <span className="spinner" style={{ width: 28, height: 28, borderWidth: 3, marginTop: 4 }} />
-                : value}
-            </div>
-
-            {/* Bottom row: Trend and Arrow button */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {trendValue && (
-                  <span style={{
-                    display: 'flex', alignItems: 'center', gap: 4,
-                    background: trend === 'up' ? '#d1fae5' : '#f3f4f6',
-                    color: trend === 'up' ? '#047857' : '#4b5563',
-                    padding: '6px 12px', borderRadius: '24px', fontSize: '0.85rem', fontWeight: 800,
-                    boxShadow: trend === 'up' ? '0 2px 8px rgba(16, 185, 129, 0.15)' : 'none',
-                    border: trend === 'up' ? '1px solid #a7f3d0' : '1px solid #e5e7eb'
-                  }}>
-                    {trend === 'up' && <ArrowUpRight size={14} strokeWidth={3} />}
-                    {trendValue}
-                  </span>
-                )}
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>{trendText}</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span className="stat-label">{label}</span>
+              <div style={{ width: 28, height: 28, borderRadius: 'var(--radius-xs)', background: 'var(--bg-surface-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon size={14} color="var(--text-secondary)" />
               </div>
+            </div>
+            <div className="stat-value" style={{ marginTop: 8 }}>
+              {loading ? <span style={{ fontSize: '1.1rem', color: 'var(--text-muted)' }}>Loading...</span> : value}
+            </div>
+            <div className="stat-trend" style={{ color: trendUp ? 'var(--status-green-text)' : 'var(--text-secondary)' }}>
+              {trendUp && <ArrowUpRight size={12} />}
+              <span style={{ fontWeight: 600 }}>{trend}</span>
+              <span style={{ color: 'var(--text-muted)', marginLeft: 4 }}>{sub}</span>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Two-column layout */}
-      <div className="dashboard-grid">
-
-        {/* Recent Leads */}
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title">Recent Leads</span>
-            <a href="/leads" style={{ fontSize: '0.8rem', color: 'var(--brand-600)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-              View all <ChevronRight size={14} />
-            </a>
+      {/* Main 2-Column Frappe Workspace Layout */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: 20 }}>
+        
+        {/* Left: Recent Inbound Leads Table */}
+        <div className="table-container">
+          <div className="table-toolbar">
+            <div className="table-toolbar-left">
+              <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary)' }}>
+                Recent Inbound Inquiries
+              </span>
+            </div>
+            <div className="table-toolbar-right">
+              <NavLink to="/leads" className="btn btn-ghost btn-sm">
+                View all leads <ChevronRight size={13} />
+              </NavLink>
+            </div>
           </div>
+
           {loading ? (
-            <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
-              <div className="spinner" />
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+              Loading recent inquiries...
             </div>
           ) : leads.length === 0 ? (
-            <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
-              <div style={{ width: 48, height: 48, background: 'var(--gray-50)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-                <Users size={24} color="var(--gray-400)" />
-              </div>
-              <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>No leads yet</h3>
-              <p style={{ fontSize: '0.85rem' }}>Leads from Email & WhatsApp will appear here automatically.</p>
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+              <Users size={32} style={{ margin: '0 auto 10px', opacity: 0.4 }} />
+              <div style={{ fontWeight: 500 }}>No inquiries logged yet</div>
+              <div style={{ fontSize: '0.75rem', marginTop: 4 }}>Inbound emails from Strato and WhatsApp will appear here automatically.</div>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {leads.map((lead, idx) => (
-                <div key={lead.id} style={{
-                  display: 'flex', alignItems: 'center', padding: '16px 24px',
-                  borderBottom: idx === leads.length - 1 ? 'none' : '1px solid var(--border)',
-                  transition: 'background-color 0.2s', cursor: 'pointer',
-                  backgroundColor: 'transparent'
-                }}
-                  onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--gray-50)'}
-                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-                >
-                  <div className="notranslate" style={{
-                    width: 44, height: 44, borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #fff3ec, #ffe4d6)',
-                    border: '1px solid #fed7aa',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '0.9rem', fontWeight: 800, color: '#ea580c', flexShrink: 0,
-                    boxShadow: '0 2px 8px rgba(234, 88, 12, 0.1)'
-                  }}>
-                    {getInitials(lead.name || lead.email)}
-                  </div>
-                  <div style={{ flex: 1, marginLeft: 16, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {lead.name || 'Unknown Lead'}
+            <table className="frappe-table">
+              <thead>
+                <tr>
+                  <th>Client / Contact</th>
+                  <th>Intent</th>
+                  <th>Vehicle / Inquiry</th>
+                  <th style={{ textAlign: 'right' }}>Received</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leads.map((lead) => (
+                  <tr key={lead.id}>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 'var(--radius-sm)',
+                          background: 'var(--bg-surface-subtle)',
+                          border: '1px solid var(--border)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          color: 'var(--text-primary)'
+                        }}>
+                          {getInitials(lead.name || lead.email)}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {lead.name || 'Anonymous Lead'}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                            {lead.email || lead.phone || 'No direct contact'}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>{intentBadge(lead.intent)}</td>
+                    <td>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                        {lead.car_details || lead.notes || '—'}
                       </span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500, flexShrink: 0 }}>
-                        {timeAgo(lead.created_at)}
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {lead.email || lead.phone || 'No contact info'}
-                      </span>
-                      {intentBadge(lead.intent)}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                    </td>
+                    <td style={{ textAlign: 'right', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                      {timeAgo(lead.created_at)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
         </div>
 
-        {/* Right Column (Alerts & Meetings) */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-
-          {/* Inactive Deals Alert */}
-          {/* {summary && summary.inactive_deals && summary.inactive_deals.length > 0 && (
-            <div className="card" style={{ borderLeft: '4px solid var(--warning)' }}>
-              <div className="card-header">
-                <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <AlertTriangle size={16} color="var(--warning)" />
-                  Needs Attention ({summary.inactive_deals.length})
-                </span>
-              </div>
-              <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {summary.inactive_deals.slice(0, 3).map(deal => (
-                  <div key={deal.id} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--warning)', marginTop: 6, flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {deal.client_name || deal.id}
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 2 }}>
-                        Stale for {timeAgo(deal.updated_at)}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )} */}
-
-          {/* Today's Meetings */}
+        {/* Right: Today's Schedule & Quick Actions */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          
+          {/* Today's Schedule Card */}
           <div className="card">
             <div className="card-header">
-              <span className="card-title">Today's Schedule</span>
-              <a href="/calendar" style={{ fontSize: '0.8rem', color: 'var(--brand-600)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 2 }}>
-                Calendar <ChevronRight size={14} />
-              </a>
+              <div className="card-title">
+                <Calendar size={15} color="var(--text-secondary)" /> Today's Appointments
+              </div>
+              <NavLink to="/calendar" className="btn btn-ghost btn-sm">
+                Open Calendar <ChevronRight size={13} />
+              </NavLink>
             </div>
-            <div className="card-body" style={{ padding: '20px' }}>
+            <div className="card-body" style={{ padding: '14px 18px' }}>
               {loading ? (
-                <div style={{ padding: 20, display: 'flex', justifyContent: 'center' }}>
-                  <div className="spinner" />
-                </div>
+                <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)' }}>Loading schedule...</div>
               ) : meetings.length === 0 ? (
-                <div style={{ padding: '30px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  <div style={{ width: 40, height: 40, background: 'var(--brand-50)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
-                    <Calendar size={20} color="var(--brand-500)" />
-                  </div>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 500 }}>Your day is clear!</div>
+                <div style={{ padding: '24px 10px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <div style={{ fontWeight: 500, fontSize: '0.85rem' }}>No meetings scheduled for today</div>
+                  <div style={{ fontSize: '0.75rem', marginTop: 4 }}>Sync with Outlook ICS in Settings to auto-import your day.</div>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {meetings.map((m, idx) => (
-                    <div key={m.name || idx} style={{
-                      display: 'flex', gap: 14, alignItems: 'center', padding: '14px 18px',
-                      background: '#ffffff', borderRadius: 12, border: '1px solid #e5e7eb',
-                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'pointer',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-                    }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = '#fed7aa'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(249,115,22,0.08)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+                    <div
+                      key={m.name || idx}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        padding: '10px 12px',
+                        background: 'var(--bg-surface-subtle)',
+                        borderRadius: 'var(--radius-sm)',
+                        border: '1px solid var(--border)'
+                      }}
                     >
                       <div style={{
-                        background: 'linear-gradient(135deg, #fff3ec, #ffe4d6)', borderRadius: 8,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        border: '1px solid #fed7aa', flexShrink: 0, padding: '8px 14px',
-                        boxShadow: '0 2px 4px rgba(234, 88, 12, 0.05)'
+                        padding: '4px 8px',
+                        background: 'var(--bg-surface)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--radius-xs)',
+                        fontWeight: 700,
+                        fontSize: '0.78rem',
+                        color: 'var(--text-primary)'
                       }}>
-                        <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#ea580c', letterSpacing: '0.5px' }}>
-                          {formatTime(m.starts_on || m.start_time)}
+                        {formatTime(m.starts_on || m.start_time)}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: '0.82rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {m.subject || m.title || 'Client Appointment'}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                          {m.location || 'Mindelstetten Office'}
                         </div>
                       </div>
-                      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                        <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 4 }}>
-                          {m.subject || m.title}
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                          {(m.event_type === 'Private' || m.location_type === 'ONLINE') ? (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#e0f2fe', color: '#0369a1', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>
-                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#0284c7' }} /> Online
-                            </span>
-                          ) : (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#fef3c7', color: '#b45309', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>
-                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#d97706' }} /> Onsite
-                            </span>
-                          )}
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <Clock size={12} style={{ opacity: 0.7 }} />
-                            {formatDistanceToNow(new Date(m.starts_on || m.start_time), { addSuffix: true })}
-                          </span>
-                        </div>
-                      </div>
+                      <span className="badge badge-emerald">Confirmed</span>
                     </div>
                   ))}
                 </div>
@@ -314,7 +278,60 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* Frappe Quick Action Links Card */}
+          <div className="card">
+            <div className="card-header">
+              <div className="card-title">Quick Operations</div>
+            </div>
+            <div className="card-body" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+              <NavLink
+                to="/projects"
+                className="btn btn-secondary"
+                style={{ justifyContent: 'flex-start', padding: '10px 12px', height: 'auto', flexDirection: 'column', alignItems: 'flex-start' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  <FolderKanban size={14} /> Active Deals
+                </div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>Kanban pipeline & stages</div>
+              </NavLink>
+
+              <NavLink
+                to="/contracts"
+                className="btn btn-secondary"
+                style={{ justifyContent: 'flex-start', padding: '10px 12px', height: 'auto', flexDirection: 'column', alignItems: 'flex-start' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  <FileText size={14} /> Contracts
+                </div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>1-Click PDF generation</div>
+              </NavLink>
+
+              <NavLink
+                to="/customers"
+                className="btn btn-secondary"
+                style={{ justifyContent: 'flex-start', padding: '10px 12px', height: 'auto', flexDirection: 'column', alignItems: 'flex-start' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  <Users size={14} /> Customer Master
+                </div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>Client profiles & history</div>
+              </NavLink>
+
+              <NavLink
+                to="/profile"
+                className="btn btn-secondary"
+                style={{ justifyContent: 'flex-start', padding: '10px 12px', height: 'auto', flexDirection: 'column', alignItems: 'flex-start' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  <ExternalLink size={14} /> Integrations
+                </div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>Google Drive & Outlook</div>
+              </NavLink>
+            </div>
+          </div>
+
         </div>
+
       </div>
     </div>
   );

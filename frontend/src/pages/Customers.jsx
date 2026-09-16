@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Users, Search, RefreshCw, Mail, Phone, Clock, Star, UserPlus, Repeat, Plus, X, Briefcase, Car, Eye, Trash2, Edit3 } from 'lucide-react';
+import { Users, Search, RefreshCw, Mail, Phone, Plus, X, Briefcase, Car, Trash2, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { api, supabase } from '../api/api';
 import CreateProjectModal from '../components/CreateProjectModal';
+import ContactDetailPanel from '../components/ContactDetailPanel';
 
 function getCustomerCar(customer) {
   if (!customer || !customer.interactions) return null;
@@ -188,323 +189,185 @@ export default function Customers() {
   };
 
   return (
-    <div style={{ paddingBottom: 40 }}>
-      {/* Header */}
-      <div className="page-header" style={{ alignItems: 'flex-end', marginBottom: 32 }}>
+    <div style={{ maxWidth: 1280, margin: '0 auto' }}>
+      {/* Contact Detail Panel */}
+      {selectedCustomerDetail && (
+        <ContactDetailPanel
+          customer={selectedCustomerDetail}
+          onClose={() => setSelectedCustomerDetail(null)}
+        />
+      )}
+
+      {/* Frappe Header */}
+      <div className="page-header">
         <div className="page-header-left">
-          <h1 style={{ fontSize: '1.85rem', fontWeight: 800, letterSpacing: '-0.5px', color: '#0f172a', margin: '0 0 6px 0' }}>Customers</h1>
-          <p style={{ fontSize: '0.9rem' }}>Manage your client relationships, categorizing New vs Repeat customers.</p>
+          <h1 className="page-title">Contacts</h1>
+          <p className="page-subtitle">Manage client relationships, contact records, and active deal histories.</p>
         </div>
-        <div style={{ display: 'flex', gap: 12 }}>
-          <button className="btn btn-primary" onClick={() => setIsAddCustomerOpen(true)} style={{ padding: '8px 16px' }}>
-            <Plus size={16} /> Add Customer
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button className="btn btn-secondary btn-sm" onClick={loadCustomers} title="Refresh Directory">
+            <RefreshCw size={13} /> Refresh
+          </button>
+          <button className="btn btn-primary" onClick={() => setIsAddCustomerOpen(true)}>
+            <Plus size={14} /> Add Customer
           </button>
         </div>
       </div>
 
-      {/* Folder Tabs */}
-      <div style={{ display: 'flex', paddingLeft: 0, position: 'relative', zIndex: 10, marginBottom: 0 }}>
-        {[
-          { id: 'NEW', label: 'New Customers', icon: UserPlus },
-          { id: 'REPEAT', label: 'Repeat Customers', icon: Repeat }
-        ].map((tab) => {
-          const isActive = activeTab === tab.id;
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className="customer-tab-btn"
-              style={{
-                background: isActive ? 'var(--surface)' : 'transparent',
-                border: 'none',
-                borderTopLeftRadius: 16,
-                borderTopRightRadius: 16,
-                color: isActive ? 'var(--brand-600)' : 'var(--text-secondary)',
-                fontWeight: isActive ? 700 : 600,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                position: 'relative',
-                zIndex: isActive ? 2 : 1,
-                boxShadow: isActive ? '0 -4px 6px -4px rgba(0,0,0,0.05)' : 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8
-              }}
-            >
-              <Icon size={16} />
-              {tab.label}
-            </button>
-          )
-        })}
-      </div>
+      {/* Frappe Container */}
+      <div className="frappe-list-container">
+        {/* Toolbar with Filter Tabs and Search */}
+        <div className="table-toolbar">
+          <div className="table-toolbar-left">
+            <div className="tabs-container" style={{ margin: 0, border: 'none', gap: 4 }}>
+              <button
+                className={`tab-btn ${activeTab === 'NEW' ? 'active' : ''}`}
+                onClick={() => setActiveTab('NEW')}
+              >
+                New Clients
+              </button>
+              <button
+                className={`tab-btn ${activeTab === 'REPEAT' ? 'active' : ''}`}
+                onClick={() => setActiveTab('REPEAT')}
+              >
+                Repeat Clients
+              </button>
+            </div>
+          </div>
 
-      {/* Customers Table */}
-      <div className="card" style={{ border: 'none', borderTopLeftRadius: activeTab === 'NEW' ? 0 : 16, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)' }}>
-        <div className="card-header customers-header-mobile" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
-          <span className="card-title" style={{ fontSize: '1.05rem', fontWeight: 700 }}>
-            {activeTab === 'NEW' ? 'New Customers' : 'Repeat Customers'} ({filtered.length})
-          </span>
-
-          <div className="customers-actions-mobile" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <div className="search-bar customers-search-mobile" style={{ padding: '4px 12px', borderRadius: 24, background: 'var(--surface)', border: '1px solid var(--border)' }}>
-              <Search size={14} color="var(--text-muted)" />
+          <div className="table-toolbar-right">
+            <div className="input-group" style={{ width: 280 }}>
+              <Search size={14} className="input-icon-left" />
               <input
+                type="text"
+                className="input input-sm input-with-icon-left"
                 placeholder="Search customers..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                style={{ fontSize: '0.85rem', border: 'none', background: 'transparent', outline: 'none', marginLeft: 8 }}
               />
             </div>
-            <button className="btn btn-secondary btn-icon" onClick={loadCustomers} style={{ padding: '6px', borderRadius: '50%' }} title="Refresh customers">
-              <RefreshCw size={14} />
-            </button>
           </div>
         </div>
 
         {loading ? (
-          <div className="card-body" style={{ textAlign: 'center', padding: 60 }}>
-            <div className="spinner" style={{ margin: '0 auto 16px', width: 28, height: 28, borderWidth: 3 }} />
-            <div style={{ color: 'var(--text-muted)' }}>Loading customers from Supabase...</div>
+          <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>
+            Loading customer records from Supabase...
           </div>
         ) : filtered.length === 0 ? (
-          <div className="card-body" style={{ textAlign: 'center', padding: 80 }}>
-            <div style={{ width: 64, height: 64, background: 'var(--gray-50)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-              <Users size={32} color="var(--gray-400)" />
-            </div>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>No {activeTab.toLowerCase()} customers found</h3>
-            <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', maxWidth: 300, margin: '0 auto' }}>
-              Try adjusting your search or check back later.
-            </p>
+          <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>
+            <Users size={36} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
+              No {activeTab.toLowerCase()} customers found
+            </h3>
+            <p style={{ fontSize: '0.8rem' }}>Try adjusting your search terms.</p>
           </div>
         ) : (
-          <>
-          <div className="table-wrap" style={{ border: 'none', borderRadius: '0 0 var(--radius-lg) var(--radius-lg)', boxShadow: 'none' }}>
-            <table style={{ margin: 0 }}>
-              <thead>
-                <tr>
-                  <th style={{ paddingLeft: 24, paddingTop: 16, paddingBottom: 16 }}>Client</th>
-                  <th>Contact Info</th>
-                  <th>Vehicle</th>
-                  {activeTab === 'NEW' ? (
-                    <th>Total Leads</th>
-                  ) : (
-                    <th>Activity</th>
-                  )}
-                  <th>Type</th>
-                  <th>Last Active</th>
-                  <th style={{ textAlign: 'right', paddingRight: 24 }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginated.map(customer => (
-                  <tr key={customer.id} style={{ transition: 'background-color 0.2s', cursor: 'pointer' }}>
-                    <td style={{ paddingLeft: 24, paddingVertical: 16 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                        <div className="notranslate" style={{ 
-                          width: 44, height: 44, borderRadius: '50%', 
-                          background: customer.interactions.length > 1 ? 'linear-gradient(135deg, #fef3c7, #fde68a)' : 'linear-gradient(135deg, #fff3ec, #ffe4d6)',
-                          border: customer.interactions.length > 1 ? '1px solid #fcd34d' : '1px solid #fed7aa',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '0.9rem', fontWeight: 800, 
-                          color: customer.interactions.length > 1 ? '#b45309' : '#ea580c',
-                          boxShadow: customer.interactions.length > 1 ? '0 2px 8px rgba(180, 83, 9, 0.1)' : '0 2px 8px rgba(234, 88, 12, 0.1)', flexShrink: 0
-                        }}>
-                          {getInitials(customer.name, customer.email)}
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                            {customer.name || 'Unknown Client'}
-                            {customer.interactions.length > 1 && <Star size={12} color="#f59e0b" fill="#f59e0b" />}
-                          </div>
-                        </div>
+          <table className="frappe-table">
+            <thead>
+              <tr>
+                <th style={{ width: 220 }}>Client Name</th>
+                <th>Contact Info</th>
+                <th>Vehicle / Interest</th>
+                <th>Activity</th>
+                <th>Category</th>
+                <th>Last Active</th>
+                <th style={{ textAlign: 'right', width: 120 }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginated.map(customer => (
+                <tr key={customer.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedCustomerDetail(customer)}>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div className="notranslate" style={{
+                        width: 30, height: 30, borderRadius: 'var(--radius-xs)',
+                        background: 'var(--bg-surface-subtle)',
+                        border: '1px solid var(--border)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '0.75rem', fontWeight: 700,
+                        color: 'var(--text-primary)', flexShrink: 0
+                      }}>
+                        {getInitials(customer.name, customer.email)}
                       </div>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem' }}>
-                          <Mail size={14} color="#f47c3c" flexShrink={0} />
-                          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 180 }}>
-                            {customer.email || <span style={{ color: 'var(--text-muted)' }}>—</span>}
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem' }}>
-                          <Phone size={14} color="#f47c3c" flexShrink={0} />
-                          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 180 }}>
-                            {customer.phone || <span style={{ color: 'var(--text-muted)' }}>—</span>}
-                          </span>
-                        </div>
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.85rem' }}>
+                        {customer.name || 'Unknown Client'}
                       </div>
-                    </td>
-                    <td>
-                      {(() => {
-                        const car = getCustomerCar(customer);
-                        return car ? (
-                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: '0.85rem', fontWeight: 700, color: '#1a1a1a' }}>
-                            <Car size={16} color="#f47c3c" style={{ flexShrink: 0, marginTop: 2 }} />
-                            <span>{car}</span>
-                          </div>
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
-                        );
-                      })()}
-                    </td>
-                    {activeTab === 'NEW' ? (
-                      <td>
-                        <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>
-                          {customer.interactions.filter(i => i.type === 'Lead').length} Leads
+                    </div>
+                  </td>
+                  <td>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                      <div>{customer.email || '—'}</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>{customer.phone || ''}</div>
+                    </div>
+                  </td>
+                  <td>
+                    {(() => {
+                      const car = getCustomerCar(customer);
+                      return car ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)' }}>
+                          <Car size={13} color="var(--text-secondary)" />
+                          <span>{car}</span>
                         </div>
-                      </td>
-                    ) : (
-                      <td>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                          <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#1e293b' }}>
-                            {customer.interactions.filter(i => i.type === 'Project').length} Projects
-                          </div>
-                          <div style={{ fontWeight: 600, fontSize: '0.75rem', color: '#64748b' }}>
-                            {customer.interactions.filter(i => i.type === 'Lead').length} Leads
-                          </div>
-                        </div>
-                      </td>
-                    )}
-                    <td>
-                      {customer.interactions.length > 1 ? (
-                        <span className="badge" style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a' }}>Repeat</span>
                       ) : (
-                        <span className="badge badge-new">New</span>
-                      )}
-                    </td>
-                    <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <Clock size={12} />
-                        {customer.last_interaction ? (() => {
-                          const d = new Date(customer.last_interaction);
-                          const day = String(d.getDate()).padStart(2, '0');
-                          const month = String(d.getMonth() + 1).padStart(2, '0');
-                          return `${day}/${month}/${d.getFullYear()}`;
-                        })() : '—'}
-                      </div>
-                    </td>
-                    <td style={{ textAlign: 'right', paddingRight: 24 }}>
-                      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                        <button
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => setSelectedCustomerDetail(customer)}
-                          style={{ padding: '6px 10px', fontSize: '0.75rem', gap: 4 }}
-                          title="View / Edit Customer Details"
-                        >
-                          <Eye size={13} /> View
-                        </button>
-                        <button
-                          className="btn btn-secondary btn-sm"
-                          onClick={(e) => handleDeleteCustomer(customer, e)}
-                          style={{ padding: '6px 8px', color: '#ef4444', borderColor: '#fca5a5' }}
-                          title="Delete Customer Record"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>—</span>
+                      );
+                    })()}
+                  </td>
+                  <td>
+                    <span className="badge badge-gray">
+                      {customer.interactions.length} {customer.interactions.length === 1 ? 'record' : 'records'}
+                    </span>
+                  </td>
+                  <td>
+                    {customer.interactions.length > 1 ? (
+                      <span className="badge badge-amber">Repeat</span>
+                    ) : (
+                      <span className="badge badge-blue">New</span>
+                    )}
+                  </td>
+                  <td style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                    {customer.last_interaction ? new Date(customer.last_interaction).toLocaleDateString('de-DE') : '—'}
+                  </td>
+                  <td style={{ textAlign: 'right' }}>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={(e) => { e.stopPropagation(); setSelectedCustomerDetail(customer); }}
+                    >
+                      View
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
 
-          {/* ── Pagination Bar ── */}
-          {filtered.length > PAGE_SIZE && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '14px 24px',
-              borderTop: '1px solid var(--border)',
-              background: 'var(--surface)',
-              borderRadius: '0 0 var(--radius-lg) var(--radius-lg)',
-              flexWrap: 'wrap',
-              gap: 12
-            }}>
-              {/* Info text */}
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length} customers
-              </span>
-
-              {/* Page controls */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                {/* Previous */}
-                <button
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: 8,
-                    border: '1px solid var(--border)',
-                    background: currentPage === 1 ? 'var(--gray-50)' : 'var(--surface)',
-                    color: currentPage === 1 ? 'var(--text-muted)' : 'var(--text-primary)',
-                    fontWeight: 600,
-                    fontSize: '0.8rem',
-                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                >← Prev</button>
-
-                {/* First page shortcut */}
-                {getPageNumbers()[0] > 1 && (
-                  <>
-                    <button onClick={() => setCurrentPage(1)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>1</button>
-                    {getPageNumbers()[0] > 2 && <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', padding: '0 2px' }}>…</span>}
-                  </>
-                )}
-
-                {/* Page number buttons */}
-                {getPageNumbers().map(n => (
-                  <button
-                    key={n}
-                    onClick={() => setCurrentPage(n)}
-                    style={{
-                      padding: '6px 10px',
-                      borderRadius: 8,
-                      border: n === currentPage ? 'none' : '1px solid var(--border)',
-                      background: n === currentPage ? 'var(--brand-600)' : 'var(--surface)',
-                      color: n === currentPage ? '#ffffff' : 'var(--text-primary)',
-                      fontWeight: n === currentPage ? 700 : 600,
-                      fontSize: '0.8rem',
-                      cursor: 'pointer',
-                      minWidth: 32,
-                      transition: 'all 0.2s',
-                      boxShadow: n === currentPage ? '0 2px 8px rgba(226,106,44,0.25)' : 'none'
-                    }}
-                  >{n}</button>
-                ))}
-
-                {/* Last page shortcut */}
-                {getPageNumbers().at(-1) < totalPages && (
-                  <>
-                    {getPageNumbers().at(-1) < totalPages - 1 && <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', padding: '0 2px' }}>…</span>}
-                    <button onClick={() => setCurrentPage(totalPages)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>{totalPages}</button>
-                  </>
-                )}
-
-                {/* Next */}
-                <button
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: 8,
-                    border: '1px solid var(--border)',
-                    background: currentPage === totalPages ? 'var(--gray-50)' : 'var(--surface)',
-                    color: currentPage === totalPages ? 'var(--text-muted)' : 'var(--text-primary)',
-                    fontWeight: 600,
-                    fontSize: '0.8rem',
-                    cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                >Next →</button>
+        {/* Frappe Pagination Footer */}
+        {totalPages > 1 && (
+          <div className="card-footer">
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+              Showing {((currentPage - 1) * PAGE_SIZE) + 1} to {Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length} customers
+            </span>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Prev
+              </button>
+              <div style={{ display: 'flex', alignItems: 'center', padding: '0 8px', fontSize: '0.78rem', fontWeight: 600 }}>
+                Page {currentPage} of {totalPages}
               </div>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </button>
             </div>
-          )}
-          </>
+          </div>
         )}
       </div>
 

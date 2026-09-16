@@ -1,43 +1,54 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Plus, Search, RefreshCw, Mail, Phone, Car, Tag, ShoppingCart, Sparkles, CheckCircle2, XCircle, ShieldAlert, RotateCcw, Trash2 } from 'lucide-react';
+import {
+  Users, Plus, Search, RefreshCw, RotateCcw, Trash2,
+  ChevronLeft, ChevronRight, ArrowRight
+} from 'lucide-react';
 import { api } from '../api/api';
 import LeadModal from '../components/LeadModal';
+import LeadDetailPanel from '../components/LeadDetailPanel';
+import { formatDistanceToNow } from 'date-fns';
 
 function getLeadVehicleDisplay(lead) {
   if (lead.vehicle_interest) return lead.vehicle_interest;
   if (lead.vehicle) return lead.vehicle;
   if (lead.manufacturer || lead.model) return `${lead.manufacturer || ''} ${lead.model || ''}`.trim();
-
-  // Smart extraction from subject, message, or notes
   const text = `${lead.subject || ''} ${lead.message || ''} ${lead.notes || ''}`;
   const carMatch = text.match(/(Porsche\s+[\w\d\.\s\(\)\-]+|BMW\s+[\w\d\.\s\-]+|Audi\s+[\w\d\.\s\-]+|Mercedes-?Benz?\s+[\w\d\.\s\-]+|VW\s+[\w\d\.\s\-]+|Volkswagen\s+[\w\d\.\s\-]+)/i);
-  if (carMatch) {
-    return carMatch[0].split('\n')[0].split('-')[0].trim().slice(0, 35);
-  }
-
+  if (carMatch) return carMatch[0].split('\n')[0].split('-')[0].trim().slice(0, 35);
   return null;
 }
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 15;
+
+const STATUS_FILTERS = [
+  { key: '',      label: 'All Leads' },
+  { key: 'NEW',   label: 'New' },
+  { key: 'SELL',  label: 'Sell Intent' },
+  { key: 'BUY',   label: 'Buy Intent' },
+  { key: 'SPAM',  label: 'Junk / Spam' },
+];
+
+function getInitials(name) {
+  if (!name) return '?';
+  return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+}
+
+function timeAgo(iso) {
+  try { return formatDistanceToNow(new Date(iso), { addSuffix: true }); } catch { return ''; }
+}
 
 export default function Leads() {
   const navigate = useNavigate();
-  const [leads, setLeads] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [intentFilter, setIntentFilter] = useState('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [leads,        setLeads]        = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [search,       setSearch]       = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [isModalOpen,  setIsModalOpen]  = useState(false);
   const [convertingId, setConvertingId] = useState(null);
-  const [actioningId, setActioningId] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [alertConfig, setAlertConfig] = useState({
-    isOpen: false,
-    title: '',
-    message: '',
-    type: 'success',
-    onConfirm: null
-  });
+  const [actioningId,  setActioningId]  = useState(null);
+  const [currentPage,  setCurrentPage]  = useState(1);
+  const [selectedLead, setSelectedLead] = useState(null);
 
   const loadLeads = async () => {
     setLoading(true);
@@ -57,11 +68,7 @@ export default function Leads() {
       const cleanedNotes = (lead.notes || '').replace(/\[AUTO-FLAGGED:.*?\]/g, '').trim();
       await api.updateLead(lead.id, { status: 'NEW', notes: cleanedNotes || null });
       await loadLeads();
-    } catch (err) {
-      console.error('Failed to restore lead:', err);
-    } finally {
-      setActioningId(null);
-    }
+    } finally { setActioningId(null); }
   };
 
   const handleDeleteSpamLead = async (lead) => {
@@ -69,12 +76,9 @@ export default function Leads() {
     setActioningId(lead.id);
     try {
       await api.deleteLead(lead.id);
+      if (selectedLead?.id === lead.id) setSelectedLead(null);
       await loadLeads();
-    } catch (err) {
-      console.error('Failed to delete spam lead:', err);
-    } finally {
-      setActioningId(null);
-    }
+    } finally { setActioningId(null); }
   };
 
   const handleConvertLeadToProject = async (lead) => {
@@ -82,562 +86,294 @@ export default function Leads() {
     try {
       const vehicleName = getLeadVehicleDisplay(lead) || 'Vehicle TBD';
       const pType = (lead.intent || '').toUpperCase().includes('SELL') ? 'SELL' : 'BUY';
-
-      // 1. Create project in projects table
       await api.createProject({
-        client_name: lead.name || 'Client Lead',
-        client_email: lead.email,
-        client_phone: lead.phone,
-        project_type: pType,
+        client_name:    lead.name || 'Client Lead',
+        client_email:   lead.email,
+        client_phone:   lead.phone,
+        project_type:   pType,
         target_vehicle: vehicleName,
-        vin: lead.vin,
-        status: 'ACTIVE',
-        current_stage: 'Intake & Onboarding',
-        notes: lead.notes || lead.message || `Converted from Lead ID ${lead.id}`
+        vin:            lead.vin,
+        status:         'ACTIVE',
+        current_stage:  'Intake & Onboarding',
+        notes:          lead.notes || lead.message || `Converted from Lead ID ${lead.id}`
       });
-
-      // 2. Remove converted lead from leads table so client officially moves to Customers & Projects
-      await api.deleteLead(lead.id).catch(() => { });
-
-      setAlertConfig({
-        isOpen: true,
-        title: 'Success!',
-        message: `Successfully converted ${lead.name || 'Lead'} into an official Client & active Project!`,
-        type: 'success',
-        onConfirm: () => {
-          navigate('/projects');
-        }
-      });
+      await api.deleteLead(lead.id).catch(() => {});
+      setSelectedLead(null);
+      await loadLeads();
+      navigate('/projects');
     } catch (err) {
-      setAlertConfig({
-        isOpen: true,
-        title: 'Conversion Failed',
-        message: `Failed to convert lead to project: ${err.message}`,
-        type: 'error',
-        onConfirm: null
-      });
-    } finally {
-      setConvertingId(null);
-    }
+      alert('Conversion Error: ' + err.message);
+    } finally { setConvertingId(null); }
   };
 
   useEffect(() => {
     loadLeads();
-
-    // Subscribe to realtime changes in Supabase!
-    const sub = api.subscribeToLeads(() => {
-      loadLeads();
-    });
-    return () => {
-      if (sub) sub.unsubscribe();
-    };
+    const sub = api.subscribeToLeads(() => loadLeads());
+    return () => { if (sub) sub.unsubscribe(); };
   }, []);
 
-  const spamCount = leads.filter(l => l.status === 'SPAM').length;
+  // Counts for filter sidebar
+  const spamCount   = leads.filter(l => l.status === 'SPAM').length;
+  const sellCount   = leads.filter(l => l.status !== 'SPAM' && (l.intent || '').toUpperCase().includes('SELL')).length;
+  const buyCount    = leads.filter(l => l.status !== 'SPAM' && (l.intent || '').toUpperCase().includes('BUY')).length;
+  const activeCount = leads.filter(l => l.status !== 'SPAM').length;
 
+  const getCounts = (key) => {
+    if (key === '')     return leads.length;
+    if (key === 'SPAM') return spamCount;
+    if (key === 'SELL') return sellCount;
+    if (key === 'BUY')  return buyCount;
+    if (key === 'NEW')  return activeCount;
+    return 0;
+  };
+
+  // Filtering
   const filtered = leads.filter(l => {
     const isSpam = l.status === 'SPAM';
-    if (intentFilter === 'SPAM') {
-      if (!isSpam) return false;
-    } else {
-      if (isSpam) return false;
-      if (intentFilter === 'SELL' && !(l.intent || '').toUpperCase().includes('SELL')) return false;
-      if (intentFilter === 'BUY' && !(l.intent || '').toUpperCase().includes('BUY')) return false;
-    }
+    if (statusFilter === 'SPAM')                  { if (!isSpam) return false; }
+    else if (statusFilter === 'SELL')             { if (isSpam || !(l.intent || '').toUpperCase().includes('SELL')) return false; }
+    else if (statusFilter === 'BUY')              { if (isSpam || !(l.intent || '').toUpperCase().includes('BUY'))  return false; }
+    else if (statusFilter === 'NEW' || statusFilter === '') { if (isSpam && statusFilter === 'NEW') return false; }
 
-    const query = search.toLowerCase();
-    const name = (l.name || '').toLowerCase();
-    const email = (l.email || '').toLowerCase();
+    const query  = search.toLowerCase();
+    const name   = (l.name    || '').toLowerCase();
+    const email  = (l.email   || '').toLowerCase();
     const vehicle = `${l.manufacturer || ''} ${l.model || ''}`.toLowerCase();
-    return !search || name.includes(query) || email.includes(query) || vehicle.includes(query);
+    const notes  = (l.notes   || '').toLowerCase();
+    return !search || name.includes(query) || email.includes(query) || vehicle.includes(query) || notes.includes(query);
   });
 
-  // Reset to page 1 whenever search or filter changes
-  useEffect(() => { setCurrentPage(1); }, [search, intentFilter]);
+  useEffect(() => { setCurrentPage(1); }, [search, statusFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-
-  // Build page number array (max 5 buttons around current)
-  const getPageNumbers = () => {
-    const pages = [];
-    const start = Math.max(1, currentPage - 2);
-    const end = Math.min(totalPages, currentPage + 2);
-    for (let i = start; i <= end; i++) pages.push(i);
-    return pages;
-  };
-
-  const intentBadge = (l) => {
-    const i = (l.intent || '').toUpperCase();
-    const notes = l.notes || '';
-    const isRepeat = notes.includes('REPEAT CLIENT') || notes.includes('Repeat Client');
-    const isFollowup = notes.includes('Follow-up Message');
-    const isSell = i.includes('SELL');
-
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
-        {isSell ? (
-          <span className="badge badge-sell">Sell Intent</span>
-        ) : (
-          <span className="badge badge-buy">Buy Intent</span>
-        )}
-        {isRepeat && (
-          <span className="badge" style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', fontWeight: 700 }}>
-            ⭐ Repeat Client
-          </span>
-        )}
-        {isFollowup && (
-          <span className="badge" style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)', fontWeight: 600 }}>
-            ✨ New Activity
-          </span>
-        )}
-      </div>
-    );
-  };
-
-  const getInquiryDetailsDisplay = (l) => {
-    if (l.subject) return l.subject;
-    if (l.notes) {
-      const line = l.notes.split('\n')[0].replace(/^Subject:\s*/i, '').trim();
-      if (line) return line;
-    }
-    if (l.message) return l.message.slice(0, 60);
-    return 'Direct Vehicle Inquiry';
-  };
-
-  const getInitials = (name) => {
-    if (!name) return '?';
-    return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-  };
+  const paginated  = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
-    <div style={{ paddingBottom: 40 }}>
-      {/* Header */}
-      <div className="page-header" style={{ alignItems: 'flex-end', marginBottom: 32 }}>
-        <div className="page-header-left">
-          <h1 style={{ fontSize: '1.85rem', fontWeight: 800, letterSpacing: '-0.5px', color: '#0f172a', margin: '0 0 6px 0' }}>Lead Management</h1>
-          <p style={{ fontSize: '0.9rem' }}>Inbound client inquiries from Email, WhatsApp, and Web Forms</p>
+    <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+      {/* ── Page Header ── */}
+      <div className="page-header">
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <h1 className="page-title">Leads</h1>
+            <span className="badge badge-gray">{filtered.length} total</span>
+          </div>
+          <p className="page-subtitle">Inbound inquiries from Strato Email, WhatsApp, and Web Forms.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setIsModalOpen(true)} style={{ padding: '10px 16px' }}>
-          <Plus size={16} /> New Lead (with OCR)
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button className="btn btn-secondary btn-sm" onClick={loadLeads} title="Refresh">
+            <RefreshCw size={13} className={loading ? 'spin' : ''} /> Refresh
+          </button>
+          <button className="btn btn-primary btn-sm" onClick={() => setIsModalOpen(true)}>
+            <Plus size={13} /> New Lead
+          </button>
+        </div>
       </div>
 
-      {/* Folder Tabs */}
-      <div style={{ display: 'flex', paddingLeft: 0, position: 'relative', zIndex: 10, marginBottom: 0, overflowX: 'auto' }}>
-        {[
-          { id: '', label: 'All Inquiries', icon: Users },
-          { id: 'SELL', label: 'Sell Intent', icon: Tag },
-          { id: 'BUY', label: 'Buy Intent', icon: ShoppingCart },
-          { id: 'SPAM', label: `Filtered (${spamCount})`, icon: ShieldAlert, badge: spamCount }
-        ].map((tab) => {
-          const isActive = intentFilter === tab.id;
-          const Icon = tab.icon;
-          return (
+      {/* ── CRM Layout: Filter Sidebar + List ── */}
+      <div className="crm-layout">
+
+        {/* Left: Status Filter Sidebar */}
+        <div className="crm-filter-sidebar">
+          <div className="crm-filter-section-label">Status</div>
+          {STATUS_FILTERS.map(({ key, label }) => (
             <button
-              key={tab.id}
-              onClick={() => setIntentFilter(tab.id)}
-              className="customer-tab-btn"
-              style={{
-                background: isActive ? 'var(--surface)' : 'transparent',
-                border: 'none',
-                borderTopLeftRadius: 16,
-                borderTopRightRadius: 16,
-                color: isActive ? (tab.id === 'SPAM' ? '#ef4444' : 'var(--brand-600)') : 'var(--text-secondary)',
-                fontWeight: isActive ? 700 : 600,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                position: 'relative',
-                zIndex: isActive ? 2 : 1,
-                boxShadow: isActive ? '0 -4px 6px -4px rgba(0,0,0,0.05)' : 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '10px 18px',
-                whiteSpace: 'nowrap'
-              }}
+              key={key}
+              className={`crm-filter-pill ${statusFilter === key ? 'active' : ''}`}
+              onClick={() => setStatusFilter(key)}
             >
-              <Icon size={16} />
-              {tab.label}
+              <span>{label}</span>
+              <span className="crm-filter-pill-count">{getCounts(key)}</span>
             </button>
-          )
-        })}
-      </div>
+          ))}
+        </div>
 
-      {/* Leads Table */}
-      <div className="card" style={{ border: 'none', borderTopLeftRadius: intentFilter === '' ? 0 : 16, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)' }}>
-        <div className="card-header customers-header-mobile" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
-          <span className="card-title" style={{ fontSize: '1.05rem', fontWeight: 700 }}>
-            {intentFilter === 'SPAM' ? 'Auto-Filtered Newsletters & Spam' : 'Inquiries'} ({filtered.length})
-          </span>
-
-          <div className="customers-actions-mobile" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <div className="search-bar customers-search-mobile" style={{ padding: '4px 12px', borderRadius: 24, background: 'var(--surface)', border: '1px solid var(--border)' }}>
-              <Search size={14} color="var(--text-muted)" />
+        {/* Right: List Area */}
+        <div className="crm-list-area">
+          {/* Search bar */}
+          <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div className="input-group" style={{ maxWidth: 320 }}>
+              <Search size={13} className="input-icon-left" />
               <input
-                placeholder="Search leads..."
+                type="text"
+                className="input input-sm input-with-icon-left"
+                placeholder="Search by name, vehicle, email…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                style={{ fontSize: '0.85rem', border: 'none', background: 'transparent', outline: 'none', marginLeft: 8, width: '100%', minWidth: 0 }}
               />
             </div>
-            <button className="btn btn-secondary btn-icon" onClick={loadLeads} style={{ padding: '6px', borderRadius: '50%' }} title="Refresh leads">
-              <RefreshCw size={14} />
-            </button>
+          </div>
+
+          {/* Table container */}
+          <div className="table-container" style={{ flex: 1, overflow: 'auto' }}>
+            {loading ? (
+              <div className="empty-state"><div className="spinner spinner-dark" /></div>
+            ) : filtered.length === 0 ? (
+              <div className="empty-state">
+                <Users size={32} style={{ opacity: 0.2 }} />
+                <div className="empty-state-title">No leads found</div>
+                <div className="empty-state-sub">Try clearing filters or search terms.</div>
+              </div>
+            ) : (
+              <table className="frappe-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: 36, padding: '10px 12px' }}></th>
+                    <th style={{ minWidth: 200 }}>Lead / Client</th>
+                    <th style={{ width: 120 }}>Intent</th>
+                    <th>Vehicle / Inquiry</th>
+                    <th style={{ width: 130 }}>Source</th>
+                    <th style={{ width: 120 }}>Received</th>
+                    <th style={{ width: 120, textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginated.map(lead => {
+                    const isSpam   = lead.status === 'SPAM';
+                    const isSell   = (lead.intent || '').toUpperCase().includes('SELL');
+                    const vehicle  = getLeadVehicleDisplay(lead);
+                    const selected = selectedLead?.id === lead.id;
+
+                    return (
+                      <tr
+                        key={lead.id}
+                        className={`crm-row${selected ? ' selected' : ''}`}
+                        onClick={() => setSelectedLead(selected ? null : lead)}
+                      >
+                        {/* Avatar / initials */}
+                        <td style={{ padding: '8px 12px' }}>
+                          <div style={{
+                            width: 28, height: 28,
+                            borderRadius: '50%',
+                            background: isSpam ? 'var(--status-red-bg)' : isSell ? '#dcfce7' : '#ede9fe',
+                            color: isSpam ? 'var(--status-red-text)' : isSell ? '#166534' : '#5b21b6',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '0.65rem', fontWeight: 700, flexShrink: 0
+                          }}>
+                            {getInitials(lead.name || lead.email)}
+                          </div>
+                        </td>
+
+                        {/* Name + Email */}
+                        <td>
+                          <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                            {lead.name || 'Anonymous Lead'}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            {lead.email || lead.phone || '—'}
+                          </div>
+                        </td>
+
+                        {/* Intent badge */}
+                        <td>
+                          {isSpam ? (
+                            <span className="badge badge-red">Spam</span>
+                          ) : isSell ? (
+                            <span className="badge badge-green">Sell Side</span>
+                          ) : (
+                            <span className="badge badge-purple">Buy Side</span>
+                          )}
+                        </td>
+
+                        {/* Vehicle */}
+                        <td>
+                          <div style={{ fontSize: '0.82rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                            {vehicle || lead.subject || 'General Inquiry'}
+                          </div>
+                          {(lead.notes || lead.message) && (
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', maxWidth: 320,
+                                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {lead.notes || lead.message}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Source */}
+                        <td style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                          {lead.channel || 'Manual'}
+                        </td>
+
+                        {/* Time */}
+                        <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          {timeAgo(lead.created_at)}
+                        </td>
+
+                        {/* Actions */}
+                        <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
+                          {isSpam ? (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => handleRestoreLead(lead)}
+                                disabled={actioningId === lead.id}
+                              >
+                                <RotateCcw size={11} /> Restore
+                              </button>
+                              <button
+                                className="btn btn-danger btn-sm btn-icon"
+                                onClick={() => handleDeleteSpamLead(lead)}
+                                disabled={actioningId === lead.id}
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => setSelectedLead(selected ? null : lead)}
+                            >
+                              View <ArrowRight size={11} />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="card-footer">
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                  Showing {((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length}
+                </span>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button className="btn btn-secondary btn-sm btn-icon"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
+                    <ChevronLeft size={13} />
+                  </button>
+                  <span style={{ fontSize: '0.78rem', padding: '0 8px', display: 'flex', alignItems: 'center' }}>
+                    {currentPage} / {totalPages}
+                  </span>
+                  <button className="btn btn-secondary btn-sm btn-icon"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
+                    <ChevronRight size={13} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
-
-        {loading ? (
-          <div className="card-body" style={{ textAlign: 'center', padding: 60 }}>
-            <div className="spinner" style={{ margin: '0 auto 16px', width: 28, height: 28, borderWidth: 3 }} />
-            <div style={{ color: 'var(--text-muted)' }}>Loading leads from Supabase...</div>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="card-body" style={{ textAlign: 'center', padding: 80 }}>
-            <div style={{ width: 64, height: 64, background: 'var(--gray-50)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-              <Users size={32} color="var(--gray-400)" />
-            </div>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
-              {intentFilter === 'SPAM' ? 'No spam or filtered items found' : 'No leads found'}
-            </h3>
-            <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', maxWidth: 300, margin: '0 auto' }}>
-              {intentFilter === 'SPAM'
-                ? 'Your inbox and database are completely clean.'
-                : 'Click "+ New Lead" to create a record or upload a document to auto-fill.'}
-            </p>
-          </div>
-        ) : (
-          <>
-          <div className="table-wrap" style={{ border: 'none', borderRadius: '0 0 var(--radius-lg) var(--radius-lg)', boxShadow: 'none' }}>
-            <table style={{ margin: 0 }}>
-              <thead>
-                <tr>
-                  <th style={{ paddingLeft: 24, paddingTop: 16, paddingBottom: 16 }}>Client</th>
-                  <th>Contact Info</th>
-                  <th>Vehicle</th>
-                  <th>{intentFilter === 'SPAM' ? 'Flag Reason' : 'Pipeline Intent'}</th>
-                  <th>Inquiry Details</th>
-                  <th>Channel</th>
-                  <th>Created</th>
-                  <th style={{ textAlign: 'right', paddingRight: 24 }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginated.map(lead => (
-                  <tr key={lead.id} style={{ transition: 'background-color 0.2s', cursor: 'pointer' }}>
-                    <td style={{ paddingLeft: 24, paddingVertical: 16 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                        <div className="notranslate" style={{
-                          width: 44, height: 44, borderRadius: '50%',
-                          background: lead.status === 'SPAM' ? 'linear-gradient(135deg, #fee2e2, #fecaca)' : 'linear-gradient(135deg, #fff3ec, #ffe4d6)',
-                          border: lead.status === 'SPAM' ? '1px solid #fca5a5' : '1px solid #fed7aa',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '0.9rem', fontWeight: 800, color: lead.status === 'SPAM' ? '#dc2626' : '#ea580c',
-                          boxShadow: '0 2px 8px rgba(234, 88, 12, 0.1)', flexShrink: 0
-                        }}>
-                          {getInitials(lead.name || lead.email)}
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>{lead.name || 'Unknown Lead'}</div>
-                          {lead.status === 'SPAM' && (
-                            <span style={{ fontSize: '0.72rem', color: '#dc2626', fontWeight: 600 }}>[Auto-Filtered Spam]</span>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem' }}>
-                          <Mail size={14} color="#f47c3c" flexShrink={0} />
-                          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200 }}>
-                            {lead.email || <span style={{ color: 'var(--text-muted)' }}>—</span>}
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem' }}>
-                          <Phone size={14} color="#f47c3c" flexShrink={0} />
-                          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200 }}>
-                            {lead.phone || <span style={{ color: 'var(--text-muted)' }}>—</span>}
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      {(() => {
-                        const vDisplay = getLeadVehicleDisplay(lead);
-                        return vDisplay ? (
-                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontWeight: 700, color: '#1a1a1a' }}>
-                            <Car size={16} color="#f47c3c" style={{ flexShrink: 0, marginTop: 3 }} />
-                            <span>{vDisplay}</span>
-                          </div>
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
-                        );
-                      })()}
-                      {lead.vin && (
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace', marginTop: 6, fontWeight: 500 }}>
-                          VIN: {lead.vin}
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      {lead.status === 'SPAM' ? (
-                        <span className="badge" style={{ background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', fontWeight: 600, fontSize: '0.75rem' }}>
-                          {lead.notes?.includes('[AUTO-FLAGGED:')
-                            ? lead.notes.match(/\[AUTO-FLAGGED:\s*([^\]]+)\]/)?.[1] || 'Spam Filter'
-                            : 'Filtered Spam'}
-                        </span>
-                      ) : (
-                        intentBadge(lead)
-                      )}
-                    </td>
-                    <td>
-                      <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={getInquiryDetailsDisplay(lead)}>
-                        {getInquiryDetailsDisplay(lead)}
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`badge ${lead.channel === 'WHATSAPP' ? 'badge-whatsapp' : lead.channel === 'EMAIL' || lead.channel === 'STRATO_EMAIL' ? 'badge-email' : 'badge-manual'}`}>
-                        {lead.channel || 'Manual'}
-                      </span>
-                    </td>
-                    <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      {lead.created_at ? (() => {
-                        const d = new Date(lead.created_at);
-                        const day = String(d.getDate()).padStart(2, '0');
-                        const month = String(d.getMonth() + 1).padStart(2, '0');
-                        return `${day}/${month}/${d.getFullYear()}`;
-                      })() : '—'}
-                    </td>
-                    <td style={{ textAlign: 'right', paddingRight: 24 }}>
-                      {lead.status === 'SPAM' ? (
-                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => handleRestoreLead(lead)}
-                            disabled={actioningId === lead.id}
-                            style={{ padding: '6px 10px', fontSize: '0.75rem', gap: 4 }}
-                            title="Restore to active leads"
-                          >
-                            <RotateCcw size={12} /> Restore
-                          </button>
-                          <button
-                            className="btn btn-sm"
-                            onClick={() => handleDeleteSpamLead(lead)}
-                            disabled={actioningId === lead.id}
-                            style={{ padding: '6px 10px', fontSize: '0.75rem', gap: 4, background: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5' }}
-                            title="Permanently remove from DB"
-                          >
-                            <Trash2 size={12} /> Delete
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          className="btn btn-primary btn-sm"
-                          onClick={() => handleConvertLeadToProject(lead)}
-                          disabled={convertingId === lead.id}
-                          style={{ padding: '6px 12px', fontSize: '0.78rem', gap: 6 }}
-                        >
-                          <Sparkles size={13} /> Convert to Project
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* ── Pagination Bar ── */}
-          {filtered.length > PAGE_SIZE && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '14px 24px',
-              borderTop: '1px solid var(--border)',
-              background: 'var(--surface)',
-              borderRadius: '0 0 var(--radius-lg) var(--radius-lg)',
-              flexWrap: 'wrap',
-              gap: 12
-            }}>
-              {/* Info text */}
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length} leads
-              </span>
-
-              {/* Page controls */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                {/* Previous */}
-                <button
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: 8,
-                    border: '1px solid var(--border)',
-                    background: currentPage === 1 ? 'var(--gray-50)' : 'var(--surface)',
-                    color: currentPage === 1 ? 'var(--text-muted)' : 'var(--text-primary)',
-                    fontWeight: 600,
-                    fontSize: '0.8rem',
-                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                >← Prev</button>
-
-                {/* First page shortcut */}
-                {getPageNumbers()[0] > 1 && (
-                  <>
-                    <button onClick={() => setCurrentPage(1)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>1</button>
-                    {getPageNumbers()[0] > 2 && <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', padding: '0 2px' }}>…</span>}
-                  </>
-                )}
-
-                {/* Page number buttons */}
-                {getPageNumbers().map(n => (
-                  <button
-                    key={n}
-                    onClick={() => setCurrentPage(n)}
-                    style={{
-                      padding: '6px 10px',
-                      borderRadius: 8,
-                      border: n === currentPage ? 'none' : '1px solid var(--border)',
-                      background: n === currentPage ? 'var(--brand-600)' : 'var(--surface)',
-                      color: n === currentPage ? '#ffffff' : 'var(--text-primary)',
-                      fontWeight: n === currentPage ? 700 : 600,
-                      fontSize: '0.8rem',
-                      cursor: 'pointer',
-                      minWidth: 32,
-                      transition: 'all 0.2s',
-                      boxShadow: n === currentPage ? '0 2px 8px rgba(226,106,44,0.25)' : 'none'
-                    }}
-                  >{n}</button>
-                ))}
-
-                {/* Last page shortcut */}
-                {getPageNumbers().at(-1) < totalPages && (
-                  <>
-                    {getPageNumbers().at(-1) < totalPages - 1 && <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', padding: '0 2px' }}>…</span>}
-                    <button onClick={() => setCurrentPage(totalPages)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>{totalPages}</button>
-                  </>
-                )}
-
-                {/* Next */}
-                <button
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: 8,
-                    border: '1px solid var(--border)',
-                    background: currentPage === totalPages ? 'var(--gray-50)' : 'var(--surface)',
-                    color: currentPage === totalPages ? 'var(--text-muted)' : 'var(--text-primary)',
-                    fontWeight: 600,
-                    fontSize: '0.8rem',
-                    cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                >Next →</button>
-              </div>
-            </div>
-          )}
-          </>
-        )}
       </div>
 
-      {/* Modal */}
+      {/* ── Lead Detail Panel (right side) ── */}
+      {selectedLead && (
+        <LeadDetailPanel
+          lead={selectedLead}
+          onClose={() => setSelectedLead(null)}
+          onConvert={handleConvertLeadToProject}
+          onRefresh={loadLeads}
+          converting={convertingId === selectedLead.id}
+        />
+      )}
+
+      {/* ── New Lead Modal ── */}
       <LeadModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onLeadCreated={loadLeads}
+        onCreated={() => { setIsModalOpen(false); loadLeads(); }}
       />
-
-      {/* Custom Alert/Success Popup */}
-      {alertConfig.isOpen && (
-        <div className="modal-overlay" style={{ background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(6px)', zIndex: 1200 }}>
-          <div className="custom-alert-card" style={{
-            width: '90%',
-            maxWidth: 400,
-            borderRadius: 24,
-            background: 'var(--surface)',
-            border: '1px solid var(--border)',
-            boxShadow: 'var(--shadow-lg)',
-            textAlign: 'center',
-            padding: '32px 24px 24px',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            animation: 'slideUp .2s ease'
-          }}>
-            {/* Icon */}
-            <div style={{
-              width: 60,
-              height: 60,
-              borderRadius: '50%',
-              background: alertConfig.type === 'success'
-                ? 'linear-gradient(135deg, #dcfce7, #bbf7d0)'
-                : 'linear-gradient(135deg, #fee2e2, #fecaca)',
-              color: alertConfig.type === 'success' ? '#10b981' : '#ef4444',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: 20,
-              boxShadow: alertConfig.type === 'success'
-                ? '0 10px 15px -3px rgba(16, 185, 129, 0.2)'
-                : '0 10px 15px -3px rgba(239, 68, 68, 0.2)'
-            }}>
-              {alertConfig.type === 'success' ? (
-                <CheckCircle2 size={32} strokeWidth={2.5} />
-              ) : (
-                <XCircle size={32} strokeWidth={2.5} />
-              )}
-            </div>
-
-            {/* Content */}
-            <h3 style={{
-              fontSize: '1.25rem',
-              fontWeight: 800,
-              color: 'var(--text-primary)',
-              marginBottom: 8,
-              letterSpacing: '-0.3px'
-            }}>
-              {alertConfig.title}
-            </h3>
-            <p style={{
-              fontSize: '0.925rem',
-              color: 'var(--text-secondary)',
-              lineHeight: 1.5,
-              marginBottom: 24,
-              padding: '0 8px'
-            }}>
-              {alertConfig.message}
-            </p>
-
-            {/* Buttons */}
-            <button
-              onClick={() => {
-                setAlertConfig(prev => ({ ...prev, isOpen: false }));
-                if (alertConfig.onConfirm) alertConfig.onConfirm();
-              }}
-              className="btn btn-primary"
-              style={{
-                width: '100%',
-                padding: '12px',
-                borderRadius: 12,
-                fontWeight: 700,
-                fontSize: '0.9rem',
-                border: 'none',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              {alertConfig.type === 'success' ? 'Go to Projects' : 'Close'}
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

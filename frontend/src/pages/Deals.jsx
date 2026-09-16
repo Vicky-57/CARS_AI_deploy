@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Briefcase, Clock, DollarSign, Plus, CheckCircle, Car, Search, SearchX, ChevronLeft, RefreshCw } from 'lucide-react';
+import { Briefcase, Clock, DollarSign, Plus, Car, Search, SearchX, ChevronLeft, RefreshCw } from 'lucide-react';
 import { api } from '../api/api';
 import CreateProjectModal from '../components/CreateProjectModal';
 
@@ -163,13 +163,11 @@ export default function Deals() {
     (d.target_vehicle || '').toLowerCase().includes(search.toLowerCase())
   );
 
-  // Reset to page 1 whenever search changes
   useEffect(() => { setCurrentPage(1); }, [search]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  // Build page number array (max 5 buttons around current)
   const getPageNumbers = () => {
     const pages = [];
     const start = Math.max(1, currentPage - 2);
@@ -179,34 +177,34 @@ export default function Deals() {
   };
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div className="page-header" style={{ alignItems: 'flex-end', marginBottom: 32 }}>
+    <div style={{ height: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <div className="page-header" style={{ marginBottom: 16 }}>
         <div className="page-header-left">
-          <h1 style={{ fontSize: '1.85rem', fontWeight: 800, letterSpacing: '-0.5px', color: '#0f172a', margin: '0 0 6px 0' }}>Deals</h1>
-          <p style={{ fontSize: '0.9rem' }}>Review completed projects, log post-sale labor, and track expenses.</p>
+          <h1 className="page-title">Deals & Post-Sale Logs</h1>
+          <p className="page-subtitle">Track completed broker transactions, labor hours, and post-sale vehicle costs</p>
         </div>
-        <div style={{ display: 'flex', gap: 12 }}>
-          <button className="btn btn-primary" onClick={() => setIsDealModalOpen(true)} style={{ padding: '8px 16px' }}>
-            <Plus size={16} /> New Deal
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-secondary btn-sm" onClick={loadDeals}>
+            <RefreshCw size={13} /> Refresh
           </button>
-          <button className="btn btn-secondary" onClick={loadDeals} style={{ padding: '8px 16px' }}>
-            <RefreshCw size={14} /> Refresh
+          <button className="btn btn-primary btn-sm" onClick={() => setIsDealModalOpen(true)}>
+            <Plus size={14} /> New Deal
           </button>
         </div>
       </div>
 
-      <div className={`split-panel deals-split-panel ${selectedDeal ? 'thread-active' : ''}`} style={{ flex: 1 }}>
+      <div className={`split-panel ${selectedDeal ? 'thread-active' : ''}`} style={{ flex: 1, minHeight: 0 }}>
         
         {/* LEFT: Deals List */}
         <div className="split-left" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
-            <div className="search-bar" style={{ borderRadius: 9999, padding: '8px 16px', maxWidth: '100%' }}>
-              <Search size={16} />
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
+            <div className="search-bar" style={{ maxWidth: '100%' }}>
+              <Search size={13} />
               <input 
-                placeholder="Search deals..." 
+                placeholder="Search deals by client or vehicle…" 
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                style={{ fontSize: '0.85rem' }}
               />
             </div>
           </div>
@@ -214,12 +212,12 @@ export default function Deals() {
           <div style={{ flex: 1, overflowY: 'auto' }}>
             {loading ? (
               <div style={{ padding: 40, textAlign: 'center' }}>
-                <div className="spinner" style={{ margin: '0 auto', width: 24, height: 24, borderWidth: 2 }} />
+                <div className="spinner" style={{ margin: '0 auto' }} />
               </div>
             ) : filtered.length === 0 ? (
-              <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)' }}>
-                <SearchX size={32} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
-                <div style={{ fontWeight: 500, fontSize: '0.9rem' }}>No deals found</div>
+              <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+                <SearchX size={28} style={{ margin: '0 auto 8px', opacity: 0.4 }} />
+                <div style={{ fontWeight: 500, fontSize: '0.85rem' }}>No deals found</div>
               </div>
             ) : (
               paginated.map(deal => {
@@ -229,27 +227,25 @@ export default function Deals() {
                     key={deal.id} 
                     className={`contact-item ${isSelected ? 'active' : ''}`}
                     onClick={() => setSelectedDeal(deal)}
-                    style={{ padding: '16px 20px', gap: 16 }}
                   >
-                    <div className="notranslate" style={{ 
-                      width: 42, height: 42, borderRadius: '50%', 
-                      background: 'linear-gradient(135deg, var(--gray-100), var(--gray-200))',
+                    <div style={{ 
+                      width: 32, height: 32, borderRadius: 'var(--radius-sm)', 
+                      background: 'var(--bg-canvas)',
+                      border: '1px solid var(--border)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '0.9rem', fontWeight: 700, color: 'var(--gray-600)',
+                      fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-primary)',
                       flexShrink: 0
                     }}>
                       {getInitials(deal.client_name)}
                     </div>
                     <div className="contact-info">
-                      <div className="contact-name" style={{ fontSize: '0.95rem', marginBottom: 2 }}>{deal.client_name}</div>
-                      <div className="contact-preview" style={{ fontSize: '0.8rem' }}>{deal.target_vehicle || 'No vehicle specified'}</div>
+                      <div className="contact-name">{deal.client_name}</div>
+                      <div className="contact-preview">{deal.target_vehicle || 'No vehicle specified'}</div>
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500, flexShrink: 0 }}>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 500, flexShrink: 0 }}>
                       {(() => {
                         const d = new Date(deal.updated_at);
-                        const day = String(d.getDate()).padStart(2, '0');
-                        const month = String(d.getMonth() + 1).padStart(2, '0');
-                        return `${day}/${month}/${d.getFullYear()}`;
+                        return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
                       })()}
                     </div>
                   </div>
@@ -258,19 +254,18 @@ export default function Deals() {
             )}
           </div>
 
-          {/* ── Pagination Bar ── */}
+          {/* Pagination Bar */}
           {filtered.length > PAGE_SIZE && (
             <div style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '12px 16px',
+              padding: '8px 12px',
               borderTop: '1px solid var(--border)',
               background: 'var(--surface)',
-              flexWrap: 'wrap',
-              gap: 8
+              fontSize: '0.75rem'
             }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+              <span style={{ color: 'var(--text-muted)' }}>
                 {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length}
               </span>
 
@@ -278,49 +273,24 @@ export default function Deals() {
                 <button
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  style={{
-                    padding: '4px 8px',
-                    borderRadius: 6,
-                    border: '1px solid var(--border)',
-                    background: currentPage === 1 ? 'var(--gray-50)' : 'var(--surface)',
-                    color: currentPage === 1 ? 'var(--text-muted)' : 'var(--text-primary)',
-                    fontWeight: 600,
-                    fontSize: '0.75rem',
-                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                  }}
+                  className="btn btn-secondary btn-sm"
+                  style={{ padding: '2px 6px' }}
                 >←</button>
 
                 {getPageNumbers().map(n => (
                   <button
                     key={n}
                     onClick={() => setCurrentPage(n)}
-                    style={{
-                      padding: '4px 8px',
-                      borderRadius: 6,
-                      border: n === currentPage ? 'none' : '1px solid var(--border)',
-                      background: n === currentPage ? 'var(--brand-600)' : 'var(--surface)',
-                      color: n === currentPage ? '#ffffff' : 'var(--text-primary)',
-                      fontWeight: n === currentPage ? 700 : 600,
-                      fontSize: '0.75rem',
-                      cursor: 'pointer',
-                      minWidth: 28,
-                    }}
+                    className={`btn btn-sm ${n === currentPage ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ padding: '2px 8px', minWidth: 24 }}
                   >{n}</button>
                 ))}
 
                 <button
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
-                  style={{
-                    padding: '4px 8px',
-                    borderRadius: 6,
-                    border: '1px solid var(--border)',
-                    background: currentPage === totalPages ? 'var(--gray-50)' : 'var(--surface)',
-                    color: currentPage === totalPages ? 'var(--text-muted)' : 'var(--text-primary)',
-                    fontWeight: 600,
-                    fontSize: '0.75rem',
-                    cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                  }}
+                  className="btn btn-secondary btn-sm"
+                  style={{ padding: '2px 6px' }}
                 >→</button>
               </div>
             </div>
@@ -333,120 +303,106 @@ export default function Deals() {
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               
               {/* Header */}
-              <div className="thread-header deals-header-mobile" style={{ justifyContent: 'space-between', padding: '20px 28px', background: 'var(--surface)', borderBottom: '1px solid var(--gray-200)', gap: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+              <div className="thread-header" style={{ justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                   <button className="btn-icon show-on-mobile" style={{ marginRight: -4, padding: 4 }} onClick={() => setSelectedDeal(null)}>
-                    <ChevronLeft size={20} />
+                    <ChevronLeft size={18} />
                   </button>
-                  <div className="deals-avatar-mobile notranslate" style={{ 
-                    width: 52, height: 52, borderRadius: '50%', 
-                    background: 'linear-gradient(135deg, var(--brand-100), var(--brand-200))',
+                  <div style={{ 
+                    width: 36, height: 36, borderRadius: 'var(--radius-sm)', 
+                    background: 'var(--bg-canvas)', border: '1px solid var(--border)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '1.2rem', fontWeight: 700, color: 'var(--brand-700)',
+                    fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)',
                     flexShrink: 0
                   }}>
                     {getInitials(selectedDeal.client_name)}
                   </div>
                   <div style={{ minWidth: 0 }}>
-                    <h3 className="deals-name-mobile" style={{ margin: '0 0 4px', fontSize: '1.25rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedDeal.client_name}</h3>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'flex-start', gap: 6, fontWeight: 500 }}>
-                      <Car size={14} style={{ flexShrink: 0, marginTop: 2 }} /> 
-                      <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{selectedDeal.target_vehicle || 'Vehicle details missing'}</span>
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4, display: 'flex', gap: 12, alignItems: 'center', fontWeight: 500 }}>
-                      <span>📅 Created: {selectedDeal.created_at ? new Date(selectedDeal.created_at).toLocaleDateString() : '—'}</span>
-                      <span>🔄 Updated: {selectedDeal.updated_at ? new Date(selectedDeal.updated_at).toLocaleDateString() : '—'}</span>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>{selectedDeal.client_name}</div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <Car size={13} /> 
+                      <span>{selectedDeal.target_vehicle || 'Vehicle details'}</span>
                     </div>
                   </div>
                 </div>
-                <div className={`badge ${selectedDeal.project_type === 'BUY' ? 'badge-buy' : 'badge-sell'}`} style={{ padding: '6px 12px', fontSize: '0.75rem', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                <div className={`badge ${selectedDeal.project_type === 'BUY' ? 'badge-info' : 'badge-success'}`}>
                   {selectedDeal.project_type} DEAL
                 </div>
               </div>
 
               {/* Details Body */}
-              <div className="deals-body-mobile" style={{ flex: 1, padding: '32px 28px', overflowY: 'auto', background: 'var(--gray-50)' }}>
+              <div style={{ flex: 1, padding: 20, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
                 
-                {/* Financials Overview */}
-                <div className="grid-2" style={{ gap: 20, marginBottom: 32 }}>
-                  <div className="stat-card" style={{ background: 'var(--surface)', border: 'none', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                    <div className="stat-card-header">
-                      <span className="stat-label" style={{ fontWeight: 600 }}>Total Labor Logged</span>
-                      <div className="stat-icon purple" style={{ width: 40, height: 40 }}><Clock size={18} /></div>
-                    </div>
-                    <div className="stat-value" style={{ fontSize: '2rem' }}>{calculateTotalTime(selectedDeal.project_labor).toFixed(1)}h</div>
+                {/* Financials Overview Cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div className="kpi-card">
+                    <div className="kpi-title">Labor Time Logged</div>
+                    <div className="kpi-value">{calculateTotalTime(selectedDeal.project_labor).toFixed(1)}h</div>
                   </div>
-                  <div className="stat-card" style={{ background: 'var(--surface)', border: 'none', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                    <div className="stat-card-header">
-                      <span className="stat-label" style={{ fontWeight: 600 }}>Total Expenses</span>
-                      <div className="stat-icon amber" style={{ width: 40, height: 40 }}><DollarSign size={18} /></div>
-                    </div>
-                    <div className="stat-value" style={{ fontSize: '2rem' }}>€{calculateTotalExpenses(selectedDeal.project_expenses).toFixed(2)}</div>
+                  <div className="kpi-card">
+                    <div className="kpi-title">Total Project Expenses</div>
+                    <div className="kpi-value">€{calculateTotalExpenses(selectedDeal.project_expenses).toFixed(2)}</div>
                   </div>
                 </div>
 
                 {/* Details Lists */}
-                <div className="grid-2" style={{ gap: 24 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   
                   {/* Labor Logs */}
-                  <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-lg)', padding: 24, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-                      <h4 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>Labor History</h4>
-                      <button className="btn btn-primary btn-sm" onClick={() => setShowTimeModal(true)}>
-                        <Plus size={14} /> Log Time
+                  <div className="card">
+                    <div className="card-header" style={{ justifyContent: 'space-between' }}>
+                      <span className="card-title" style={{ fontSize: '0.85rem' }}>Labor History</span>
+                      <button className="btn btn-secondary btn-sm" onClick={() => setShowTimeModal(true)}>
+                        <Plus size={12} /> Log Time
                       </button>
                     </div>
-                    {(!selectedDeal.project_labor || selectedDeal.project_labor.length === 0) ? (
-                      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', padding: '20px 0' }}>No time logged.</p>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        {selectedDeal.project_labor.map(labor => (
-                          <div key={labor.id} style={{ padding: 16, background: 'var(--gray-50)', borderRadius: 8 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
-                              <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--brand-700)' }}>{labor.hours_spent} hours</span>
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>{(() => {
-                                const d = new Date(labor.logged_at);
-                                const day = String(d.getDate()).padStart(2, '0');
-                                const month = String(d.getMonth() + 1).padStart(2, '0');
-                                return `${day}/${month}/${d.getFullYear()}`;
-                              })()}</span>
+                    <div className="card-body" style={{ padding: 12 }}>
+                      {(!selectedDeal.project_labor || selectedDeal.project_labor.length === 0) ? (
+                        <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center', margin: '16px 0' }}>No labor time logged.</p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {selectedDeal.project_labor.map(labor => (
+                            <div key={labor.id} style={{ padding: 10, background: 'var(--bg-canvas)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, alignItems: 'center' }}>
+                                <span style={{ fontWeight: 600, fontSize: '0.8125rem', color: 'var(--text-primary)' }}>{labor.hours_spent} hours</span>
+                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{(() => {
+                                  const d = new Date(labor.logged_at);
+                                  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+                                })()}</span>
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{labor.activity_description}</div>
                             </div>
-                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{labor.activity_description}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Expense Logs */}
-                  <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-lg)', padding: 24, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-                      <h4 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>Expense History</h4>
-                      <button className="btn btn-primary btn-sm" onClick={() => setShowExpenseModal(true)}>
-                        <Plus size={14} /> Log Expense
+                  <div className="card">
+                    <div className="card-header" style={{ justifyContent: 'space-between' }}>
+                      <span className="card-title" style={{ fontSize: '0.85rem' }}>Expense History</span>
+                      <button className="btn btn-secondary btn-sm" onClick={() => setShowExpenseModal(true)}>
+                        <Plus size={12} /> Log Expense
                       </button>
                     </div>
-                    {(!selectedDeal.project_expenses || selectedDeal.project_expenses.length === 0) ? (
-                      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', padding: '20px 0' }}>No expenses logged.</p>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        {selectedDeal.project_expenses.map(expense => (
-                          <div key={expense.id} style={{ padding: 16, background: 'var(--gray-50)', borderRadius: 8 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
-                              <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#d97706' }}>€{expense.amount.toFixed(2)}</span>
-                              <span className="badge" style={{ fontSize: '0.65rem' }}>{expense.expense_type}</span>
+                    <div className="card-body" style={{ padding: 12 }}>
+                      {(!selectedDeal.project_expenses || selectedDeal.project_expenses.length === 0) ? (
+                        <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center', margin: '16px 0' }}>No expenses logged.</p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {selectedDeal.project_expenses.map(expense => (
+                            <div key={expense.id} style={{ padding: 10, background: 'var(--bg-canvas)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, alignItems: 'center' }}>
+                                <span style={{ fontWeight: 700, fontSize: '0.8125rem', color: 'var(--text-primary)' }}>€{expense.amount.toFixed(2)}</span>
+                                <span className="badge badge-neutral" style={{ fontSize: '0.62rem' }}>{expense.expense_type}</span>
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{expense.description}</div>
                             </div>
-                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{expense.description}</div>
-                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 8, fontWeight: 500 }}>{(() => {
-                              const d = new Date(expense.logged_at);
-                              const day = String(d.getDate()).padStart(2, '0');
-                              const month = String(d.getMonth() + 1).padStart(2, '0');
-                              return `${day}/${month}/${d.getFullYear()}`;
-                            })()}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                 </div>
@@ -454,9 +410,9 @@ export default function Deals() {
             </div>
           ) : (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-              <Briefcase size={48} style={{ opacity: 0.2, marginBottom: 16 }} />
-              <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>No deal selected</div>
-              <div style={{ fontSize: '0.9rem', marginTop: 4 }}>Select a deal to view details and log info.</div>
+              <Briefcase size={36} style={{ opacity: 0.2, marginBottom: 12 }} />
+              <div style={{ fontSize: '0.95rem', fontWeight: 600 }}>No deal selected</div>
+              <div style={{ fontSize: '0.8rem', marginTop: 2 }}>Select a deal to view details and log labor or expenses.</div>
             </div>
           )}
         </div>
@@ -465,13 +421,13 @@ export default function Deals() {
       {/* Time Logging Modal */}
       {showTimeModal && (
         <div className="modal-overlay" onClick={() => setShowTimeModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
             <div className="modal-header">
-              <h3 className="modal-title">Log Time</h3>
+              <h3 className="modal-title">Log Labor Time</h3>
               <button className="btn-icon" onClick={() => setShowTimeModal(false)}>✕</button>
             </div>
-            <form onSubmit={handleLogTime} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-              <div className="modal-body" style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <form onSubmit={handleLogTime} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label">Hours Spent</label>
                   <input 
@@ -488,6 +444,7 @@ export default function Deals() {
                   <label className="form-label">Description of Activity</label>
                   <textarea 
                     className="form-textarea" 
+                    rows={3}
                     value={timeForm.description}
                     onChange={e => setTimeForm({...timeForm, description: e.target.value})}
                     required
@@ -506,13 +463,13 @@ export default function Deals() {
       {/* Expense Logging Modal */}
       {showExpenseModal && (
         <div className="modal-overlay" onClick={() => setShowExpenseModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
             <div className="modal-header">
               <h3 className="modal-title">Log Expense</h3>
               <button className="btn-icon" onClick={() => setShowExpenseModal(false)}>✕</button>
             </div>
-            <form onSubmit={handleLogExpense} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-              <div className="modal-body" style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <form onSubmit={handleLogExpense} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label">Amount (€)</label>
                   <input 
@@ -545,6 +502,7 @@ export default function Deals() {
                   <label className="form-label">Description</label>
                   <textarea 
                     className="form-textarea" 
+                    rows={3}
                     value={expenseForm.description}
                     onChange={e => setExpenseForm({...expenseForm, description: e.target.value})}
                     required

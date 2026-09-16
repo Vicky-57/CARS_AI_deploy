@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Car, CheckCircle, ChevronLeft, ChevronRight, Loader, ChevronDown } from 'lucide-react';
+import { Car, CheckCircle, ChevronLeft, ChevronRight, Loader } from 'lucide-react';
 import { api } from '../api/api';
-
-const SECTION_LABEL = (en, de) => ({ en, de });
 
 function Field({ label, de, type = 'text', required = false, placeholder = '', full = false, value, onChange, disabled = false }) {
   const id = (label + de).replace(/\s+/g, '-').toLowerCase();
@@ -10,7 +8,7 @@ function Field({ label, de, type = 'text', required = false, placeholder = '', f
     <div className="form-group" style={full ? { gridColumn: '1 / -1' } : undefined}>
       <label className="form-label" htmlFor={id}>
         {label} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>[{de}]</span>
-        {required && <span style={{ color: 'var(--danger, #dc2626)' }}> *</span>}
+        {required && <span style={{ color: 'var(--danger)' }}> *</span>}
       </label>
       <input id={id} className="form-input" type={type} required={required} placeholder={placeholder} value={value ?? ''} onChange={e => onChange(e.target.value)} disabled={disabled} />
     </div>
@@ -23,31 +21,22 @@ function SelectField({ label, de, required = false, options = [], value, onChang
     <div className="form-group" style={full ? { gridColumn: '1 / -1' } : undefined}>
       <label className="form-label" htmlFor={id}>
         {label} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>[{de}]</span>
-        {required && <span style={{ color: '#dc2626' }}> *</span>}
+        {required && <span style={{ color: 'var(--danger)' }}> *</span>}
       </label>
-      <div style={{ position: 'relative' }}>
-        <select 
-          id={id} 
-          className="form-select" 
-          required={required} 
-          value={value ?? ''} 
-          onChange={e => onChange(e.target.value)}
-          disabled={disabled}
-          style={{ 
-            appearance: 'none', WebkitAppearance: 'none',
-            paddingRight: 36, cursor: 'pointer', width: '100%',
-            borderColor: '#e2e8f0', background: '#ffffff', color: '#0f172a'
-          }}
-        >
-          <option value="">— Please select / Bitte wählen —</option>
-          {options.map(o => (
-            <option key={o} value={o}>{o}</option>
-          ))}
-        </select>
-        <div style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#ea580c' }}>
-          <ChevronDown size={16} />
-        </div>
-      </div>
+      <select 
+        id={id} 
+        className="form-select" 
+        required={required} 
+        value={value ?? ''} 
+        onChange={e => onChange(e.target.value)}
+        disabled={disabled}
+        style={{ width: '100%' }}
+      >
+        <option value="">— Please select / Bitte wählen —</option>
+        {options.map(o => (
+          <option key={o} value={o}>{o}</option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -58,7 +47,7 @@ function TextAreaField({ label, de, required = false, placeholder = '', full = f
     <div className="form-group" style={full ? { gridColumn: '1 / -1' } : undefined}>
       <label className="form-label" htmlFor={id}>
         {label} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>[{de}]</span>
-        {required && <span style={{ color: '#dc2626' }}> *</span>}
+        {required && <span style={{ color: 'var(--danger)' }}> *</span>}
       </label>
       <textarea id={id} className="form-textarea" rows={3} required={required} placeholder={placeholder} value={value ?? ''} onChange={e => onChange(e.target.value)} />
     </div>
@@ -67,54 +56,50 @@ function TextAreaField({ label, de, required = false, placeholder = '', full = f
 
 function SectionTitle({ num, en, de }) {
   return (
-    <div style={{ gridColumn: '1 / -1', marginTop: 8 }}>
-      <h2 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: 2, color: 'var(--brand-700, #1d4ed8)' }}>
-        {num}. {en} <span style={{ color: 'var(--text-muted)', fontWeight: 500, fontSize: '0.85rem' }}>[{de}]</span>
-      </h2>
-      <div style={{ height: 2, background: 'var(--brand-100, #dbeafe)', borderRadius: 2, marginBottom: 20 }} />
+    <div style={{ gridColumn: '1 / -1', marginTop: 12, marginBottom: 8 }}>
+      <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className="badge badge-neutral" style={{ fontSize: '0.75rem', padding: '2px 8px' }}>Section {num}</span>
+        <span>{en} <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '0.8rem' }}>[{de}]</span></span>
+      </div>
+      <div style={{ height: 1, background: 'var(--border)', marginTop: 8 }} />
     </div>
   );
 }
 
 function CheckItem({ label, de, checked, onChange }) {
   return (
-    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8125rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
       <input type="checkbox" checked={!!checked} onChange={e => onChange(e.target.checked)} />
-      {label} <span style={{ color: 'var(--text-muted)' }}>[{de}]</span>
+      <span>{label} <span style={{ color: 'var(--text-muted)' }}>[{de}]</span></span>
     </label>
   );
 }
 
 function ServiceItem({ label, de, priceType = 'number', value, onPriceChange, onBillingChange }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.85rem', color: 'var(--text-primary)', flexWrap: 'wrap' }}>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 180 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.8125rem', color: 'var(--text-primary)', flexWrap: 'wrap', padding: '6px 0' }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 180, cursor: 'pointer' }}>
         <input type="checkbox" checked={!!(value && value.price)} onChange={e => onPriceChange(e.target.checked ? '0' : '')} />
-        {label} <span style={{ color: 'var(--text-muted)' }}>[{de}]</span>
+        <span>{label} <span style={{ color: 'var(--text-muted)' }}>[{de}]</span></span>
       </label>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Price [Preis]</span>
-        <input type={priceType} className="form-input" style={{ width: 90, padding: '4px 8px', fontSize: '0.8rem' }} placeholder="€" value={value?.price ?? ''} onChange={e => onPriceChange(e.target.value)} />
+        <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Price:</span>
+        <input type={priceType} className="form-input" style={{ width: 85, padding: '4px 8px', fontSize: '0.8rem' }} placeholder="€" value={value?.price ?? ''} onChange={e => onPriceChange(e.target.value)} />
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Billing [Abrechnung]</span>
-        <div style={{ position: 'relative' }}>
-          <select 
-            className="form-select" 
-            style={{ width: 110, padding: '4px 28px 4px 8px', fontSize: '0.8rem', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }} 
-            value={value?.billing ?? ''} 
-            onChange={e => onBillingChange(e.target.value)}
-          >
-            <option value="">—</option>
-            <option>VK</option>
-            <option>VR</option>
-            <option>INCL</option>
-            <option>SZ</option>
-          </select>
-          <div style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#ea580c' }}>
-            <ChevronDown size={14} />
-          </div>
-        </div>
+        <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Billing:</span>
+        <select 
+          className="form-select" 
+          style={{ width: 90, padding: '4px 8px', fontSize: '0.8rem' }} 
+          value={value?.billing ?? ''} 
+          onChange={e => onBillingChange(e.target.value)}
+        >
+          <option value="">—</option>
+          <option>VK</option>
+          <option>VR</option>
+          <option>INCL</option>
+          <option>SZ</option>
+        </select>
       </div>
     </div>
   );
@@ -155,7 +140,6 @@ export default function SellForm() {
 
   const setF = (k) => (v) => setForm(prev => ({ ...prev, [k]: v }));
 
-  // Load session from ?token=
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
@@ -169,8 +153,7 @@ export default function SellForm() {
     }
   }, []);
 
-  // Persist current step to backend
-  const saveStep = async (nextStep) => {
+  const saveStep = async () => {
     if (!sessionId) return true;
     setSaving(true);
     try {
@@ -191,36 +174,32 @@ export default function SellForm() {
   };
 
   const goNext = async () => {
-    const ok = await saveStep(step + 1);
+    const ok = await saveStep();
     if (ok) setStep(s => Math.min(5, s + 1));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const ok = await saveStep(5);
-    if (ok) {
-      setSaved(true);
-    }
+    const ok = await saveStep();
+    if (ok) setSaved(true);
   };
 
   const steps = [
-    { n: 1, label: 'Personal Details / Persönliche Daten' },
-    { n: 2, label: 'Vehicle / Fahrzeug' },
-    { n: 3, label: 'Condition / Zustand' },
-    { n: 4, label: 'Price & Package / Preis & Paket' },
-    { n: 5, label: 'Handover / Übergabe' },
+    { n: 1, label: 'Personal Details' },
+    { n: 2, label: 'Vehicle Specs' },
+    { n: 3, label: 'Condition' },
+    { n: 4, label: 'Price & Package' },
+    { n: 5, label: 'Handover' },
   ];
 
   if (saved) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--gray-50,#f9fafb)', padding: 32 }}>
-        <div className="card" style={{ maxWidth: 480, textAlign: 'center', padding: 40, border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.08)', borderRadius: 16 }}>
-          <CheckCircle size={48} color="var(--success,#16a34a)" style={{ margin: '0 auto 16px' }} />
-          <h2 style={{ margin: '0 0 8px', fontSize: '1.3rem' }}>Thank you! / Vielen Dank!</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: 0 }}>
-            Your information has been saved. We will contact you shortly.
-            <br />
-            Ihre Angaben wurden gespeichert. Wir melden uns in Kürze.
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-canvas)', padding: 32 }}>
+        <div className="card" style={{ maxWidth: 480, textAlign: 'center', padding: '40px 32px' }}>
+          <CheckCircle size={44} color="#16a34a" style={{ margin: '0 auto 16px' }} />
+          <h2 style={{ margin: '0 0 8px', fontSize: '1.2rem', fontWeight: 700 }}>Thank you! / Vielen Dank!</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>
+            Your vehicle sales information has been saved. Our broker team will contact you shortly.
           </p>
         </div>
       </div>
@@ -228,72 +207,55 @@ export default function SellForm() {
   }
 
   return (
-    <div className="customer-form-page" style={{
-      minHeight: '100vh', background: 'var(--gray-50, #f9fafb)', padding: '32px 16px',
-      fontFamily: 'inherit',
-    }}>
-      <div style={{ maxWidth: 860, margin: '0 auto' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-canvas)', padding: '32px 16px', fontFamily: 'inherit' }}>
+      <div style={{ maxWidth: 780, margin: '0 auto' }}>
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <div style={{
-            width: 56, height: 56, borderRadius: 16, margin: '0 auto 12px',
-            background: 'linear-gradient(135deg, var(--brand-600,#2563eb), var(--brand-700,#1d4ed8))',
+            width: 44, height: 44, borderRadius: 8, margin: '0 auto 10px',
+            background: 'var(--primary)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white',
           }}>
-            <Car size={28} />
+            <Car size={22} />
           </div>
-          <h1 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
-            Sell Your Vehicle / Fahrzeugverkauf
+          <h1 style={{ fontSize: '1.35rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+            Vehicle Sale Intake / Verkaufsauftrag
           </h1>
-          <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: 6 }}>
-            Complete the form and we will handle the sale of your vehicle.
-            <br />
-            Bitte füllen Sie das Formular aus — wir übernehmen den Verkauf Ihres Fahrzeugs.
+          <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: 4 }}>
+            Enter vehicle specifications, history, and sales conditions for brokerage listing
           </p>
-          <div className="badge badge-sell" style={{ marginTop: 10, padding: '4px 12px' }}>SELL / VERKAUF</div>
         </div>
 
-        {/* Step indicator */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 40, position: 'relative', maxWidth: 640, margin: '0 auto 40px' }}>
-          {/* Connecting line */}
-          <div style={{ position: 'absolute', top: 20, left: '10%', right: '10%', height: 2, background: '#e2e8f0', zIndex: 0 }}></div>
-          
+        {/* Step Progress Bar */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 24, background: 'var(--border)', padding: 3, borderRadius: 'var(--radius-sm)' }}>
           {steps.map((s) => (
-            <div key={s.n} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, position: 'relative', zIndex: 1 }}>
-              <div style={{
-                width: 42, height: 42, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: step === s.n ? '#ba5d39' : '#ffffff',
-                color: step === s.n ? '#ffffff' : '#64748b',
-                border: step === s.n ? 'none' : '3px solid #e2e8f0',
-                fontSize: '0.9rem', fontWeight: 800, marginBottom: 12,
-                boxShadow: step === s.n ? '0 4px 12px rgba(186, 93, 57, 0.3)' : '0 2px 4px rgba(0,0,0,0.02)'
-              }}>
-                0{s.n}
-              </div>
-              <div style={{
-                fontSize: '0.65rem',
-                fontWeight: step === s.n ? 800 : 700,
-                color: step === s.n ? '#0f172a' : '#94a3b8',
-                textTransform: 'uppercase',
+            <button
+              key={s.n}
+              type="button"
+              onClick={() => setStep(s.n)}
+              style={{
+                flex: 1,
+                padding: '8px 4px',
+                borderRadius: 4,
+                border: 'none',
+                background: step === s.n ? 'var(--surface)' : 'transparent',
+                color: step === s.n ? 'var(--text-primary)' : 'var(--text-muted)',
+                boxShadow: step === s.n ? 'var(--shadow-xs)' : 'none',
+                fontWeight: step === s.n ? 700 : 500,
+                fontSize: '0.75rem',
+                cursor: 'pointer',
                 textAlign: 'center',
-                lineHeight: 1.4,
-                letterSpacing: '0.5px',
-                padding: '0 4px'
-              }}>
-                {s.label.split(' / ')[0]}
-                <br />
-                <span style={{ fontSize: '0.55rem', opacity: step === s.n ? 0.7 : 0.5, fontWeight: 600 }}>{s.label.split(' / ')[1]}</span>
-              </div>
-            </div>
+                transition: 'all 0.15s ease'
+              }}
+            >
+              Step {s.n}: {s.label}
+            </button>
           ))}
         </div>
 
-        <div className="card" style={{ border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.08)', borderRadius: 16 }}>
-          <form
-            onSubmit={handleSubmit}
-            className="grid-2"
-            style={{ gap: '4px 20px', padding: 28 }}
-          >
+        {/* Card Form */}
+        <div className="card" style={{ padding: '24px 28px' }}>
+          <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px' }}>
             {/* STEP 1: Personal */}
             {step === 1 && (
               <>
@@ -323,42 +285,23 @@ export default function SellForm() {
                 <Field label="HU/AU valid until" de="HU/AU gültig bis" type="date" value={form.tuev_until} onChange={setF('tuev_until')} />
                 <Field label="Number of Owners" de="Anzahl Halter" type="number" placeholder="2" value={form.owners} onChange={setF('owners')} />
                 <Field label="Color / Paint" de="Farbe / Lackart" placeholder="Schwarz / Uni" value={form.color} onChange={setF('color')} />
-                <Field label="Registration Cert. Part II No." de="Nr. Zulassungsbescheinigung Teil II" placeholder="ABC1234" value={form.zb2} onChange={setF('zb2')} />
-                <Field label="Gas System Test until" de="Gasanlagenprüfung bis" type="date" value={form.gas_until} onChange={setF('gas_until')} />
-                <Field label="Number of Keys" de="Anzahl Schlüssel" type="number" placeholder="2" value={form.keys} onChange={setF('keys')} />
+                <Field label="ZB II Document No." de="Nr. Zulassungsbescheinigung Teil II" placeholder="ABC1234" value={form.zb2} onChange={setF('zb2')} />
               </>
             )}
 
             {/* STEP 3: Condition */}
             {step === 3 && (
               <>
-                <SectionTitle num={3} en="Vehicle Condition & Declarations" de="Fahrzeugzustand & Erklärungen" />
+                <SectionTitle num={3} en="Condition & Declarations" de="Fahrzeugzustand & Erklärungen" />
                 <SelectField label="Accident-free?" de="Unfallfreiheit" required options={['Ja / Yes', 'Nein / No']} value={form.accident_free} onChange={setF('accident_free')} />
-                <Field label="If accident: type/extent" de="Art/Umfang von Unfallschäden" placeholder="Frontschaden, Reparatur 2023" full value={form.accident_details} onChange={setF('accident_details')} />
-                <SelectField label="Still has first engine?" de="Erster Motor" options={['Ja / Yes', 'Nein / No']} value={form.first_engine} onChange={setF('first_engine')} />
-                <Field label="Engine number" de="Motor-Nr." placeholder="WBA3A51050E123456" value={form.engine_number} onChange={setF('engine_number')} />
-                <Field label="Replacement engine mileage (km)" de="KM-Stand Tauschmotor" type="number" placeholder="82000" value={form.engine_mileage} onChange={setF('engine_mileage')} />
-                <Field label="Replacement engine install date" de="Einbaudatum" type="date" value={form.engine_date} onChange={setF('engine_date')} />
+                <Field label="Accident details (if applicable)" de="Art/Umfang Vorschäden" placeholder="Frontschaden, fachgerecht repariert" full value={form.accident_details} onChange={setF('accident_details')} />
+                <SelectField label="Original engine?" de="Erster Motor" options={['Ja / Yes', 'Nein / No']} value={form.first_engine} onChange={setF('first_engine')} />
                 <SelectField label="Commercial use?" de="Gewerbliche Nutzung" options={['Nein / No', 'Ja / Yes']} value={form.commercial} onChange={setF('commercial')} />
-                <SelectField label="Re-import vehicle?" de="Re-Import" options={['Nein / No', 'Ja / Yes']} value={form.reimport} onChange={setF('reimport')} />
-                <Field label="Origin country (if re-import)" de="Herkunftsland" placeholder="Niederlande" value={form.origin} onChange={setF('origin')} />
-                <SelectField label="Ownership" de="Eigentumsverhältnisse" options={['Alleiniges Eigentum / Sole property', 'Belastet mit Rechten Dritter / Encumbered']} value={form.ownership} onChange={setF('ownership')} />
-                <Field label="Details of third-party rights" de="Details Rechte Dritter" placeholder="Offener Kredit" full value={form.third_party} onChange={setF('third_party')} />
-                <TextAreaField label="Known defects / prior damage" de="Bekannte Mängel/Vorschäden" placeholder="Describe any known defects / Bitte Mängel beschreiben" full value={form.defects} onChange={setF('defects')} />
-                <TextAreaField label="Special equipment & accessories" de="Sonderausstattung & Zubehör" placeholder="AHK, Anhängerkupplung, Ledersitze…" full value={form.special_equipment} onChange={setF('special_equipment')} />
+                <SelectField label="Ownership status" de="Eigentumsverhältnisse" options={['Alleiniges Eigentum / Sole owner', 'Belastet mit Rechten Dritter / Encumbered']} value={form.ownership} onChange={setF('ownership')} />
+                <TextAreaField label="Known defects / issues" de="Bekannte Mängel" placeholder="Describe any known defects" full value={form.defects} onChange={setF('defects')} />
+                <TextAreaField label="Special equipment & features" de="Sonderausstattung" placeholder="AHK, Panoramadach, Leder..." full value={form.special_equipment} onChange={setF('special_equipment')} />
                 <SelectField label="Mounted tires" de="Montierte Bereifung" options={['Sommer / Summer', 'Winter / Winter', 'Allwetter / All-season']} value={form.tires} onChange={setF('tires')} />
-                <SelectField label="Tire profile" de="Reifenprofil" options={['Neu / New', 'Gut / Good', 'Brauchbar / Usable', 'Verschlissen / Worn']} value={form.tire_profile} onChange={setF('tire_profile')} />
-                <SelectField label="Additional wheelset" de="Zusätzlicher Radsatz" options={['Keiner / None', 'Sommer / Summer', 'Winter / Winter', 'Allwetter / All-season']} value={form.wheelset} onChange={setF('wheelset')} />
-                <SelectField label="Spare wheel" de="Reserverad" options={['Ja / Yes', 'Nein / No']} value={form.spare} onChange={setF('spare')} />
-                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                  <label className="form-label">Tread depth (mm) [Profiltiefe (mm)] — for Kaufvertrag</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, background: 'var(--gray-50,#f9fafb)', padding: 14, borderRadius: 10 }}>
-                    <Field label="Front left / VL" de="Profiltiefe" type="number" placeholder="mm" value={form.tread_vl} onChange={setF('tread_vl')} />
-                    <Field label="Front right / VR" de="Profiltiefe" type="number" placeholder="mm" value={form.tread_vr} onChange={setF('tread_vr')} />
-                    <Field label="Rear left / HL" de="Profiltiefe" type="number" placeholder="mm" value={form.tread_hl} onChange={setF('tread_hl')} />
-                    <Field label="Rear right / HR" de="Profiltiefe" type="number" placeholder="mm" value={form.tread_hr} onChange={setF('tread_hr')} />
-                  </div>
-                </div>
+                <SelectField label="Tire profile condition" de="Reifenprofil" options={['Neu / New', 'Gut / Good', 'Brauchbar / Usable', 'Verschlissen / Worn']} value={form.tire_profile} onChange={setF('tire_profile')} />
               </>
             )}
 
@@ -366,34 +309,20 @@ export default function SellForm() {
             {step === 4 && (
               <>
                 <SectionTitle num={4} en="Price & Service Package" de="Preis & Leistungspaket" />
-                <Field label="Minimum sale price (€)" de="Mindestverkaufspreis (€)" required type="number" placeholder="15000" value={form.min_price} onChange={setF('min_price')} />
-                <Field label="Final purchase price (€) — for Kaufvertrag" de="Kaufpreis (€)" required type="number" placeholder="16200" value={form.final_price} onChange={setF('final_price')} />
-                <SelectField label="Service package" de="Leistungspaket" required full options={[
-                  'Essential – €347 (4 weeks / Wochen)',
-                  'Advanced – €1,247 (8 weeks / Wochen)',
-                  'Concierge – €2,497 (12 weeks / Wochen)',
+                <Field label="Minimum Sales Price (€)" de="Mindestverkaufspreis (€)" required type="number" placeholder="15000" value={form.min_price} onChange={setF('min_price')} />
+                <Field label="Final Purchase Price (€) — for contract" de="Kaufpreis (€)" required type="number" placeholder="16200" value={form.final_price} onChange={setF('final_price')} />
+                <SelectField label="Service Package" de="Leistungspaket" required options={[
+                  'Essential – €347 (4 weeks)',
+                  'Advanced – €1,247 (8 weeks)',
+                  'Concierge – €2,497 (12 weeks)',
                 ]} value={form.package} onChange={setF('package')} />
-                <Field label="Special agreements" de="Sondervereinbarungen" placeholder="Anything else agreed / Sonstige Absprachen" full value={form.special_agreements} onChange={setF('special_agreements')} />
-                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                  <label className="form-label">Additional services (optional) / Zusatzservices (optional)</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10, background: 'var(--gray-50,#f9fafb)', padding: 14, borderRadius: 10 }}>
-                    <ServiceItem label="Vehicle detailing" de="Fahrzeugaufbereitung" value={services.detailing} onPriceChange={v => setServices(s => ({ ...s, detailing: { ...s.detailing, price: v } }))} onBillingChange={v => setServices(s => ({ ...s, detailing: { ...s.detailing, billing: v } }))} />
-                    <ServiceItem label="Extra cleaning" de="Zusätzliche Reinigung" value={services.cleaning} onPriceChange={v => setServices(s => ({ ...s, cleaning: { ...s.cleaning, price: v } }))} onBillingChange={v => setServices(s => ({ ...s, cleaning: { ...s.cleaning, billing: v } }))} />
-                    <ServiceItem label="HU/AU renewal" de="HU/AU-Auffrischung" value={services.hau} onPriceChange={v => setServices(s => ({ ...s, hau: { ...s.hau, price: v } }))} onBillingChange={v => setServices(s => ({ ...s, hau: { ...s.hau, billing: v } }))} />
-                    <ServiceItem label="TÜV/DEKRA condition certificate" de="Zustandszertifikat" value={services.cert} onPriceChange={v => setServices(s => ({ ...s, cert: { ...s.cert, price: v } }))} onBillingChange={v => setServices(s => ({ ...s, cert: { ...s.cert, billing: v } }))} />
-                    <ServiceItem label="Appraisal / valuation" de="Wert-/Zustandsgutachten" value={services.appraisal} onPriceChange={v => setServices(s => ({ ...s, appraisal: { ...s.appraisal, price: v } }))} onBillingChange={v => setServices(s => ({ ...s, appraisal: { ...s.appraisal, billing: v } }))} />
-                    <ServiceItem label="Service arrangement" de="Service-Vermittlung" value={services.service} onPriceChange={v => setServices(s => ({ ...s, service: { ...s.service, price: v } }))} onBillingChange={v => setServices(s => ({ ...s, service: { ...s.service, billing: v } }))} />
-                    <ServiceItem label="Pickup & delivery" de="Hol- und Bringservice" value={services.pickup} onPriceChange={v => setServices(s => ({ ...s, pickup: { ...s.pickup, price: v } }))} onBillingChange={v => setServices(s => ({ ...s, pickup: { ...s.pickup, billing: v } }))} />
-                    <ServiceItem label="Vehicle transport" de="Überführungsservice" value={services.transport} onPriceChange={v => setServices(s => ({ ...s, transport: { ...s.transport, price: v } }))} onBillingChange={v => setServices(s => ({ ...s, transport: { ...s.transport, billing: v } }))} />
-                    <ServiceItem label="Marketing boost" de="Marketing-Boost" value={services.marketing} onPriceChange={v => setServices(s => ({ ...s, marketing: { ...s.marketing, price: v } }))} onBillingChange={v => setServices(s => ({ ...s, marketing: { ...s.marketing, billing: v } }))} />
-                    <ServiceItem label="Sorglos insurance package" de="Sorglos-Paket-Versicherung" value={services.sorglos} onPriceChange={v => setServices(s => ({ ...s, sorglos: { ...s.sorglos, price: v } }))} onBillingChange={v => setServices(s => ({ ...s, sorglos: { ...s.sorglos, billing: v } }))} />
-                    <ServiceItem label="Storage fees" de="Standgeldgebühren" value={services.storage} onPriceChange={v => setServices(s => ({ ...s, storage: { ...s.storage, price: v } }))} onBillingChange={v => setServices(s => ({ ...s, storage: { ...s.storage, billing: v } }))} />
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10, background: 'var(--gray-50,#f9fafb)', padding: 14, borderRadius: 10, marginTop: 10 }}>
-                    <ServiceItem label="External: Repair work" de="Instandsetzung" value={services.repair} onPriceChange={v => setServices(s => ({ ...s, repair: { ...s.repair, price: v } }))} onBillingChange={v => setServices(s => ({ ...s, repair: { ...s.repair, billing: v } }))} />
-                    <ServiceItem label="External: Maintenance" de="Instandhaltung" value={services.maintenance} onPriceChange={v => setServices(s => ({ ...s, maintenance: { ...s.maintenance, price: v } }))} onBillingChange={v => setServices(s => ({ ...s, maintenance: { ...s.maintenance, billing: v } }))} />
-                    <ServiceItem label="External: Care / other" de="Pflege/Sonstiges" value={services.care} onPriceChange={v => setServices(s => ({ ...s, care: { ...s.care, price: v } }))} onBillingChange={v => setServices(s => ({ ...s, care: { ...s.care, billing: v } }))} />
-                  </div>
+                <Field label="Special Agreements" de="Sondervereinbarungen" placeholder="Additional conditions" full value={form.special_agreements} onChange={setF('special_agreements')} />
+                <div style={{ gridColumn: '1 / -1', background: 'var(--bg-canvas)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: 12 }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 600, marginBottom: 8, color: 'var(--text-primary)' }}>Additional Services:</div>
+                  <ServiceItem label="Vehicle detailing" de="Fahrzeugaufbereitung" value={services.detailing} onPriceChange={v => setServices(s => ({ ...s, detailing: { ...s.detailing, price: v } }))} onBillingChange={v => setServices(s => ({ ...s, detailing: { ...s.detailing, billing: v } }))} />
+                  <ServiceItem label="Extra cleaning" de="Zusätzliche Reinigung" value={services.cleaning} onPriceChange={v => setServices(s => ({ ...s, cleaning: { ...s.cleaning, price: v } }))} onBillingChange={v => setServices(s => ({ ...s, cleaning: { ...s.cleaning, billing: v } }))} />
+                  <ServiceItem label="HU/AU renewal" de="HU/AU-Auffrischung" value={services.hau} onPriceChange={v => setServices(s => ({ ...s, hau: { ...s.hau, price: v } }))} onBillingChange={v => setServices(s => ({ ...s, hau: { ...s.hau, billing: v } }))} />
+                  <ServiceItem label="Appraisal / valuation" de="Wertgutachten" value={services.appraisal} onPriceChange={v => setServices(s => ({ ...s, appraisal: { ...s.appraisal, price: v } }))} onBillingChange={v => setServices(s => ({ ...s, appraisal: { ...s.appraisal, billing: v } }))} />
                 </div>
               </>
             )}
@@ -402,61 +331,37 @@ export default function SellForm() {
             {step === 5 && (
               <>
                 <SectionTitle num={5} en="Handover & Documents" de="Übergabe & Dokumente" />
-                <SelectField label="Will the vehicle be stored with CAR-AGENTS during marketing?" de="Fahrzeug beim Makler abgestellt?" required full
+                <SelectField label="Store vehicle with broker during sales period?" de="Fahrzeug beim Makler abgestellt?" required full
                   options={['Ja / Yes', 'Nein / No']} value={form.stored} onChange={setF('stored')} />
-                <SelectField label="Storage / risk option" de="Verwahrungsoption" full options={[
-                  'Option A – Own insurance / Eigene Versicherung',
-                  'Option B – Sorglos package / Sorglos-Paket (paid)',
-                  'Option C – Own risk without comprehensive cover / Eigenrisiko',
-                ]} value={form.storage_opt} onChange={setF('storage_opt')} />
-                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                  <label className="form-label">Documents handed over / Übergebene Unterlagen</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, background: 'var(--gray-50,#f9fafb)', padding: 14, borderRadius: 10 }}>
-                    <CheckItem label="Registration Certificate Part I" de="Zulassungsbescheinigung Teil I" checked={form.doc_zb1} onChange={setF('doc_zb1')} />
-                    <CheckItem label="Registration Certificate Part II" de="Zulassungsbescheinigung Teil II" checked={form.doc_zb2} onChange={setF('doc_zb2')} />
-                    <CheckItem label="COC paper" de="COC-Papier" checked={form.doc_coc} onChange={setF('doc_coc')} />
-                    <CheckItem label="Service booklet" de="Serviceheft" checked={form.doc_service} onChange={setF('doc_service')} />
-                  </div>
-                </div>
                 <Field label="Number of keys handed over" de="Anzahl übergebener Schlüssel" type="number" placeholder="2" value={form.keys_handed} onChange={setF('keys_handed')} />
-                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: '0.85rem', color: 'var(--text-primary)', background: 'var(--gray-50,#f9fafb)', padding: 14, borderRadius: 10 }}>
+                <div style={{ gridColumn: '1 / -1', padding: '10px 12px', background: 'var(--bg-canvas)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: '0.8125rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
                     <input type="checkbox" required checked={!!form.consent} onChange={e => setF('consent')(e.target.checked)} />
-                    <span>
-                      I confirm that the information provided is complete and correct, and I have read the Terms &amp; Conditions, Fairplay Check and revocation notice.
-                      <br />
-                      <span style={{ color: 'var(--text-muted)' }}>Ich bestätige, dass die Angaben vollständig und korrekt sind und ich AGB, Fairplay-Check und Widerrufsbelehrung erhalten habe.</span>
-                    </span>
+                    <span>I confirm the accuracy of the information provided and agree to CAR-AGENTS Terms & Privacy terms.</span>
                   </label>
                 </div>
-                <Field label="Place" de="Ort" placeholder="Mindelstetten" value={form.place} onChange={setF('place')} />
-                <Field label="Date" de="Datum" type="date" required value={form.date} onChange={setF('date')} />
+                <Field label="Place / Ort" de="Ort" placeholder="Mindelstetten" value={form.place} onChange={setF('place')} />
+                <Field label="Date / Datum" de="Datum" type="date" required value={form.date} onChange={setF('date')} />
               </>
             )}
 
-            {/* Footer */}
-            <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', marginTop: 24, borderTop: '1px solid var(--border)', paddingTop: 20 }}>
-              <button type="button" className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-                onClick={() => setStep(Math.max(1, step - 1))} disabled={step === 1 || saving}>
-                <ChevronLeft size={15} /> Back / Zurück
+            {/* Navigation Footer */}
+            <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setStep(Math.max(1, step - 1))} disabled={step === 1 || saving}>
+                <ChevronLeft size={14} /> Back
               </button>
               {step < 5 ? (
-                <button type="button" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-                  onClick={goNext} disabled={saving}>
-                  {saving ? <Loader size={15} className="spin" /> : <ChevronRight size={15} />} Next / Weiter
+                <button type="button" className="btn btn-primary btn-sm" onClick={goNext} disabled={saving}>
+                  {saving ? <Loader size={14} className="spin" /> : <ChevronRight size={14} />} Next Step
                 </button>
               ) : (
-                <button type="submit" className="btn btn-success" style={{ display: 'flex', alignItems: 'center', gap: 6 }} disabled={saving}>
-                  {saving ? <Loader size={15} className="spin" /> : <CheckCircle size={15} />} Submit / Absenden
+                <button type="submit" className="btn btn-primary btn-sm" disabled={saving}>
+                  {saving ? <Loader size={14} className="spin" /> : <CheckCircle size={14} />} Submit Sales Intake
                 </button>
               )}
             </div>
           </form>
         </div>
-
-        <p style={{ textAlign: 'center', fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 20 }}>
-          CAR-AGENTS · Inhaber: Maxim Lorenz · Lerchenweg 7, 93349 Mindelstetten · info@car-agents.de
-        </p>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, User, Car, DollarSign, Tag, Search, Plus, CheckCircle2 } from 'lucide-react';
+import { X, Car, Tag, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { api } from '../api/api';
 
@@ -23,7 +23,6 @@ export default function CreateProjectModal({ isOpen, onClose, onCreated, default
 
   const [submitting, setSubmitting] = useState(false);
 
-  // Load existing customers on open
   useEffect(() => {
     if (!isOpen) return;
 
@@ -76,7 +75,6 @@ export default function CreateProjectModal({ isOpen, onClose, onCreated, default
     fetchCustomers();
   }, [isOpen, defaultType, defaultStatus]);
 
-  // When dropdown selection changes
   const handleCustomerSelect = (e) => {
     const val = e.target.value;
     setSelectedCustomerId(val);
@@ -137,67 +135,66 @@ export default function CreateProjectModal({ isOpen, onClose, onCreated, default
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 540 }}>
         
         {/* Header */}
         <div className="modal-header">
-          <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Car size={20} color="var(--brand-600)" />
-            {formData.status === 'COMPLETED' ? 'Create New Historical Deal' : 'Create New Brokerage Project'}
-          </h3>
-          <button className="btn-icon" onClick={onClose}><X size={18} /></button>
+          <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Car size={16} />
+            <span>{formData.status === 'COMPLETED' ? 'New Deal Record' : 'New Project DocType'}</span>
+          </div>
+          <button className="btn-icon" onClick={onClose}><X size={16} /></button>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-          <div className="modal-body" style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+          <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
             {/* Pipeline Type Selection */}
             <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label" style={{ fontWeight: 600 }}>Pipeline Type</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <label className="form-label">Pipeline Type</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 <button
                   type="button"
-                  className={`btn ${formData.project_type === 'SELL' ? 'btn-primary' : 'btn-secondary'}`}
+                  className={`btn btn-sm ${formData.project_type === 'SELL' ? 'btn-primary' : 'btn-secondary'}`}
                   onClick={() => setFormData({ ...formData, project_type: 'SELL' })}
-                  style={{ justifyContent: 'center', gap: 8, padding: '10px' }}
+                  style={{ justifyContent: 'center', gap: 6 }}
                 >
-                  <Tag size={16} /> SELL SIDE (Vermittlung)
+                  <Tag size={14} /> SELL (Vermittlung)
                 </button>
                 <button
                   type="button"
-                  className={`btn ${formData.project_type === 'BUY' ? 'btn-primary' : 'btn-secondary'}`}
+                  className={`btn btn-sm ${formData.project_type === 'BUY' ? 'btn-primary' : 'btn-secondary'}`}
                   onClick={() => setFormData({ ...formData, project_type: 'BUY' })}
-                  style={{ justifyContent: 'center', gap: 8, padding: '10px' }}
+                  style={{ justifyContent: 'center', gap: 6 }}
                 >
-                  <Search size={16} /> BUY SIDE (Beschaffung)
+                  <Search size={14} /> BUY (Beschaffung)
                 </button>
               </div>
             </div>
 
             {/* Customer Dropdown */}
             <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600 }}>
+              <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>Select Client / Customer</span>
-                {loadingCustomers && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Loading contacts...</span>}
+                {loadingCustomers && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Loading contacts…</span>}
               </label>
               <select
                 className="form-select"
                 value={selectedCustomerId}
                 onChange={handleCustomerSelect}
-                style={{ fontWeight: 500 }}
               >
-                <option value="NEW">➕ Add New Customer / Client</option>
-                <optgroup label="Existing Customers Directory">
+                <option value="NEW">➕ Add New Client</option>
+                <optgroup label="Existing Customers">
                   {existingCustomers.map(c => (
                     <option key={c.id} value={c.id}>
-                      👤 {c.name} {c.email ? `(${c.email})` : c.phone ? `(${c.phone})` : ''}
+                      {c.name} {c.email ? `(${c.email})` : c.phone ? `(${c.phone})` : ''}
                     </option>
                   ))}
                 </optgroup>
               </select>
             </div>
 
-            {/* Client Details (Auto-filled if existing selected, editable if new) */}
+            {/* Client Details */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div className="form-group" style={{ margin: 0 }}>
                 <label className="form-label">Client Name *</label>
@@ -228,7 +225,7 @@ export default function CreateProjectModal({ isOpen, onClose, onCreated, default
               <input
                 type="text"
                 className="form-input"
-                placeholder="e.g. Porsche 911 Carrera S (991.2) or BMW 320i M Sport"
+                placeholder="e.g. Porsche 911 Carrera S or VW Multivan"
                 value={formData.target_vehicle}
                 onChange={e => setFormData({ ...formData, target_vehicle: e.target.value })}
                 required
@@ -237,7 +234,7 @@ export default function CreateProjectModal({ isOpen, onClose, onCreated, default
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Purchase / Base Price (€)</label>
+                <label className="form-label">Purchase Price (€)</label>
                 <input
                   type="number"
                   step="0.01"
@@ -248,7 +245,7 @@ export default function CreateProjectModal({ isOpen, onClose, onCreated, default
                 />
               </div>
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Agreed / Target Sale Price (€)</label>
+                <label className="form-label">Target Sale Price (€)</label>
                 <input
                   type="number"
                   step="0.01"
@@ -260,13 +257,13 @@ export default function CreateProjectModal({ isOpen, onClose, onCreated, default
               </div>
             </div>
 
-            {/* Notes / Special Instructions */}
+            {/* Notes */}
             <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Notes & Criteria</label>
+              <label className="form-label">Notes & Specifications</label>
               <textarea
                 className="form-textarea"
                 rows={2}
-                placeholder="e.g. Max 50,000 km, Agategrau color preference, TÜV valid until 2027..."
+                placeholder="Max mileage, preferred color, options..."
                 value={formData.notes}
                 onChange={e => setFormData({ ...formData, notes: e.target.value })}
               />
@@ -275,12 +272,12 @@ export default function CreateProjectModal({ isOpen, onClose, onCreated, default
           </div>
 
           {/* Footer */}
-          <div className="modal-footer" style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={submitting}>
+          <div className="modal-footer">
+            <button type="button" className="btn btn-secondary btn-sm" onClick={onClose} disabled={submitting}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? 'Creating...' : formData.status === 'COMPLETED' ? 'Create Deal Record' : 'Create Project'}
+            <button type="submit" className="btn btn-primary btn-sm" disabled={submitting}>
+              {submitting ? 'Creating…' : formData.status === 'COMPLETED' ? 'Create Deal Record' : 'Create Project'}
             </button>
           </div>
         </form>

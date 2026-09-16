@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { api } from '../api/api';
 import { format } from 'date-fns';
+import DealDetailPanel from '../components/DealDetailPanel';
 
 export const STAGES = [
   'Intake & Onboarding',
@@ -320,95 +321,79 @@ export default function Projects() {
 
   return (
     <div>
+      {/* Frappe CRM Deal Detail Panel */}
+      {selectedProject && (
+        <DealDetailPanel
+          project={selectedProject}
+          onClose={() => setSelectedProject(null)}
+          onAdvance={(proj) => handleAdvanceStage(proj)}
+          advancing={advancingCardId === selectedProject?.id}
+        />
+      )}
+
       {/* Header */}
       <div className="page-header">
         <div className="page-header-left">
-          <h1 style={{ fontSize: '1.85rem', fontWeight: 800, letterSpacing: '-0.5px', color: '#0f172a', margin: '0 0 6px 0' }}>Deals & Projects</h1>
-          <p>Unified Sales Pipeline, Financial Ledger & Drive Document Management</p>
+          <h1 className="page-title">Deals & Projects</h1>
+          <p className="page-subtitle">Unified Sales Pipeline, Financial Ledger & Drive Document Management</p>
         </div>
 
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Pipeline Filters moved below search bar */}
-
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           {/* View Switcher Toggle */}
-          <div style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 3 }}>
+          <div style={{ display: 'flex', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: 2 }}>
             <button
-              className={`btn btn-sm ${viewMode === 'kanban' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ padding: '6px 12px', border: 'none', borderRadius: 6, fontSize: '0.8rem', gap: 6 }}
+              className={`btn btn-sm ${viewMode === 'kanban' ? 'btn-primary' : 'btn-ghost'}`}
+              style={{ padding: '5px 10px', fontSize: '0.78rem', gap: 6 }}
               onClick={() => setViewMode('kanban')}
             >
-              <LayoutGrid size={14} /> Kanban Board
+              <LayoutGrid size={13} /> Kanban Board
             </button>
             <button
-              className={`btn btn-sm ${viewMode === 'table' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ padding: '6px 12px', border: 'none', borderRadius: 6, fontSize: '0.8rem', gap: 6 }}
+              className={`btn btn-sm ${viewMode === 'table' ? 'btn-primary' : 'btn-ghost'}`}
+              style={{ padding: '5px 10px', fontSize: '0.78rem', gap: 6 }}
               onClick={() => setViewMode('table')}
             >
-              <List size={14} /> Table View
+              <List size={13} /> Table View
             </button>
           </div>
 
           <button className="btn btn-secondary" onClick={loadProjects}>
-            <RefreshCw size={14} /> Refresh
+            <RefreshCw size={13} /> Refresh
           </button>
           <button className="btn btn-primary" onClick={() => setShowCreateModal(true)} style={{ gap: 6 }}>
-            <Plus size={16} /> Create Deal / Project
+            <Plus size={14} /> Create Deal / Project
           </button>
         </div>
       </div>
 
-      {/* Search & Filters */}
-      <div style={{ marginBottom: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {/* Search Bar */}
-        <div className="search-bar" style={{ maxWidth: 420 }}>
-          <Search size={14} />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search deals by client, vehicle make/model, or VIN…"
-          />
-        </div>
-
+      {/* Search & Frappe Filter Tabs */}
+      <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         {/* Pipeline Type Filters */}
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <div className="tabs-container" style={{ margin: 0, border: 'none', gap: 4 }}>
           {['ALL', 'BUY', 'SELL'].map(type => {
             const isActive = pipelineFilter === type;
             return (
               <button
                 key={type}
                 onClick={() => setPipelineFilter(type)}
-                style={{
-                  padding: '8px 20px',
-                  borderRadius: 24,
-                  fontSize: '0.8rem',
-                  fontWeight: isActive ? 800 : 600,
-                  background: isActive ? 'linear-gradient(135deg, #f97316, #ea580c)' : '#ffffff',
-                  color: isActive ? '#ffffff' : '#64748b',
-                  border: isActive ? '1px solid #ea580c' : '1px solid #e2e8f0',
-                  boxShadow: isActive ? '0 4px 10px rgba(234, 88, 12, 0.2)' : '0 2px 4px rgba(0,0,0,0.02)',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.borderColor = '#fed7aa';
-                    e.currentTarget.style.color = '#ea580c';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.borderColor = '#e2e8f0';
-                    e.currentTarget.style.color = '#64748b';
-                  }
-                }}
+                className={`tab-btn ${isActive ? 'active' : ''}`}
+                style={{ padding: '6px 14px', fontSize: '0.82rem' }}
               >
-                {type === 'ALL' ? 'All Deals' : type === 'BUY' ? 'Buy Side' : 'Sell Side'}
+                {type === 'ALL' ? 'All Deals' : type === 'BUY' ? 'Buy Side (Beschaffung)' : 'Sell Side (Vermittlung)'}
               </button>
             );
           })}
+        </div>
+
+        {/* Search Bar */}
+        <div className="input-group" style={{ width: 320 }}>
+          <Search size={14} className="input-icon-left" />
+          <input
+            className="input input-sm input-with-icon-left"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search deals by client, car model, VIN…"
+          />
         </div>
       </div>
 
@@ -445,7 +430,7 @@ export default function Projects() {
         </div>
       ) : viewMode === 'kanban' ? (
         /* KANBAN BOARD VIEW */
-        <div className="kanban-board-container" style={{ gap: 16, overflowX: 'auto', paddingBottom: 24, minHeight: 500 }}>
+        <div className="kanban-container">
           {STAGES.map((stage, sIdx) => {
             const stageDeals = filtered.filter(p => (p.current_stage || STAGES[0]) === stage);
             return (
@@ -453,33 +438,35 @@ export default function Projects() {
                 key={stage}
                 id={`kanban-col-${sIdx}`}
                 className="kanban-column"
-                style={{
-                  background: 'rgba(15, 23, 42, 0.04)', /* Subtle dark overlay to distinctly separate from bg */
-                  border: '1px solid rgba(15, 23, 42, 0.08)',
-                  borderRadius: 16,
-                  padding: 16,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.02)' /* Subtle inner shadow to look like a tray */
-                }}
               >
                 {/* Column Header */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid rgba(0, 0, 0, 0.06)' }}>
-                  <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ width: 22, height: 22, borderRadius: '50%', background: 'linear-gradient(135deg, #f97316, #ea580c)', color: '#ffffff', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, boxShadow: '0 2px 6px rgba(234, 88, 12, 0.2)' }}>
+                <div className="kanban-column-header">
+                  <div className="kanban-column-title">
+                    <span style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: 'var(--radius-xs)',
+                      background: 'var(--primary)',
+                      color: 'var(--primary-text)',
+                      fontSize: '0.68rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 700
+                    }}>
                       {sIdx + 1}
                     </span>
                     {stage}
                   </div>
-                  <span className="badge" style={{ background: 'rgba(255, 255, 255, 0.8)', color: '#64748b', fontSize: '0.75rem', border: '1px solid rgba(0, 0, 0, 0.05)', fontWeight: 700 }}>
+                  <span className="kanban-column-count">
                     {stageDeals.length}
                   </span>
                 </div>
 
                 {/* Deal Cards Container */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
+                <div className="kanban-cards-list">
                   {stageDeals.length === 0 ? (
-                    <div style={{ border: '1.5px dashed rgba(203, 213, 225, 0.6)', borderRadius: 12, padding: '24px 12px', textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600, background: 'rgba(255, 255, 255, 0.3)' }}>
+                    <div style={{ border: '1px dashed var(--border-dark)', borderRadius: 'var(--radius-sm)', padding: '24px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem', background: 'transparent' }}>
                       No deals in this stage
                     </div>
                   ) : (
@@ -493,84 +480,69 @@ export default function Projects() {
                       return (
                         <div
                           key={p.id}
-                          className={`card kanban-card ${advancingCardId === p.id ? 'advancing-card' : ''}`}
+                          className="kanban-card"
                           onClick={() => { setSelectedProject(p); setActiveTab('overview'); }}
-                          style={{
-                            padding: 18,
-                            borderRadius: 12,
-                            border: '1px solid rgba(226, 232, 240, 0.8)',
-                            cursor: 'pointer',
-                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                            background: '#ffffff',
-                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
-                            position: 'relative'
-                          }}
-                          onMouseEnter={(e) => {
-                            if (advancingCardId === p.id) return;
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                            e.currentTarget.style.boxShadow = '0 8px 24px rgba(234, 88, 12, 0.08)';
-                            e.currentTarget.style.borderColor = '#fed7aa';
-                          }}
-                          onMouseLeave={(e) => {
-                            if (advancingCardId === p.id) return;
-                            e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.03)';
-                            e.currentTarget.style.borderColor = 'rgba(226, 232, 240, 0.8)';
-                          }}
                         >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                              <div className="client-avatar notranslate" style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #fff3ec, #ffe4d6)', color: '#ea580c', border: '1px solid #fed7aa', fontSize: '0.85rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(234, 88, 12, 0.1)', flexShrink: 0 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <div className="notranslate" style={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: 'var(--radius-xs)',
+                                background: 'var(--bg-surface-subtle)',
+                                color: 'var(--text-primary)',
+                                border: '1px solid var(--border)',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0
+                              }}>
                                 {getInitials(p.client_name)}
                               </div>
                               <div>
-                                <div className="client-name" style={{ fontWeight: 800, fontSize: '0.95rem', color: '#0f172a' }}>{p.client_name}</div>
-                                <div className="client-phone" style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500, marginTop: 2 }}>{p.client_phone || 'No phone'}</div>
+                                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)' }}>{p.client_name}</div>
+                                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{p.client_phone || 'No phone'}</div>
                               </div>
                             </div>
-                            <span className={`badge ${p.project_type === 'BUY' ? 'badge-buy' : 'badge-sell'}`} style={{ fontSize: '0.7rem', padding: '4px 8px', border: 'none' }}>
-                              {p.project_type === 'BUY' ? 'BUY' : 'SELL'}
+                            <span className={`badge ${p.project_type === 'BUY' ? 'badge-purple' : 'badge-emerald'}`}>
+                              {p.project_type === 'BUY' ? 'Buy' : 'Sell'}
                             </span>
                           </div>
 
                           {/* Target Vehicle */}
-                          <div className="vehicle-details" style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <Car size={16} color="#f47c3c" />
-                            {p.target_vehicle || 'No vehicle specified'}
+                          <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <Car size={14} color="var(--text-secondary)" />
+                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {p.target_vehicle || 'No vehicle specified'}
+                            </span>
                           </div>
 
                           {/* Project Date Info */}
-                          <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 500 }}>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                              <Clock size={12} /> {formatDateDDMMYYYY(p.created_at)}
+                              <Clock size={11} /> {formatDateDDMMYYYY(p.created_at)}
                             </span>
-                            <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
-                              Updated {formatDateDDMMYYYY(p.updated_at)}
+                            <span>
+                              Upd {formatDateDDMMYYYY(p.updated_at)}
                             </span>
                           </div>
 
                           {/* Profit & Action Footer */}
-                          <div className="profit-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12, borderTop: '1px solid rgba(226, 232, 240, 0.6)' }}>
-                            <div className="profit-value" style={{ fontWeight: 800, fontSize: '0.85rem', color: netProfit >= 0 ? '#059669' : '#dc2626', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <div className="kanban-card-footer">
+                            <div style={{ fontWeight: 700, fontSize: '0.78rem', color: netProfit >= 0 ? 'var(--status-green-text)' : 'var(--status-red-text)' }}>
                               {netProfit >= 0 ? '+' : ''}€{netProfit.toLocaleString(undefined, { minimumFractionDigits: 0 })}
                             </div>
 
                             {sIdx < STAGES.length - 1 && (
                               <button
-                                className="btn btn-secondary btn-sm advance-btn"
-                                style={{ padding: '6px 12px', fontSize: '0.75rem', gap: 4, background: '#ffedd5', border: 'none', color: '#ea580c', fontWeight: 800 }}
+                                className="btn btn-secondary btn-sm"
+                                style={{ padding: '3px 8px', fontSize: '0.72rem', gap: 3 }}
                                 onClick={(e) => handleAdvanceStage(p, e)}
-                                title="Move to next stage"
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.background = '#ea580c';
-                                  e.currentTarget.style.color = '#ffffff';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.background = '#ffedd5';
-                                  e.currentTarget.style.color = '#ea580c';
-                                }}
+                                title="Advance to next stage"
                               >
-                                Advance <ChevronRight size={14} />
+                                Advance <ChevronRight size={12} />
                               </button>
                             )}
                           </div>
@@ -619,100 +591,78 @@ export default function Projects() {
                     const stageIdx = STAGES.indexOf(currentStage);
 
                     return (
-                      <tr key={p.id} style={{ cursor: 'pointer', transition: 'background-color 0.2s' }} onClick={() => { setSelectedProject(p); setActiveTab('overview'); }}>
-                        <td style={{ paddingLeft: 24, paddingTop: 12, paddingBottom: 12 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <tr key={p.id} style={{ cursor: 'pointer' }} onClick={() => { setSelectedProject(p); setActiveTab('overview'); }}>
+                        <td style={{ paddingLeft: 16 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                             <div className="notranslate" style={{
-                              width: 38, height: 38, borderRadius: 10,
-                              background: 'linear-gradient(135deg, #fff3ec, #ffe4d6)',
-                              border: '1px solid #fed7aa',
+                              width: 30, height: 30, borderRadius: 'var(--radius-xs)',
+                              background: 'var(--bg-surface-subtle)',
+                              border: '1px solid var(--border)',
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              fontSize: '0.85rem', fontWeight: 800,
-                              color: '#ea580c',
-                              boxShadow: '0 2px 6px rgba(234, 88, 12, 0.1)', flexShrink: 0
+                              fontSize: '0.75rem', fontWeight: 700,
+                              color: 'var(--text-primary)', flexShrink: 0
                             }}>
                               {getInitials(p.client_name)}
                             </div>
-                            <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0f172a' }}>
+                            <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
                               {p.client_name}
                             </div>
                           </div>
                         </td>
                         <td>
                           {p.target_vehicle ? (
-                            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                              <Car size={16} color="#f47c3c" style={{ marginTop: 2, flexShrink: 0 }} />
+                            <div style={{ fontSize: '0.82rem', fontWeight: 500, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <Car size={14} color="var(--text-secondary)" />
                               <span>{p.target_vehicle}</span>
                             </div>
                           ) : (
-                            <span style={{ color: '#94a3b8' }}>—</span>
+                            <span style={{ color: 'var(--text-muted)' }}>—</span>
                           )}
                         </td>
                         <td>
-                          <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: '#64748b', background: '#f1f5f9', padding: '4px 8px', borderRadius: 6, border: '1px solid #e2e8f0', fontWeight: 600 }}>
+                          <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--text-secondary)', background: 'var(--bg-surface-subtle)', padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border)' }}>
                             {p.vin || '—'}
                           </span>
                         </td>
                         <td>
-                          <span className={`badge ${p.project_type === 'BUY' ? 'badge-buy' : 'badge-sell'}`} style={{ fontSize: '0.7rem', padding: '4px 8px', border: 'none' }}>
-                            {p.project_type === 'BUY' ? 'BUY SIDE' : 'SELL SIDE'}
+                          <span className={`badge ${p.project_type === 'BUY' ? 'badge-purple' : 'badge-emerald'}`}>
+                            {p.project_type === 'BUY' ? 'Buy Side' : 'Sell Side'}
                           </span>
                         </td>
                         <td>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#ffffff', border: '1px solid #e2e8f0', padding: '4px 12px 4px 4px', borderRadius: 20, boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
-                            <span style={{ width: 22, height: 22, minWidth: 22, flexShrink: 0, borderRadius: '50%', background: 'linear-gradient(135deg, #f97316, #ea580c)', color: '#ffffff', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
-                              {stageIdx + 1}
-                            </span>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>{currentStage}</span>
+                          <span className="badge badge-gray" style={{ gap: 6 }}>
+                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--primary)' }} />
+                            {currentStage}
                           </span>
                         </td>
-                        <td>
-                          <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500 }}>
-                            {formatDateDDMMYYYY(p.created_at)}
-                          </span>
+                        <td style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                          {formatDateDDMMYYYY(p.created_at)}
+                        </td>
+                        <td style={{ fontSize: '0.82rem', fontWeight: 500, color: 'var(--text-primary)' }}>
+                          €{totalInvestment.toLocaleString()}
                         </td>
                         <td>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>
-                            €{totalInvestment.toLocaleString()}
-                          </span>
-                        </td>
-                        <td>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: netProfit >= 0 ? '#059669' : '#dc2626', background: netProfit >= 0 ? '#dcfce7' : '#fee2e2', padding: '4px 8px', borderRadius: 6 }}>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: netProfit >= 0 ? 'var(--status-green-text)' : 'var(--status-red-text)' }}>
                             {netProfit >= 0 ? '+' : ''}€{netProfit.toLocaleString(undefined, { minimumFractionDigits: 0 })}
                           </span>
                         </td>
-                        <td style={{ paddingRight: 24, textAlign: 'right' }}>
-                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                        <td style={{ paddingRight: 16, textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                             <button
-                              className="btn btn-secondary btn-sm"
+                              className="btn btn-secondary btn-sm btn-icon"
                               onClick={(e) => { e.stopPropagation(); setSelectedProject(p); setActiveTab('financials'); }}
-                              style={{ padding: '6px 12px', background: 'rgba(241, 245, 249, 0.8)', border: 'none', color: '#475569' }}
                               title="Financial Ledger & Expenses"
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.background = '#e2e8f0';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.background = 'rgba(241, 245, 249, 0.8)';
-                              }}
                             >
-                              <Calculator size={14} />
+                              <Calculator size={13} />
                             </button>
                             {stageIdx < STAGES.length - 1 && (
                               <button
                                 className="btn btn-secondary btn-sm"
                                 onClick={(e) => handleAdvanceStage(p, e)}
-                                style={{ padding: '6px 12px', fontSize: '0.75rem', gap: 4, background: '#ffedd5', border: 'none', color: '#ea580c', fontWeight: 800 }}
-                                title="Move to next stage"
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.background = '#ea580c';
-                                  e.currentTarget.style.color = '#ffffff';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.background = '#ffedd5';
-                                  e.currentTarget.style.color = '#ea580c';
-                                }}
+                                style={{ padding: '3px 8px', fontSize: '0.72rem' }}
+                                title="Advance to next stage"
                               >
-                                Advance <ChevronRight size={14} />
+                                Advance <ChevronRight size={12} />
                               </button>
                             )}
                           </div>

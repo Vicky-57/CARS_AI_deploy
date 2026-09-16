@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Upload, Sparkles, User, Mail, Phone, Car, FileText, CheckCircle2, Loader2, Contact2 } from 'lucide-react';
+import { X, User, Car, Contact2, Loader2, CheckCircle2 } from 'lucide-react';
 import { api } from '../api/api';
 
 export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
@@ -43,36 +43,26 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal" style={{ maxWidth: 640 }}>
-        <div className="modal-header" style={{ padding: '24px 28px 20px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{
-              width: 36, height: 36, borderRadius: 10,
-              background: 'linear-gradient(135deg, var(--brand-500), var(--brand-700))',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white',
-              boxShadow: '0 2px 4px rgba(244,124,60,0.2)'
-            }}>
-              <User size={18} />
-            </div>
-            <div>
-              <div className="modal-title" style={{ fontSize: '1.1rem', fontWeight: 700, letterSpacing: '-0.3px' }}>Create New Lead</div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                Enter client contact info and vehicle criteria
-              </div>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 580 }}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">New Lead DocType</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>
+              Enter prospective buyer or seller inquiry details
             </div>
           </div>
-          <button className="btn-icon" onClick={onClose} style={{ padding: 8 }}><X size={18} /></button>
+          <button className="btn-icon" onClick={onClose}><X size={16} /></button>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-          <div className="modal-body" style={{ overflowY: 'auto', padding: '20px 28px 28px' }}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+          <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-            {/* Client Info Grid */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-              <Contact2 size={14} color="var(--brand-500)" /> Client Contact Information
+            {/* Client Info */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              <Contact2 size={13} /> Client Contact Details
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Full Name *</label>
                 <input
@@ -115,11 +105,11 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
               </div>
             </div>
 
-            {/* Vehicle Info Grid */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-              <Car size={14} color="var(--brand-500)" /> Vehicle Specifications (Auto-extracted or Manual)
+            {/* Vehicle Info */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: 4 }}>
+              <Car size={13} /> Vehicle Requirements
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Manufacturer</label>
                 <input
@@ -133,7 +123,7 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
                 <label className="form-label">Vehicle Model</label>
                 <input
                   className="form-input"
-                  placeholder="e.g. Multivan Comfortline"
+                  placeholder="e.g. 911 GT3 / Multivan"
                   value={form.model}
                   onChange={e => setForm({ ...form, model: e.target.value })}
                 />
@@ -148,10 +138,10 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
                 />
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">License Plate / Budget (€)</label>
+                <label className="form-label">Budget / Limit (€)</label>
                 <input
                   className="form-input"
-                  placeholder="e.g. IN-CA-8580 or 45000"
+                  placeholder="e.g. 45000"
                   value={form.price_limit}
                   onChange={e => setForm({ ...form, price_limit: e.target.value })}
                 />
@@ -159,22 +149,22 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Internal Notes</label>
+              <label className="form-label">Internal Broker Notes</label>
               <textarea
                 className="form-textarea"
                 rows={2}
-                placeholder="Additional vehicle specs, TÜV date, or client requirements..."
+                placeholder="Additional vehicle specs, inspection requests, or client requirements…"
                 value={form.notes}
                 onChange={e => setForm({ ...form, notes: e.target.value })}
               />
             </div>
           </div>
 
-          <div className="modal-footer" style={{ padding: '16px 28px', background: 'var(--gray-50)', borderRadius: '0 0 var(--radius-xl) var(--radius-xl)' }}>
-            <button type="button" className="btn btn-secondary" onClick={onClose} style={{ padding: '10px 16px' }}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={submitting} style={{ padding: '10px 16px' }}>
-              {submitting ? <Loader2 size={16} className="spin" /> : <CheckCircle2 size={16} />}
-              Save Lead to Supabase
+          <div className="modal-footer">
+            <button type="button" className="btn btn-secondary btn-sm" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn btn-primary btn-sm" disabled={submitting}>
+              {submitting ? <Loader2 size={13} className="spin" /> : <CheckCircle2 size={13} />}
+              <span>Save Lead</span>
             </button>
           </div>
         </form>
