@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   FolderKanban, LayoutGrid, List, Plus, Search, RefreshCw, User, Car,
   ChevronRight, ChevronDown, Calculator, Clock, Receipt, Folder, Sparkles, CheckCircle2,
-  X, ExternalLink, Tag, FileText, Phone, Mail, ShieldCheck, UploadCloud
+  X, ExternalLink, Tag, FileText, Phone, Mail, ShieldCheck, UploadCloud, Check, Filter
 } from 'lucide-react';
 import { api } from '../api/api';
 import { format } from 'date-fns';
@@ -32,80 +32,82 @@ function getInitials(name) {
   return name.slice(0, 2).toUpperCase();
 }
 
+function DropdownItem({ active, onClick, children }) {
+  return (
+    <div
+      style={{
+        padding: '6px 12px', fontSize: '0.85rem', cursor: 'pointer',
+        borderRadius: 4, background: active ? 'var(--bg-canvas)' : 'transparent',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        fontWeight: active ? 600 : 400
+      }}
+      onClick={onClick}
+      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-canvas)'}
+      onMouseLeave={e => e.currentTarget.style.background = active ? 'var(--bg-canvas)' : 'transparent'}
+    >
+      {children}
+      {active && <Check size={14} style={{ color: 'var(--primary)' }} />}
+    </div>
+  );
+}
+
+function CustomSelect({ value, onChange, options, style }) {
+  const [open, setOpen] = useState(false);
+  const selectedOption = options.find(o => o.value === value) || options[0];
+
+  return (
+    <div style={{ position: 'relative', ...style }}>
+      <button
+        className="input input-sm"
+        style={{ 
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: 'var(--bg-surface)', cursor: 'pointer', textAlign: 'left'
+        }}
+        onClick={() => setOpen(!open)}
+      >
+        <span>{selectedOption ? selectedOption.label : 'Select...'}</span>
+        <ChevronDown size={14} style={{ opacity: 0.5 }} />
+      </button>
+
+      {open && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 90 }} onClick={() => setOpen(false)} />
+          <div style={{
+            position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, zIndex: 100,
+            background: 'var(--bg-surface)', border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-md)',
+            padding: 4, display: 'flex', flexDirection: 'column', gap: 2,
+            maxHeight: 250, overflowY: 'auto'
+          }}>
+            {options.map(opt => (
+              <DropdownItem key={opt.value} active={value === opt.value} onClick={() => { onChange(opt.value); setOpen(false); }}>
+                {opt.label}
+              </DropdownItem>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function Projects() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('kanban'); // 'kanban' | 'table'
   const [pipelineFilter, setPipelineFilter] = useState('ALL'); // 'ALL' | 'BUY' | 'SELL'
   const [search, setSearch] = useState('');
+  
+  // Advanced Filters
+  const [showFilters, setShowFilters] = useState(false);
+  const [stageFilter, setStageFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  
   const [advancingCardId, setAdvancingCardId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
 
   // Selected detail drawer
   const [selectedProject, setSelectedProject] = useState(null);
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'financials' | 'drive'
-
-  // Drive State & Uploads
-  const [driveUrls, setDriveUrls] = useState(null);
-  const [loadingDriveUrls, setLoadingDriveUrls] = useState(false);
-  const [uploadingDriveFile, setUploadingDriveFile] = useState(false);
-  const [uploadTargetFolder, setUploadTargetFolder] = useState('1. OCR');
-  const [uploadedFileResult, setUploadedFileResult] = useState(null);
-
-  const fetchDriveUrls = async (project) => {
-    if (!project) return;
-    setDriveUrls(null); // Clear stale driveUrls immediately before fetching new project links
-    setLoadingDriveUrls(true);
-    try {
-      const res = await api.getProjectDriveFolders(project.id, project.client_name);
-      if (res && res.success && res.project_id === project.id) {
-        setDriveUrls(res);
-      }
-    } catch (err) {
-      console.error('Failed to fetch Drive URLs:', err);
-    } finally {
-      setLoadingDriveUrls(false);
-    }
-  };
-
-  useEffect(() => {
-    setDriveUrls(null); // Reset driveUrls when switching selected project
-    if (selectedProject && activeTab === 'drive') {
-      fetchDriveUrls(selectedProject);
-    }
-  }, [selectedProject?.id, activeTab]);
-
-  const handleFileUploadToDrive = async (e) => {
-    const file = e.target.files[0];
-    if (!file || !selectedProject) return;
-
-    setUploadingDriveFile(true);
-    setUploadedFileResult(null);
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('client_name', selectedProject.client_name || 'Customer');
-    formData.append('target_folder', uploadTargetFolder);
-
-    try {
-      const res = await api.uploadFileToProjectDrive(selectedProject.id, formData);
-      if (res && res.success) {
-        setUploadedFileResult(res);
-        alert(`Successfully uploaded "${file.name}" to Google Drive!`);
-      } else {
-        alert('Upload error: ' + (res.error || 'Could not upload to Drive'));
-      }
-    } catch (err) {
-      alert('Upload error: ' + err.message);
-    } finally {
-      setUploadingDriveFile(false);
-      e.target.value = '';
-    }
-  };
-
-  // Sub-forms for Expenses & Labor inside drawer
-  const [showExpenseModal, setShowExpenseModal] = useState(false);
-  const [showLaborModal, setShowLaborModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -119,17 +121,6 @@ export default function Projects() {
     purchase_price: '',
     agreed_sale_price: '',
     notes: ''
-  });
-
-  const [expenseForm, setExpenseForm] = useState({
-    expense_type: 'OTHER',
-    description: '',
-    amount: ''
-  });
-
-  const [laborForm, setLaborForm] = useState({
-    hours_spent: '',
-    activity_description: ''
   });
 
   const handleCreateProjectSubmit = async (e) => {
@@ -226,59 +217,33 @@ export default function Projects() {
     }
   };
 
-  const handleAddExpense = async (e) => {
-    e.preventDefault();
-    if (!selectedProject) return;
-    setSubmitting(true);
-    try {
-      await api.addExpense(selectedProject.id, {
-        expense_type: expenseForm.expense_type,
-        description: expenseForm.description,
-        amount: parseFloat(expenseForm.amount) || 0
-      });
-      setShowExpenseModal(false);
-      setExpenseForm({ expense_type: 'OTHER', description: '', amount: '' });
-      await loadProjects();
-    } catch (err) {
-      alert('Error adding expense: ' + err.message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleAddLabor = async (e) => {
-    e.preventDefault();
-    if (!selectedProject) return;
-    setSubmitting(true);
-    try {
-      await api.addLabor(selectedProject.id, {
-        hours_spent: parseFloat(laborForm.hours_spent) || 0,
-        activity_description: laborForm.activity_description
-      });
-      setShowLaborModal(false);
-      setLaborForm({ hours_spent: '', activity_description: '' });
-      await loadProjects();
-    } catch (err) {
-      alert('Error adding labor hours: ' + err.message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   // Filtered projects
   const filtered = projects.filter(p => {
-    const matchesPipeline = pipelineFilter === 'ALL' || p.project_type === pipelineFilter;
+    // Pipeline Tab filter
+    if (pipelineFilter !== 'ALL' && p.project_type !== pipelineFilter) return false;
+    
+    // Status Filter
+    if (statusFilter && p.status !== statusFilter) return false;
+    
+    // Stage Filter
+    if (stageFilter && getNormalizedStage(p.current_stage) !== stageFilter) return false;
+
+    // Search filter
     const q = search.toLowerCase().trim();
-    const matchesSearch = !q || (
-      (p.client_name || '').toLowerCase().includes(q) ||
-      (p.target_vehicle || '').toLowerCase().includes(q) ||
-      (p.vin || '').toLowerCase().includes(q)
-    );
-    return matchesPipeline && matchesSearch;
+    if (q) {
+      const matchesSearch = (
+        (p.client_name || '').toLowerCase().includes(q) ||
+        (p.target_vehicle || '').toLowerCase().includes(q) ||
+        (p.vin || '').toLowerCase().includes(q)
+      );
+      if (!matchesSearch) return false;
+    }
+    
+    return true;
   });
 
   const PAGE_SIZE = 10;
-  useEffect(() => { setCurrentPage(1); }, [search, pipelineFilter, viewMode]);
+  useEffect(() => { setCurrentPage(1); }, [search, pipelineFilter, stageFilter, statusFilter, viewMode]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -300,6 +265,7 @@ export default function Projects() {
           onClose={() => setSelectedProject(null)}
           onAdvance={(proj) => handleAdvanceStage(proj)}
           advancing={advancingCardId === selectedProject?.id}
+          onUpdate={loadProjects}
         />
       )}
 
@@ -357,17 +323,66 @@ export default function Projects() {
           })}
         </div>
 
-        {/* Search Bar */}
-        <div className="input-group" style={{ width: 320 }}>
-          <Search size={14} className="input-icon-left" />
-          <input
-            className="input input-sm input-with-icon-left"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search deals by client, car model, VIN…"
-          />
+        {/* Search Bar & Filter Toggle */}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button 
+            className="btn btn-secondary btn-sm" 
+            style={{ padding: '6px 12px', background: showFilters ? 'var(--bg-surface-subtle)' : 'transparent', border: '1px solid var(--border)' }}
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <Filter size={14} style={{ opacity: 0.6 }} />
+            <span style={{ fontWeight: 500 }}>Filter</span>
+          </button>
+          <div className="input-group" style={{ width: 320, background: 'var(--bg-surface)' }}>
+            <Search size={14} className="input-icon-left" />
+            <input
+              className="input input-sm input-with-icon-left"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search deals by client, car model, VIN…"
+            />
+          </div>
         </div>
       </div>
+      
+      {/* Horizontal Filters Bar */}
+      {showFilters && (
+        <div style={{ marginBottom: 16, padding: '12px 16px', background: 'var(--bg-surface-subtle)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Status</label>
+            <CustomSelect
+              style={{ minWidth: 160 }}
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={[
+                { value: '', label: 'All Statuses' },
+                { value: 'ACTIVE', label: 'Active' },
+                { value: 'COMPLETED', label: 'Completed' },
+                { value: 'CANCELLED', label: 'Cancelled' }
+              ]}
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Pipeline Stage</label>
+            <CustomSelect
+              style={{ minWidth: 200 }}
+              value={stageFilter}
+              onChange={setStageFilter}
+              options={[
+                { value: '', label: 'All Stages' },
+                ...STAGES.map(s => ({ value: s, label: s }))
+              ]}
+            />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'flex-end', marginLeft: 'auto' }}>
+            <button className="btn btn-secondary btn-sm" onClick={() => { setStatusFilter(''); setStageFilter(''); }}>
+              Clear Filters
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Content Area */}
       {loading ? (
@@ -602,10 +617,39 @@ export default function Projects() {
                           </span>
                         </td>
                         <td>
-                          <span className="badge badge-gray" style={{ gap: 6 }}>
-                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--primary)' }} />
-                            {currentStage}
-                          </span>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                              {currentStage}
+                            </div>
+                            <div style={{ display: 'flex', gap: 2, width: 120 }}>
+                              {STAGES.map((s, idx) => {
+                                const isPast = idx < stageIdx;
+                                const isCurrent = idx === stageIdx;
+                                const isCompleted = p.status === 'COMPLETED';
+                                const isCancelled = p.status === 'CANCELLED';
+                                
+                                let bg = 'var(--border)';
+                                if (isCompleted) bg = 'var(--status-green)';
+                                else if (isCancelled) bg = 'var(--status-red)';
+                                else if (isPast || isCurrent) bg = 'var(--primary)';
+
+                                let opacity = 0.5;
+                                if (isCurrent || isCompleted || isCancelled) opacity = 1;
+                                else if (isPast) opacity = 0.3;
+
+                                return (
+                                  <div key={s} style={{ 
+                                    height: 4, 
+                                    flex: 1, 
+                                    borderRadius: 2, 
+                                    background: bg,
+                                    opacity: opacity,
+                                    transition: 'all 0.2s'
+                                  }} />
+                                );
+                              })}
+                            </div>
+                          </div>
                         </td>
                         <td style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
                           {formatDateDDMMYYYY(p.created_at)}
@@ -697,14 +741,14 @@ export default function Projects() {
                       padding: '6px 10px',
                       borderRadius: 8,
                       border: n === currentPage ? 'none' : '1px solid var(--border)',
-                      background: n === currentPage ? 'var(--brand-600)' : 'var(--surface)',
+                      background: n === currentPage ? 'var(--primary)' : 'var(--surface)',
                       color: n === currentPage ? '#ffffff' : 'var(--text-primary)',
                       fontWeight: n === currentPage ? 700 : 600,
                       fontSize: '0.8rem',
                       cursor: 'pointer',
                       minWidth: 32,
                       transition: 'all 0.2s',
-                      boxShadow: n === currentPage ? '0 2px 8px rgba(226,106,44,0.25)' : 'none'
+                      boxShadow: n === currentPage ? '0 2px 6px rgba(0,0,0,0.15)' : 'none'
                     }}
                   >{n}</button>
                 ))}
@@ -734,501 +778,6 @@ export default function Projects() {
               </div>
             </div>
           )}
-        </div>
-      )}
-
-      {/* UNIFIED SIDE DRAWER DETAIL MODAL */}
-      {selectedProject && (
-        <div className="modal-overlay" onClick={() => setSelectedProject(null)}>
-          <div
-            className="modal project-drawer-modal"
-            onClick={e => e.stopPropagation()}
-            style={{
-              maxWidth: 720,
-              width: '100%',
-              maxHeight: '90vh',
-              display: 'flex',
-              flexDirection: 'column',
-              borderRadius: 16
-            }}
-          >
-            {/* Drawer Header */}
-            <div className="drawer-header" style={{ padding: '24px 28px', borderBottom: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <div className="drawer-title-row" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                  <h2 style={{ fontSize: '1.3rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
-                    {selectedProject.client_name}
-                  </h2>
-                  <span className="badge" style={{
-                    background: 'var(--brand-100)', color: 'var(--brand-700)',
-                    padding: '4px 10px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700,
-                    textTransform: 'uppercase', letterSpacing: '0.5px', border: 'none'
-                  }}>
-                    {selectedProject.project_type === 'BUY' ? 'Buy Side (Beschaffung)' : 'Sell Side (Vermittlung)'}
-                  </span>
-                </div>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', marginTop: 4 }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Car size={14} style={{ color: 'var(--brand-500)' }} />
-                    <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{selectedProject.target_vehicle || 'No vehicle specified'}</span>
-                  </span>
-                  {selectedProject.vin && <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Tag size={14} style={{ color: 'var(--brand-500)' }} /> VIN: <code>{selectedProject.vin}</code></span>}
-                  <span>Updated: {formatDateDDMMYYYY(selectedProject.updated_at)}</span>
-                </div>
-              </div>
-              <button className="btn-icon" onClick={() => setSelectedProject(null)}><X size={18} /></button>
-            </div>
-
-            {/* Drawer Tabs Bar */}
-            <div className="drawer-tabs-bar" style={{ padding: '16px 28px 0 28px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-              <div className="drawer-tabs-container" style={{ display: 'flex', gap: 6, marginBottom: '-1px' }}>
-                {[
-                  { id: 'overview', icon: <FileText size={16} />, label: 'Stage & Overview' },
-                  { id: 'financials', icon: <Receipt size={16} />, label: 'Financials & Profit Ledger' },
-                  { id: 'drive', icon: <img src="/assets/google-drive (1).png" alt="Drive" style={{ width: 16, height: 16, objectFit: 'contain' }} />, label: 'Drive Cloud Storage' }
-                ].map(tab => (
-                  <button
-                    key={tab.id}
-                    className="drawer-tab"
-                    onClick={() => setActiveTab(tab.id)}
-                    style={{
-                      background: activeTab === tab.id ? '#ffffff' : 'transparent',
-                      border: '1px solid',
-                      borderColor: activeTab === tab.id ? '#e2e8f0' : 'transparent',
-                      borderBottomColor: activeTab === tab.id ? '#ffffff' : 'transparent',
-                      borderTopLeftRadius: 10,
-                      borderTopRightRadius: 10,
-                      padding: '12px 24px',
-                      fontSize: '0.85rem',
-                      fontWeight: activeTab === tab.id ? 800 : 600,
-                      color: activeTab === tab.id ? '#ea580c' : '#64748b',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      transition: 'color 0.2s, background-color 0.2s',
-                      position: 'relative',
-                      zIndex: activeTab === tab.id ? 2 : 1
-                    }}
-                    onMouseEnter={(e) => {
-                      if (activeTab !== tab.id) {
-                        e.currentTarget.style.color = '#0f172a';
-                        e.currentTarget.style.background = 'rgba(226, 232, 240, 0.4)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (activeTab !== tab.id) {
-                        e.currentTarget.style.color = '#64748b';
-                        e.currentTarget.style.background = 'transparent';
-                      }
-                    }}
-                  >
-                    {tab.icon} {tab.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Drawer Body Content */}
-            <div className="drawer-body" style={{ padding: '24px 28px', overflowY: 'auto', flex: 1 }}>
-              {activeTab === 'overview' && (
-                <div>
-                  {/* Current Stage Card */}
-                  <div style={{ background: 'var(--brand-50)', border: '1px solid var(--brand-200)', borderRadius: 12, padding: 20, marginBottom: 24, boxShadow: 'var(--shadow-sm)' }}>
-                    <div className="stage-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand-700)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-                          <ShieldCheck size={14} /> Current Sales Stage
-                        </div>
-                        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--brand-900)', marginTop: 4 }}>
-                          {getNormalizedStage(selectedProject.current_stage)}
-                        </div>
-                      </div>
-
-                      {STAGES.indexOf(getNormalizedStage(selectedProject.current_stage)) < STAGES.length - 1 && (
-                        <button className="btn btn-primary" onClick={(e) => handleAdvanceStage(selectedProject, e)} style={{ padding: '8px 16px', boxShadow: 'var(--shadow)' }}>
-                          Advance Stage <ChevronRight size={16} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Client Info Grid */}
-                  <div className="info-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-                    <div style={{ background: 'var(--gray-50)', border: '1px solid var(--border)', padding: 16, borderRadius: 10 }}>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 4 }}>Phone Number</div>
-                      <div style={{ fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <Phone size={14} color="var(--brand-600)" /> {selectedProject.client_phone || 'Not provided'}
-                      </div>
-                    </div>
-
-                    <div style={{ background: 'var(--gray-50)', border: '1px solid var(--border)', padding: 16, borderRadius: 10 }}>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 4 }}>Email Address</div>
-                      <div style={{ fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <Mail size={14} color="var(--brand-600)" /> {selectedProject.client_email || 'Not provided'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Project Dates & Lifecycle Grid */}
-                  <div className="info-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
-                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: 16, borderRadius: 10 }}>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <Clock size={14} color="#ea580c" /> Project Created Date
-                      </div>
-                      <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a' }}>
-                        {formatDateDDMMYYYY(selectedProject.created_at)}
-                      </div>
-                    </div>
-
-                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: 16, borderRadius: 10 }}>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <RefreshCw size={14} color="#ea580c" /> Stage Last Updated
-                      </div>
-                      <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a' }}>
-                        {formatDateDDMMYYYY(selectedProject.updated_at)}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Internal Notes */}
-                  {selectedProject.notes && (
-                    <div style={{ background: 'var(--brand-50)', border: '1px solid var(--brand-200)', padding: 16, borderRadius: 10, boxShadow: 'var(--shadow-sm)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', fontWeight: 700, color: 'var(--brand-700)', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.5px' }}>
-                        <FileText size={14} /> Internal Deal Notes
-                      </div>
-                      <div style={{ fontSize: '0.9rem', color: 'var(--gray-900)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-                        {selectedProject.notes}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {activeTab === 'financials' && (() => {
-                const totalExpenses = (selectedProject.project_expenses || []).reduce((s, x) => s + (parseFloat(x.amount) || 0), 0);
-                const totalLaborHours = (selectedProject.project_labor || []).reduce((s, x) => s + (parseFloat(x.hours_spent) || 0), 0);
-                const laborCost = totalLaborHours * (selectedProject.hourly_rate || 20);
-                const totalInvestment = (selectedProject.purchase_price || 0) + totalExpenses + laborCost;
-                const netProfit = (selectedProject.agreed_sale_price || 0) - totalInvestment;
-
-                return (
-                  <div>
-                    {/* Financial Summary Cards */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 24 }}>
-                      <div style={{ background: 'var(--gray-50)', border: '1px solid var(--border)', padding: 16, borderRadius: 12 }}>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Total Expenses</div>
-                        <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#d97706', marginTop: 4 }}>€{totalExpenses.toFixed(2)}</div>
-                      </div>
-                      <div style={{ background: 'var(--gray-50)', border: '1px solid var(--border)', padding: 16, borderRadius: 12 }}>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Labor ({totalLaborHours}h @ €20/h)</div>
-                        <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--brand-700)', marginTop: 4 }}>€{laborCost.toFixed(2)}</div>
-                      </div>
-                      <div style={{ background: netProfit >= 0 ? '#f0fdf4' : '#fef2f2', border: `1px solid ${netProfit >= 0 ? '#bbf7d0' : '#fecaca'}`, padding: 16, borderRadius: 12 }}>
-                        <div style={{ fontSize: '0.75rem', color: netProfit >= 0 ? '#166534' : '#991b1b', fontWeight: 700 }}>Net Broker Profit</div>
-                        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: netProfit >= 0 ? '#15803d' : '#b91c1c', marginTop: 4 }}>
-                          {netProfit >= 0 ? '+' : ''}€{netProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-                      <button className="btn btn-secondary btn-sm" onClick={() => setShowExpenseModal(true)}>
-                        <Receipt size={14} /> Log Receipt / Expense
-                      </button>
-                      <button className="btn btn-secondary btn-sm" onClick={() => setShowLaborModal(true)}>
-                        <Clock size={14} /> Log Labor Hours
-                      </button>
-                    </div>
-
-                    {/* Expenses History List */}
-                    <div style={{ marginBottom: 24 }}>
-                      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: 12 }}>Logged Expenses</h4>
-                      {(!selectedProject.project_expenses || selectedProject.project_expenses.length === 0) ? (
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No receipts logged yet.</div>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          {selectedProject.project_expenses.map(e => (
-                            <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', padding: 12, background: 'var(--gray-50)', borderRadius: 8, border: '1px solid var(--border)', fontSize: '0.82rem' }}>
-                              <div>
-                                <div style={{ fontWeight: 600 }}>{e.description}</div>
-                                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{formatDateDDMMYYYY(e.logged_at)}</div>
-                              </div>
-                              <div style={{ fontWeight: 700, color: '#d97706' }}>€{parseFloat(e.amount).toFixed(2)}</div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Labor Hours List */}
-                    <div>
-                      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: 12 }}>Broker Labor Log</h4>
-                      {(!selectedProject.project_labor || selectedProject.project_labor.length === 0) ? (
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No labor hours logged yet.</div>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          {selectedProject.project_labor.map(l => (
-                            <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', padding: 12, background: 'var(--gray-50)', borderRadius: 8, border: '1px solid var(--border)', fontSize: '0.82rem' }}>
-                              <div>
-                                <div style={{ fontWeight: 600 }}>{l.activity_description}</div>
-                                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{formatDateDDMMYYYY(l.logged_at)}</div>
-                              </div>
-                              <div style={{ fontWeight: 700, color: 'var(--brand-700)' }}>{l.hours_spent} hrs</div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {activeTab === 'drive' && (
-                <div style={{ padding: '16px 8px' }}>
-                  <div style={{ textAlign: 'center', marginBottom: 24 }}>
-                    <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--brand-50)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-                      <img src="/assets/google-drive (1).png" alt="Drive" style={{ width: 32, height: 32, objectFit: 'contain' }} />
-                    </div>
-                    <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: 6 }}>Google Drive Customer Storage</h3>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', maxWidth: 480, margin: '0 auto', lineHeight: 1.5 }}>
-                      Automated 3-tier document archiving active for customer <strong>{selectedProject.client_name}</strong>.
-                    </p>
-                  </div>
-
-                  {/* Direct Folder Links */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 540, margin: '0 auto 36px' }}>
-                    {[
-                      { num: 1, title: 'OCR & Media Scans Folder', desc: 'Vehicle photos, walkaround videos, vehicle specs', link: driveUrls?.ocr_folder_url },
-                      { num: 2, title: 'Legal Contracts Folder', desc: 'Power of Attorney, CAR-AGENTS GTC, disclaimers', link: driveUrls?.legal_docs_folder_url },
-                      { num: 3, title: 'Signed PDF Contracts', desc: 'Final signed brokerage & sale contracts', link: driveUrls?.signed_docs_folder_url }
-                    ].map(folder => (
-                      <div
-                        key={folder.num}
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 14, boxShadow: '0 2px 8px rgba(0,0,0,0.03)', transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'pointer' }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = 'translateY(-2px)';
-                          e.currentTarget.style.borderColor = '#fed7aa';
-                          e.currentTarget.style.boxShadow = '0 6px 16px rgba(234, 88, 12, 0.08)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.borderColor = '#e2e8f0';
-                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.03)';
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                          <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg, #fff3ec, #ffe4d6)', border: '1px solid #fed7aa', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ea580c', flexShrink: 0 }}>
-                            <Folder size={18} />
-                          </div>
-                          <div>
-                            <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a' }}>
-                              {folder.num}. {folder.title}
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 3, fontWeight: 500 }}>{folder.desc}</div>
-                          </div>
-                        </div>
-                        {loadingDriveUrls || !folder.link ? (
-                          <button
-                            disabled
-                            className="btn btn-secondary btn-sm"
-                            style={{ gap: 6, background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#94a3b8', fontWeight: 600, cursor: 'not-allowed' }}
-                          >
-                            <div className="spinner" style={{ width: 12, height: 12, borderWidth: 2 }} /> Loading Drive…
-                          </button>
-                        ) : (
-                          <a
-                            href={folder.link}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="btn btn-secondary btn-sm"
-                            style={{ gap: 6, background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569', fontWeight: 700, transition: 'all 0.2s' }}
-                            onMouseEnter={(e) => { e.currentTarget.style.background = '#ffedd5'; e.currentTarget.style.color = '#ea580c'; e.currentTarget.style.borderColor = '#fed7aa'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.color = '#475569'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
-                          >
-                            Open Drive <ExternalLink size={14} />
-                          </a>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Upload Media / Videos / Documents Box */}
-                  <div style={{ background: '#fffcf9', border: '2px dashed #fed7aa', borderRadius: 16, padding: '28px 24px', maxWidth: 540, margin: '0 auto', textAlign: 'center', transition: 'all 0.2s' }}>
-                    <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg, #f97316, #ea580c)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 4px 12px rgba(234, 88, 12, 0.2)' }}>
-                      <UploadCloud size={22} />
-                    </div>
-                    <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: 6, color: '#0f172a' }}>
-                      Upload Media or Documents
-                    </div>
-                    <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: 20, maxWidth: 400, margin: '0 auto 20px', lineHeight: 1.5, fontWeight: 500 }}>
-                      Select a vehicle walkaround video, photo, or PDF scan to upload directly to this customer's Google Drive.
-                    </p>
-
-                    <div className="form-group" style={{ marginBottom: 24, textAlign: 'left', maxWidth: 360, margin: '0 auto 24px' }}>
-                      <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: 8, display: 'block' }}>Target Drive Subfolder</label>
-                      <div style={{ position: 'relative' }}>
-                        <select
-                          className="form-select"
-                          value={uploadTargetFolder}
-                          onChange={e => setUploadTargetFolder(e.target.value)}
-                          style={{
-                            appearance: 'none',
-                            WebkitAppearance: 'none',
-                            borderColor: '#fed7aa',
-                            background: '#ffffff',
-                            fontWeight: 700,
-                            color: '#ea580c',
-                            padding: '12px 40px 12px 16px',
-                            borderRadius: 10,
-                            boxShadow: '0 2px 8px rgba(234,88,12,0.06)',
-                            cursor: 'pointer',
-                            outline: 'none',
-                            width: '100%',
-                            fontSize: '0.9rem'
-                          }}
-                        >
-                          <option value="1. OCR">1. OCR (Vehicle Photos, Videos & Spec Scans)</option>
-                          <option value="2. Legal Docs">2. Legal Docs (GTC & Power of Attorney)</option>
-                          <option value="3. Signed Docs">3. Signed Docs (Executed PDF Contracts)</option>
-                        </select>
-                        <div style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#ea580c' }}>
-                          <ChevronDown size={18} />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'center' }}>
-                      <label style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', padding: '12px 24px', background: 'linear-gradient(135deg, #f97316, #ea580c)', color: 'white', borderRadius: 8, fontWeight: 800, fontSize: '0.9rem', boxShadow: '0 4px 12px rgba(234, 88, 12, 0.25)', transition: 'transform 0.2s, box-shadow 0.2s' }}
-                        onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(234, 88, 12, 0.3)'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(234, 88, 12, 0.25)'; }}
-                      >
-                        {uploadingDriveFile ? <Sparkles size={18} className="spin" /> : <Folder size={18} />}
-                        <span>{uploadingDriveFile ? 'Uploading File to Drive…' : 'Select File to Upload'}</span>
-                        <input
-                          type="file"
-                          accept="image/*,video/*,application/pdf"
-                          onChange={handleFileUploadToDrive}
-                          disabled={uploadingDriveFile}
-                          style={{ display: 'none' }}
-                        />
-                      </label>
-                    </div>
-
-                    {uploadedFileResult && (
-                      <div style={{ marginTop: 16, padding: 12, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, fontSize: '0.8rem', color: '#166534', textAlign: 'left' }}>
-                        <div style={{ fontWeight: 700, marginBottom: 4 }}>✅ Upload Successful!</div>
-                        <div>File: <strong>{uploadedFileResult.filename}</strong></div>
-                        <a href={uploadedFileResult.drive_url} target="_blank" rel="noreferrer" style={{ color: '#15803d', textDecoration: 'underline', marginTop: 4, display: 'inline-block', fontWeight: 600 }}>
-                          View File on Google Drive <ExternalLink size={12} />
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* EXPENSE LOG MODAL */}
-      {showExpenseModal && (
-        <div className="modal-overlay" style={{ zIndex: 1100 }}>
-          <div className="modal" style={{ maxWidth: 440 }}>
-            <div className="modal-header">
-              <h3 className="modal-title">Log Expense / Receipt</h3>
-              <button className="btn-icon" onClick={() => setShowExpenseModal(false)}><X size={16} /></button>
-            </div>
-            <form onSubmit={handleAddExpense}>
-              <div className="modal-body">
-                <div className="form-group">
-                  <label className="form-label">Expense Category</label>
-                  <select
-                    className="form-select"
-                    value={expenseForm.expense_type}
-                    onChange={e => setExpenseForm({ ...expenseForm, expense_type: e.target.value })}
-                  >
-                    <option value="DETAILING">Vehicle Detailing</option>
-                    <option value="TUEV_INSPECTION">TÜV Inspection</option>
-                    <option value="TRANSPORT">Vehicle Transport</option>
-                    <option value="OIL_CHANGE">Oil Change / Service</option>
-                    <option value="ADMIN">Administrative / Legal</option>
-                    <option value="OTHER">Other Expense</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Amount (€) *</label>
-                  <input
-                    className="form-input"
-                    type="number"
-                    step="0.01"
-                    required
-                    placeholder="150.00"
-                    value={expenseForm.amount}
-                    onChange={e => setExpenseForm({ ...expenseForm, amount: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Description / Vendor</label>
-                  <input
-                    className="form-input"
-                    required
-                    placeholder="e.g. TÜV Süd Inspection fee"
-                    value={expenseForm.description}
-                    onChange={e => setExpenseForm({ ...expenseForm, description: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowExpenseModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={submitting}>Save Expense</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* LABOR HOURS LOG MODAL */}
-      {showLaborModal && (
-        <div className="modal-overlay" style={{ zIndex: 1100 }}>
-          <div className="modal" style={{ maxWidth: 440 }}>
-            <div className="modal-header">
-              <h3 className="modal-title">Log Broker Labor Hours</h3>
-              <button className="btn-icon" onClick={() => setShowLaborModal(false)}><X size={16} /></button>
-            </div>
-            <form onSubmit={handleAddLabor}>
-              <div className="modal-body">
-                <div className="form-group">
-                  <label className="form-label">Hours Spent *</label>
-                  <input
-                    className="form-input"
-                    type="number"
-                    step="0.5"
-                    required
-                    placeholder="2.5"
-                    value={laborForm.hours_spent}
-                    onChange={e => setLaborForm({ ...laborForm, hours_spent: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Activity Description *</label>
-                  <input
-                    className="form-input"
-                    required
-                    placeholder="e.g. On-site vehicle inspection & photo shoot"
-                    value={laborForm.activity_description}
-                    onChange={e => setLaborForm({ ...laborForm, activity_description: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowLaborModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={submitting}>Save Labor Hours</button>
-              </div>
-            </form>
-          </div>
         </div>
       )}
 

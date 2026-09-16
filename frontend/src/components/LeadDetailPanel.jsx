@@ -87,17 +87,6 @@ export default function LeadDetailPanel({ lead, onClose, onConvert, onRefresh, c
           </div>
 
           <div className="crm-detail-actions">
-            {!isSpam && (
-              <button
-                className="stage-advance-btn"
-                onClick={() => onConvert(lead)}
-                disabled={converting}
-                title="Convert this lead to a Deal & Project"
-              >
-                {converting ? <Loader2 size={12} className="spin" /> : <ArrowRight size={12} />}
-                Convert to Deal
-              </button>
-            )}
             <button className="btn btn-ghost btn-icon" onClick={onClose} title="Close">
               <X size={16} />
             </button>
@@ -121,7 +110,7 @@ export default function LeadDetailPanel({ lead, onClose, onConvert, onRefresh, c
         </div>
 
         {/* ── Body ── */}
-        <div className="crm-detail-body">
+        <div className="crm-detail-body" style={{ padding: '24px' }}>
 
           {/* ───── OVERVIEW TAB ───── */}
           {activeTab === 'overview' && (
@@ -235,6 +224,32 @@ export default function LeadDetailPanel({ lead, onClose, onConvert, onRefresh, c
                 </div>
               )}
             </>
+          )}
+        </div>
+        
+        {/* ── Footer ── */}
+        <div style={{
+          padding: '16px 24px', 
+          background: 'var(--bg-surface)', 
+          borderTop: '1px solid var(--border)',
+          display: 'flex', 
+          justifyContent: 'flex-end', 
+          gap: 12,
+          flexShrink: 0
+        }}>
+          <button className="btn btn-secondary" onClick={onClose}>
+            Cancel
+          </button>
+          {!isSpam && (
+            <button
+              className="btn btn-primary"
+              onClick={() => onConvert(lead)}
+              disabled={converting}
+              title="Convert this lead to a Deal & Project"
+            >
+              {converting ? <Loader2 size={14} className="spin" /> : <Sparkles size={14} style={{ marginRight: 6 }} />}
+              Convert to Deal
+            </button>
           )}
         </div>
       </aside>

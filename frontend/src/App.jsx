@@ -20,7 +20,7 @@ import Profile from './pages/Profile';
 import SellForm from './pages/SellForm';
 import BuyForm from './pages/BuyForm';
 import { api, supabase } from './api/api';
-// import GoogleTranslate from './components/GoogleTranslate';
+import GoogleTranslate from './components/GoogleTranslate';
 
 const NAV = [
   {
@@ -91,40 +91,24 @@ function DeskTopbar({ online, userProfile }) {
         <span className="desk-breadcrumbs-item active">{crumbs[1]}</span>
       </div>
 
-      {/* Frappe Awesome Bar (Global Search) */}
-      <form onSubmit={handleSearchSubmit} className="desk-search-bar">
-        <Search size={14} color="var(--text-muted)" />
-        <input
-          type="text"
-          className="desk-search-input"
-          placeholder="Search or jump to... (e.g. Leads, Deals, Docs)"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-        <div className="desk-search-kbd">⌘K</div>
-      </form>
+
 
       {/* Right Topbar Actions & Status */}
       <div className="desk-topbar-actions">
-        <div
-          className="system-status-indicator"
-          style={{
-            background: online ? 'var(--status-green-bg)' : 'var(--status-amber-bg)',
-            color: online ? 'var(--status-green-text)' : 'var(--status-amber-text)',
-            borderColor: online ? 'var(--status-green-border)' : 'var(--status-amber-border)',
-          }}
-          title={online ? 'Connected to FastAPI Backend & Supabase' : 'Connecting to Backend...'}
-        >
-          <span
-            className="status-dot"
-            style={{ background: online ? 'var(--status-green-text)' : 'var(--status-amber-text)' }}
-          />
-          {online ? 'Connected' : 'Connecting...'}
-        </div>
+        <GoogleTranslate />
 
-        <NavLink to="/profile" className="btn-icon" title="System Settings">
-          <Settings size={16} />
-        </NavLink>
+        {/* Frappe Awesome Bar (Global Search) */}
+        <form onSubmit={handleSearchSubmit} className="desk-search-bar">
+          <Search size={14} color="var(--text-muted)" />
+          <input
+            type="text"
+            className="desk-search-input"
+            placeholder="Search or jump to... (e.g. Leads, Deals, Docs)"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <div className="desk-search-kbd">⌘K</div>
+        </form>
       </div>
     </header>
   );
@@ -379,7 +363,7 @@ function AppRoutes({ isAuthenticated, online, userProfile, onLogin, onLogout }) 
     return (
       <>
         <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 9999 }}>
-          {/* <GoogleTranslate /> */}
+          <GoogleTranslate />
         </div>
         <Auth onLogin={onLogin} />
       </>
@@ -388,9 +372,7 @@ function AppRoutes({ isAuthenticated, online, userProfile, onLogin, onLogout }) 
 
   return (
     <>
-      <div style={{ position: 'fixed', top: 14, right: 16, zIndex: 9999 }}>
-        {/* <GoogleTranslate /> */}
-      </div>
+
       <div className="portal-layout">
         <Sidebar 
           online={online} 

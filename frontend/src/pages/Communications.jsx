@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Mail, MessageSquare, Search, MessageCircle, User, Sparkles, RefreshCw, CheckCircle2, ChevronLeft } from 'lucide-react';
+import { Mail, MessageSquare, Search, MessageCircle, User, Sparkles, RefreshCw, CheckCircle2, ChevronLeft, Send, ExternalLink, X } from 'lucide-react';
 import { api } from '../api/api';
 import { format } from 'date-fns';
 import EmailViewCard from '../components/EmailViewCard';
+import toast from 'react-hot-toast';
 
 function getAvatar(contact) {
   const ch = (contact.channel || '').toUpperCase();
-  if (ch === 'WHATSAPP') return { cls: 'avatar-whatsapp', icon: <MessageCircle size={15} /> };
-  if (ch === 'EMAIL' || ch === 'OUTLOOK_EMAIL' || ch === 'STRATO_EMAIL') return { cls: 'avatar-email', icon: <Mail size={15} /> };
+  if (ch === 'TELEGRAM') return { cls: 'avatar-telegram', icon: <Send size={15} /> };
+  if (ch === 'EMAIL' || ch === 'OUTLOOK_EMAIL' || ch === 'STRATO_EMAIL') return { cls: 'avatar-email', icon: <img src="/assets/mail (1).png" alt="Email" style={{ width: 24, height: 24, objectFit: 'contain' }} /> };
   return { cls: 'avatar-default', icon: <User size={15} /> };
 }
 
@@ -72,10 +73,11 @@ export default function Communications() {
   const [threadLoading, setThreadLoading] = useState(false);
   const [converting, setConverting] = useState(false);
   const [convertedMap, setConvertedMap] = useState({});
-  const [filter, setFilter] = useState('ALL');
+  const [filter, setFilter] = useState('EMAIL');
   const [showSpam, setShowSpam] = useState(false);
   const [search, setSearch] = useState('');
   const [pollingEmail, setPollingEmail] = useState(false);
+  const [showTelegramModal, setShowTelegramModal] = useState(false);
 
   const loadCommunications = async () => {
     setLoading(true);
@@ -142,11 +144,12 @@ export default function Communications() {
         message: msg.body,
         notes: 'Converted from Communications Inbox'
       });
-      alert(`Successfully converted message from ${msg.sender_name || msg.sender_contact} into a Lead.`);
       setConvertedMap(prev => ({ ...prev, [msg.id]: true }));
+      toast.success(`Successfully converted message from ${msg.sender_name || msg.sender_contact} into a Lead.`);
       loadCommunications();
     } catch (err) {
-      alert('Error converting email to lead: ' + err.message);
+      console.error(err);
+      toast.error('Error converting email to lead: ' + err.message);
     } finally {
       setConverting(false);
     }
@@ -156,11 +159,11 @@ export default function Communications() {
     setPollingEmail(true);
     try {
       const res = await api.triggerEmailPoll();
-      const count = res.new_leads_created || 0;
-      alert(`Strato Inbox Sync Complete: ${count} new email lead(s) processed.`);
+      const count = res.processed || 0;
+      toast.success(`Strato Inbox Sync Complete: ${count} new email lead(s) processed.`);
       loadCommunications();
     } catch (err) {
-      alert('Error syncing Strato email inbox: ' + err.message);
+      toast.error('Error syncing Strato email inbox: ' + err.message);
     } finally {
       setPollingEmail(false);
     }
@@ -178,7 +181,7 @@ export default function Communications() {
       }
       if (filter === 'ALL') return true;
       if (filter === 'EMAIL') return c.channel === 'EMAIL' || c.channel === 'OUTLOOK_EMAIL' || c.channel === 'STRATO_EMAIL';
-      if (filter === 'WHATSAPP') return c.channel === 'WHATSAPP';
+      if (filter === 'TELEGRAM') return c.channel === 'TELEGRAM';
       return c.channel === filter;
     })
     .filter(c => {
@@ -191,7 +194,7 @@ export default function Communications() {
     });
 
   const channelBadge = (ch) => {
-    if (ch === 'WHATSAPP') return <span className="badge badge-success" style={{ fontSize: '0.65rem' }}>WA</span>;
+    if (ch === 'TELEGRAM') return <span className="badge badge-info" style={{ fontSize: '0.65rem' }}>TG</span>;
     if (ch === 'EMAIL' || ch === 'OUTLOOK_EMAIL' || ch === 'STRATO_EMAIL') return <span className="badge badge-info" style={{ fontSize: '0.65rem' }}>Email</span>;
     return null;
   };
@@ -202,19 +205,22 @@ export default function Communications() {
       <div className="page-header" style={{ marginBottom: 16 }}>
         <div className="page-header-left">
           <h1 className="page-title">Communications Inbox</h1>
-          <p className="page-subtitle">Live unified inbox (Strato IMAP & Outlook) + WhatsApp Cloud integration</p>
+          <p className="page-subtitle">Live unified inbox (Strato IMAP & Outlook) + Telegram Bot integration</p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           {/* Channel Tabs */}
           <div style={{ display: 'inline-flex', background: 'var(--border)', padding: 2, borderRadius: 'var(--radius-sm)' }}>
-            {['ALL', 'EMAIL', 'WHATSAPP'].map(f => (
-              <button key={f} onClick={() => setFilter(f)} style={{
+            {['EMAIL', 'TELEGRAM'].map(f => (
+              <button key={f} onClick={() => {
+                if (f === 'TELEGRAM') setShowTelegramModal(true);
+                else setFilter(f);
+              }} style={{
                 padding: '5px 12px', borderRadius: 4, fontWeight: 600, fontSize: '0.75rem',
                 border: 'none', cursor: 'pointer',
                 background: filter === f ? 'var(--surface)' : 'transparent',
                 color: filter === f ? 'var(--text-primary)' : 'var(--text-muted)',
                 boxShadow: filter === f ? 'var(--shadow-xs)' : 'none',
-              }}>{f === 'ALL' ? 'All Channels' : f}</button>
+              }}>{f === 'EMAIL' ? 'EMAIL' : f}</button>
             ))}
           </div>
 
@@ -267,7 +273,10 @@ export default function Communications() {
               const displayName = cleanText(c.sender_name) || c.sender_contact || 'Unknown';
               const preview = cleanText(c.body).slice(0, 65) || cleanText(c.subject) || '—';
               return (
-                <div key={c.id} className={`contact-item${isActive ? ' active' : ''}`} onClick={() => selectContact(c)}>
+                <div key={c.id} className={`contact-item${isActive ? ' active' : ''}`} onClick={() => {
+                  if (c.channel === 'TELEGRAM') setShowTelegramModal(true);
+                  else selectContact(c);
+                }}>
                   <div className={`contact-avatar ${av.cls}`}>{av.icon}</div>
                   <div className="contact-info">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
@@ -297,12 +306,14 @@ export default function Communications() {
                 <button className="btn-icon show-on-mobile" style={{ marginRight: 8, padding: 4 }} onClick={() => setSelected(null)}>
                   <ChevronLeft size={18} />
                 </button>
-                <div className={`contact-avatar ${getAvatar(selected).cls}`} style={{ width: 28, height: 28, fontSize: '0.7rem' }}>
-                  {getAvatar(selected).icon}
-                </div>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{cleanText(selected.sender_name) || selected.sender_contact}</div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{selected.sender_contact}</div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                  <div className={`contact-avatar ${getAvatar(selected).cls}`} style={{ fontSize: '0.7rem' }}>
+                    {getAvatar(selected).icon}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{cleanText(selected.sender_name) || selected.sender_contact}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{selected.sender_contact}</div>
+                  </div>
                 </div>
 
                 <button
@@ -319,21 +330,24 @@ export default function Communications() {
               <div style={{ flex: 1, overflowY: 'auto' }}>
                 {threadLoading ? (
                   <div className="loading-spinner"><div className="spinner" /></div>
-                ) : selected.channel === 'WHATSAPP' ? (
-                  <div className="wa-chat-bg">
-                    {thread.map(msg => (
-                      <div key={msg.id} className={`wa-bubble ${msg.is_inbound !== false ? 'inbound' : 'outbound'}`}>
-                        <div style={{ whiteSpace: 'pre-wrap' }}>{cleanBodyDisplay(msg.body)}</div>
-                        <div className="wa-time">
-                          {format(new Date(msg.timestamp), 'HH:mm')}
-                        </div>
-                        {msg.ai_summary && msg.is_inbound !== false && (
-                          <div style={{ fontSize: '0.7rem', color: 'var(--primary)', marginTop: 4, borderTop: '1px solid #f0f0f0', paddingTop: 6, fontWeight: 500 }}>
-                            ✨ {msg.ai_summary}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                ) : selected.channel === 'TELEGRAM' ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 16 }}>
+                    <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#0088cc', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(0, 136, 204, 0.3)' }}>
+                      <Send size={32} />
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--text-primary)' }}>Telegram Chatbot</h3>
+                      <p style={{ margin: '8px 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>Continue this conversation in our dedicated Telegram Bot.</p>
+                    </div>
+                    <a
+                      href="https://t.me/car_agents_bot"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn btn-primary"
+                      style={{ marginTop: 12, padding: '10px 24px', fontSize: '0.9rem' }}
+                    >
+                      Open in Telegram <ExternalLink size={14} style={{ marginLeft: 6 }} />
+                    </a>
                   </div>
                 ) : (
                   // ── Email Thread — Frappe Email Communication View ──
@@ -352,6 +366,34 @@ export default function Communications() {
           )}
         </div>
       </div>
+
+      {/* Telegram Redirect Modal */}
+      {showTelegramModal && (
+        <div className="modal-overlay" onClick={() => setShowTelegramModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 400, padding: 32, textAlign: 'center' }}>
+            <div style={{ position: 'relative' }}>
+              <button className="btn-icon" onClick={() => setShowTelegramModal(false)} style={{ position: 'absolute', right: -16, top: -16 }}>
+                <X size={18} />
+              </button>
+              <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#0088cc', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', boxShadow: '0 4px 12px rgba(0, 136, 204, 0.3)' }}>
+                <Send size={36} />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--text-primary)' }}>Telegram Chatbot</h3>
+              <p style={{ margin: '12px 0 24px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>Go to our dedicated Telegram Bot to manage these communications and messages.</p>
+              <a
+                href="https://t.me/car_agents_bot"
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-primary"
+                style={{ width: '100%', justifyContent: 'center', padding: '12px 0', fontSize: '0.95rem' }}
+                onClick={() => setShowTelegramModal(false)}
+              >
+                Open in Telegram <ExternalLink size={16} style={{ marginLeft: 8 }} />
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

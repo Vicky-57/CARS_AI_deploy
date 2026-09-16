@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Plus, Search, RefreshCw, RotateCcw, Trash2,
-  ChevronLeft, ChevronRight, ArrowRight
+  ChevronLeft, ChevronRight, ArrowRight, Filter, ArrowDownUp, Columns, MoreHorizontal, Check, ChevronDown, Sparkles
 } from 'lucide-react';
 import { api } from '../api/api';
 import LeadModal from '../components/LeadModal';
@@ -21,13 +21,6 @@ function getLeadVehicleDisplay(lead) {
 
 const PAGE_SIZE = 15;
 
-const STATUS_FILTERS = [
-  { key: '',      label: 'All Leads' },
-  { key: 'NEW',   label: 'New' },
-  { key: 'SELL',  label: 'Sell Intent' },
-  { key: 'BUY',   label: 'Buy Intent' },
-  { key: 'SPAM',  label: 'Junk / Spam' },
-];
 
 function getInitials(name) {
   if (!name) return '?';
@@ -38,17 +31,129 @@ function timeAgo(iso) {
   try { return formatDistanceToNow(new Date(iso), { addSuffix: true }); } catch { return ''; }
 }
 
+function DropdownMenu({ icon: Icon, label, children, align = 'left' }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <button
+        className="btn btn-secondary btn-sm"
+        style={{ padding: '6px 12px', background: open ? 'var(--bg-surface-subtle)' : 'transparent', border: '1px solid var(--border)' }}
+        onClick={() => setOpen(!open)}
+      >
+        {Icon && <Icon size={14} style={{ opacity: 0.6 }} />}
+        <span style={{ fontWeight: 500 }}>{label}</span>
+      </button>
+
+      {open && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 90 }} onClick={() => setOpen(false)} />
+          <div style={{
+            position: 'absolute', top: '100%',
+            left: align === 'left' ? 0 : 'auto',
+            right: align === 'right' ? 0 : 'auto',
+            marginTop: 4, zIndex: 100,
+            background: 'var(--bg-surface)', border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-sm)',
+            minWidth: 200, padding: 8, display: 'flex', flexDirection: 'column', gap: 4
+          }}>
+            {children}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function DropdownItem({ active, onClick, children }) {
+  return (
+    <div
+      style={{
+        padding: '6px 12px', fontSize: '0.85rem', cursor: 'pointer',
+        borderRadius: 4, background: active ? 'var(--bg-canvas)' : 'transparent',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        fontWeight: active ? 600 : 400
+      }}
+      onClick={onClick}
+      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-canvas)'}
+      onMouseLeave={e => e.currentTarget.style.background = active ? 'var(--bg-canvas)' : 'transparent'}
+    >
+      {children}
+      {active && <Check size={14} style={{ color: 'var(--primary)' }} />}
+    </div>
+  );
+}
+
+function CustomSelect({ value, onChange, options, style }) {
+  const [open, setOpen] = useState(false);
+  const selectedOption = options.find(o => o.value === value) || options[0];
+
+  return (
+    <div style={{ position: 'relative', ...style }}>
+      <button
+        className="input input-sm"
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: 'var(--bg-surface)',
+          cursor: 'pointer',
+          textAlign: 'left'
+        }}
+        onClick={() => setOpen(!open)}
+      >
+        <span>{selectedOption ? selectedOption.label : 'Select...'}</span>
+        <ChevronDown size={14} style={{ opacity: 0.5 }} />
+      </button>
+
+      {open && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 90 }} onClick={() => setOpen(false)} />
+          <div style={{
+            position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, zIndex: 100,
+            background: 'var(--bg-surface)', border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-md)',
+            padding: 4, display: 'flex', flexDirection: 'column', gap: 2,
+            maxHeight: 200, overflowY: 'auto'
+          }}>
+            {options.map(opt => (
+              <DropdownItem
+                key={opt.value}
+                active={value === opt.value}
+                onClick={() => { onChange(opt.value); setOpen(false); }}
+              >
+                {opt.label}
+              </DropdownItem>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+
+
 export default function Leads() {
   const navigate = useNavigate();
-  const [leads,        setLeads]        = useState([]);
-  const [loading,      setLoading]      = useState(true);
-  const [search,       setSearch]       = useState('');
+  const [leads, setLeads] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+
+  // New Filters
+  const [showFilters, setShowFilters] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
-  const [isModalOpen,  setIsModalOpen]  = useState(false);
+  const [intentFilter, setIntentFilter] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('');
+  const [sortOrder, setSortOrder] = useState('newest');
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [convertingId, setConvertingId] = useState(null);
-  const [actioningId,  setActioningId]  = useState(null);
-  const [currentPage,  setCurrentPage]  = useState(1);
+  const [actioningId, setActioningId] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedLead, setSelectedLead] = useState(null);
+  const [checkedLeadIds, setCheckedLeadIds] = useState(new Set());
 
   const loadLeads = async () => {
     setLoading(true);
@@ -81,29 +186,63 @@ export default function Leads() {
     } finally { setActioningId(null); }
   };
 
-  const handleConvertLeadToProject = async (lead) => {
+  const handleConvertLeadToProject = async (lead, skipNavigate = false) => {
     setConvertingId(lead.id);
     try {
       const vehicleName = getLeadVehicleDisplay(lead) || 'Vehicle TBD';
       const pType = (lead.intent || '').toUpperCase().includes('SELL') ? 'SELL' : 'BUY';
       await api.createProject({
-        client_name:    lead.name || 'Client Lead',
-        client_email:   lead.email,
-        client_phone:   lead.phone,
-        project_type:   pType,
+        client_name: lead.name || 'Client Lead',
+        client_email: lead.email,
+        client_phone: lead.phone,
+        project_type: pType,
         target_vehicle: vehicleName,
-        vin:            lead.vin,
-        status:         'ACTIVE',
-        current_stage:  'Intake & Onboarding',
-        notes:          lead.notes || lead.message || `Converted from Lead ID ${lead.id}`
+        vin: lead.vin,
+        status: 'ACTIVE',
+        current_stage: 'Intake & Onboarding',
+        notes: lead.notes || lead.message || `Converted from Lead ID ${lead.id}`
       });
-      await api.deleteLead(lead.id).catch(() => {});
+      await api.deleteLead(lead.id).catch(() => { });
       setSelectedLead(null);
       await loadLeads();
-      navigate('/projects');
+      if (!skipNavigate) navigate('/projects');
     } catch (err) {
       alert('Conversion Error: ' + err.message);
     } finally { setConvertingId(null); }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!window.confirm(`Delete ${checkedLeadIds.size} selected leads?`)) return;
+    setActioningId('bulk');
+    try {
+      for (const id of checkedLeadIds) {
+        await api.deleteLead(id);
+      }
+      setCheckedLeadIds(new Set());
+      await loadLeads();
+    } catch (err) {
+      alert('Error deleting leads: ' + err.message);
+    } finally {
+      setActioningId(null);
+    }
+  };
+
+  const handleBulkConvert = async () => {
+    if (!window.confirm(`Convert ${checkedLeadIds.size} selected leads to active deals?`)) return;
+    setConvertingId('bulk');
+    try {
+      for (const id of checkedLeadIds) {
+        const lead = leads.find(l => l.id === id);
+        if (lead) await handleConvertLeadToProject(lead, true);
+      }
+      setCheckedLeadIds(new Set());
+      await loadLeads();
+      navigate('/projects');
+    } catch (err) {
+      alert('Bulk Conversion Error: ' + err.message);
+    } finally {
+      setConvertingId(null);
+    }
   };
 
   useEffect(() => {
@@ -112,44 +251,60 @@ export default function Leads() {
     return () => { if (sub) sub.unsubscribe(); };
   }, []);
 
-  // Counts for filter sidebar
-  const spamCount   = leads.filter(l => l.status === 'SPAM').length;
-  const sellCount   = leads.filter(l => l.status !== 'SPAM' && (l.intent || '').toUpperCase().includes('SELL')).length;
-  const buyCount    = leads.filter(l => l.status !== 'SPAM' && (l.intent || '').toUpperCase().includes('BUY')).length;
-  const activeCount = leads.filter(l => l.status !== 'SPAM').length;
-
-  const getCounts = (key) => {
-    if (key === '')     return leads.length;
-    if (key === 'SPAM') return spamCount;
-    if (key === 'SELL') return sellCount;
-    if (key === 'BUY')  return buyCount;
-    if (key === 'NEW')  return activeCount;
-    return 0;
-  };
-
   // Filtering
   const filtered = leads.filter(l => {
+    // 1. Status Filter
     const isSpam = l.status === 'SPAM';
-    if (statusFilter === 'SPAM')                  { if (!isSpam) return false; }
-    else if (statusFilter === 'SELL')             { if (isSpam || !(l.intent || '').toUpperCase().includes('SELL')) return false; }
-    else if (statusFilter === 'BUY')              { if (isSpam || !(l.intent || '').toUpperCase().includes('BUY'))  return false; }
-    else if (statusFilter === 'NEW' || statusFilter === '') { if (isSpam && statusFilter === 'NEW') return false; }
+    if (statusFilter === 'SPAM') { if (!isSpam) return false; }
+    else if (statusFilter === 'NEW') { if (isSpam || l.status !== 'NEW') return false; }
+    else if (statusFilter === '') { if (isSpam) return false; }
 
-    const query  = search.toLowerCase();
-    const name   = (l.name    || '').toLowerCase();
-    const email  = (l.email   || '').toLowerCase();
-    const vehicle = `${l.manufacturer || ''} ${l.model || ''}`.toLowerCase();
-    const notes  = (l.notes   || '').toLowerCase();
-    return !search || name.includes(query) || email.includes(query) || vehicle.includes(query) || notes.includes(query);
+    // 2. Intent Filter
+    const lIntent = (l.intent || '').toUpperCase();
+    if (intentFilter === 'SELL') { if (!lIntent.includes('SELL')) return false; }
+    else if (intentFilter === 'BUY') { if (!lIntent.includes('BUY')) return false; }
+
+    // 3. Source Filter
+    const lSource = (l.channel || 'MANUAL').toUpperCase();
+    if (sourceFilter && lSource !== sourceFilter) return false;
+
+    // 4. Search Query
+    const query = search.toLowerCase();
+    if (query) {
+      const name = (l.name || '').toLowerCase();
+      const email = (l.email || '').toLowerCase();
+      const vehicle = `${l.manufacturer || ''} ${l.model || ''}`.toLowerCase();
+      const notes = (l.notes || '').toLowerCase();
+      if (!name.includes(query) && !email.includes(query) && !vehicle.includes(query) && !notes.includes(query)) return false;
+    }
+    return true;
   });
 
-  useEffect(() => { setCurrentPage(1); }, [search, statusFilter]);
+  // Sorting
+  filtered.sort((a, b) => {
+    const tA = new Date(a.created_at || 0).getTime();
+    const tB = new Date(b.created_at || 0).getTime();
+    return sortOrder === 'newest' ? tB - tA : tA - tB;
+  });
+
+  useEffect(() => { setCurrentPage(1); setCheckedLeadIds(new Set()); }, [search, statusFilter, intentFilter, sourceFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated  = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  const allPaginatedChecked = paginated.length > 0 && paginated.every(l => checkedLeadIds.has(l.id));
+
+  const toggleAllPaginated = (checked) => {
+    const next = new Set(checkedLeadIds);
+    paginated.forEach(l => {
+      if (checked) next.add(l.id);
+      else next.delete(l.id);
+    });
+    setCheckedLeadIds(next);
+  };
 
   return (
-    <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ maxWidth: 1400, margin: '0 auto', paddingBottom: 48 }}>
       {/* ── Page Header ── */}
       <div className="page-header">
         <div>
@@ -169,41 +324,117 @@ export default function Leads() {
         </div>
       </div>
 
-      {/* ── CRM Layout: Filter Sidebar + List ── */}
-      <div className="crm-layout">
+      {/* ── CRM Layout: Table Only ── */}
+      <div className="crm-layout" style={{ display: 'block' }}>
 
-        {/* Left: Status Filter Sidebar */}
-        <div className="crm-filter-sidebar">
-          <div className="crm-filter-section-label">Status</div>
-          {STATUS_FILTERS.map(({ key, label }) => (
-            <button
-              key={key}
-              className={`crm-filter-pill ${statusFilter === key ? 'active' : ''}`}
-              onClick={() => setStatusFilter(key)}
-            >
-              <span>{label}</span>
-              <span className="crm-filter-pill-count">{getCounts(key)}</span>
-            </button>
-          ))}
-        </div>
+        <div className="crm-list-area" style={{ flex: 'none', borderRight: 'none', minWidth: '100%' }}>
 
-        {/* Right: List Area */}
-        <div className="crm-list-area">
-          {/* Search bar */}
-          <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div className="input-group" style={{ maxWidth: 320 }}>
-              <Search size={13} className="input-icon-left" />
-              <input
-                type="text"
-                className="input input-sm input-with-icon-left"
-                placeholder="Search by name, vehicle, email…"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
+          {/* Top Toolbar */}
+          <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+            {checkedLeadIds.size > 0 ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, padding: '4px 0' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{checkedLeadIds.size} selected</span>
+                <button className="btn btn-primary btn-sm" onClick={handleBulkConvert} disabled={convertingId === 'bulk'}>
+                  <Sparkles size={13} /> Convert to Deal
+                </button>
+                <button className="btn btn-danger btn-sm" onClick={handleBulkDelete} disabled={actioningId === 'bulk'}>
+                  <Trash2 size={13} /> Delete
+                </button>
+                <button className="btn btn-secondary btn-sm" onClick={() => setCheckedLeadIds(new Set())}>
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="input-group" style={{ maxWidth: 320, flex: 1 }}>
+                <Search size={13} className="input-icon-left" />
+                <input
+                  type="text"
+                  className="input input-sm input-with-icon-left"
+                  placeholder="Search by name, vehicle, email…"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                />
+              </div>
+            )}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button className="btn btn-secondary btn-sm" onClick={loadLeads} style={{ padding: '6px 8px', border: '1px solid var(--border)', background: 'transparent' }}>
+                <RefreshCw size={14} className={loading ? 'spin' : ''} style={{ opacity: 0.6 }} />
+              </button>
+
+              <button
+                className="btn btn-secondary btn-sm"
+                style={{ padding: '6px 12px', background: showFilters ? 'var(--bg-surface-subtle)' : 'transparent', border: '1px solid var(--border)' }}
+                onClick={() => setShowFilters(!showFilters)}
+              >
+                <Filter size={14} style={{ opacity: 0.6 }} />
+                <span style={{ fontWeight: 500 }}>Filter</span>
+              </button>
+
+              <DropdownMenu icon={ArrowDownUp} label="Sort" align="right">
+                <DropdownItem active={sortOrder === 'newest'} onClick={() => setSortOrder('newest')}>Newest First</DropdownItem>
+                <DropdownItem active={sortOrder === 'oldest'} onClick={() => setSortOrder('oldest')}>Oldest First</DropdownItem>
+              </DropdownMenu>
             </div>
           </div>
 
+          {/* Horizontal Filters Bar */}
+          {showFilters && (
+            <div style={{ marginBottom: 16, padding: '12px 16px', background: 'var(--bg-surface-subtle)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Status</label>
+                <CustomSelect
+                  style={{ minWidth: 160 }}
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                  options={[
+                    { value: '', label: 'All Leads' },
+                    { value: 'NEW', label: 'New Leads' },
+                    { value: 'SPAM', label: 'Junk / Spam' }
+                  ]}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Intent</label>
+                <CustomSelect
+                  style={{ minWidth: 160 }}
+                  value={intentFilter}
+                  onChange={setIntentFilter}
+                  options={[
+                    { value: '', label: 'All Intents' },
+                    { value: 'SELL', label: 'Sell Side' },
+                    { value: 'BUY', label: 'Buy Side' }
+                  ]}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Source</label>
+                <CustomSelect
+                  style={{ minWidth: 160 }}
+                  value={sourceFilter}
+                  onChange={setSourceFilter}
+                  options={[
+                    { value: '', label: 'All Sources' },
+                    { value: 'STRATO_EMAIL', label: 'Strato' },
+                    { value: 'MANUAL', label: 'Manual' },
+                    { value: 'TELEGRAM', label: 'Telegram' },
+                    { value: 'DIRECT_CALL', label: 'Direct Call' }
+                  ]}
+                />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'flex-end', marginLeft: 'auto' }}>
+                <button className="btn btn-secondary btn-sm" onClick={() => { setStatusFilter(''); setIntentFilter(''); setSourceFilter(''); }}>
+                  Clear Filters
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Table container */}
+
           <div className="table-container" style={{ flex: 1, overflow: 'auto' }}>
             {loading ? (
               <div className="empty-state"><div className="spinner spinner-dark" /></div>
@@ -217,6 +448,13 @@ export default function Leads() {
               <table className="frappe-table">
                 <thead>
                   <tr>
+                    <th style={{ width: 32, padding: '10px 12px' }}>
+                      <input
+                        type="checkbox"
+                        checked={allPaginatedChecked}
+                        onChange={e => toggleAllPaginated(e.target.checked)}
+                      />
+                    </th>
                     <th style={{ width: 36, padding: '10px 12px' }}></th>
                     <th style={{ minWidth: 200 }}>Lead / Client</th>
                     <th style={{ width: 120 }}>Intent</th>
@@ -228,17 +466,32 @@ export default function Leads() {
                 </thead>
                 <tbody>
                   {paginated.map(lead => {
-                    const isSpam   = lead.status === 'SPAM';
-                    const isSell   = (lead.intent || '').toUpperCase().includes('SELL');
-                    const vehicle  = getLeadVehicleDisplay(lead);
+                    const isSpam = lead.status === 'SPAM';
+                    const isSell = (lead.intent || '').toUpperCase().includes('SELL');
+                    const vehicle = getLeadVehicleDisplay(lead);
                     const selected = selectedLead?.id === lead.id;
+                    const isChecked = checkedLeadIds.has(lead.id);
 
                     return (
                       <tr
                         key={lead.id}
-                        className={`crm-row${selected ? ' selected' : ''}`}
+                        className={`crm-row${selected || isChecked ? ' selected' : ''}`}
                         onClick={() => setSelectedLead(selected ? null : lead)}
                       >
+                        {/* Checkbox */}
+                        <td style={{ padding: '8px 12px' }} onClick={e => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const next = new Set(checkedLeadIds);
+                              if (e.target.checked) next.add(lead.id);
+                              else next.delete(lead.id);
+                              setCheckedLeadIds(next);
+                            }}
+                          />
+                        </td>
+
                         {/* Avatar / initials */}
                         <td style={{ padding: '8px 12px' }}>
                           <div style={{
@@ -280,8 +533,10 @@ export default function Leads() {
                             {vehicle || lead.subject || 'General Inquiry'}
                           </div>
                           {(lead.notes || lead.message) && (
-                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', maxWidth: 320,
-                                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            <div style={{
+                              fontSize: '0.72rem', color: 'var(--text-muted)', maxWidth: 320,
+                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                            }}>
                               {lead.notes || lead.message}
                             </div>
                           )}

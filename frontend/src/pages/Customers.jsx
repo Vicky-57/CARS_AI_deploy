@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Users, UserPlus, Search, RefreshCw, Mail, Phone, Plus, X, Briefcase, Car, Trash2, Eye } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Users, UserPlus, Search, RefreshCw, Mail, Phone, Plus, X, Briefcase, Car, Trash2, Eye, Check, ChevronDown, Filter, Calendar, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { api, supabase } from '../api/api';
 import CreateProjectModal from '../components/CreateProjectModal';
@@ -21,17 +22,85 @@ function getCustomerCar(customer) {
 
 const PAGE_SIZE = 10;
 
+function DropdownItem({ active, onClick, children }) {
+  return (
+    <div
+      style={{
+        padding: '6px 12px', fontSize: '0.85rem', cursor: 'pointer',
+        borderRadius: 4, background: active ? 'var(--bg-canvas)' : 'transparent',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        fontWeight: active ? 600 : 400
+      }}
+      onClick={onClick}
+      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-canvas)'}
+      onMouseLeave={e => e.currentTarget.style.background = active ? 'var(--bg-canvas)' : 'transparent'}
+    >
+      {children}
+      {active && <Check size={14} style={{ color: 'var(--primary)' }} />}
+    </div>
+  );
+}
+
+function CustomSelect({ value, onChange, options, style }) {
+  const [open, setOpen] = useState(false);
+  const selectedOption = options.find(o => o.value === value) || options[0];
+
+  return (
+    <div style={{ position: 'relative', ...style }}>
+      <button
+        className="input input-sm"
+        style={{ 
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: 'var(--bg-surface)', cursor: 'pointer', textAlign: 'left'
+        }}
+        onClick={() => setOpen(!open)}
+      >
+        <span>{selectedOption ? selectedOption.label : 'Select...'}</span>
+        <ChevronDown size={14} style={{ opacity: 0.5 }} />
+      </button>
+
+      {open && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 90 }} onClick={() => setOpen(false)} />
+          <div style={{
+            position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, zIndex: 100,
+            background: 'var(--bg-surface)', border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-md)',
+            padding: 4, display: 'flex', flexDirection: 'column', gap: 2,
+            maxHeight: 200, overflowY: 'auto'
+          }}>
+            {options.map(opt => (
+              <DropdownItem key={opt.value} active={value === opt.value} onClick={() => { onChange(opt.value); setOpen(false); }}>
+                {opt.label}
+              </DropdownItem>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function Customers() {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  
+  // Filters
+  const [showFilters, setShowFilters] = useState(false);
+  const [intentFilter, setIntentFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [vehicleFilter, setVehicleFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
   const [activeTab, setActiveTab] = useState('NEW');
   const [selectedCustomerDetail, setSelectedCustomerDetail] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-
-  // Add customer modal & project creation state
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
+  const [checkedCustomerIds, setCheckedCustomerIds] = useState(new Set());
+  const [actioningId, setActioningId] = useState(null);
+  
+  const navigate = useNavigate();
   const [newCustomerForm, setNewCustomerForm] = useState({
     name: '',
     email: '',
@@ -109,6 +178,48 @@ export default function Customers() {
     if (activeTab === 'NEW' && c.interactions.length > 1) return false;
     if (activeTab === 'REPEAT' && c.interactions.length === 1) return false;
 
+    // Intent Filter
+    if (intentFilter) {
+      const hasIntent = c.interactions.some(inter => {
+        const item = inter.details || {};
+        const intent = (item.intent || item.project_type || '').toUpperCase();
+        return intent.includes(intentFilter);
+      });
+      if (!hasIntent) return false;
+    }
+
+    // Type Filter
+    if (typeFilter) {
+      const hasLead = c.interactions.some(i => i.type === 'Lead');
+      const hasProject = c.interactions.some(i => i.type === 'Project');
+      if (typeFilter === 'LEAD' && (hasProject || !hasLead)) return false;
+      if (typeFilter === 'PROJECT' && (hasLead || !hasProject)) return false;
+      if (typeFilter === 'BOTH' && (!hasLead || !hasProject)) return false;
+    }
+
+    // Vehicle Filter
+    if (vehicleFilter) {
+      const hasVeh = !!getCustomerCar(c);
+      if (vehicleFilter === 'YES' && !hasVeh) return false;
+      if (vehicleFilter === 'NO' && hasVeh) return false;
+    }
+
+    // Date Filter
+    if (dateFilter) {
+      const lastInt = c.last_interaction ? new Date(c.last_interaction) : new Date(0);
+      const now = new Date();
+      // Calculate start of today for accurate "today" filtering
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      
+      if (dateFilter === 'TODAY' && lastInt < today) return false;
+      
+      const diffTime = Math.abs(now - lastInt);
+      const diffDays = diffTime / (1000 * 60 * 60 * 24);
+      
+      if (dateFilter === 'WEEK' && diffDays > 7) return false;
+      if (dateFilter === 'MONTH' && diffDays > 30) return false;
+    }
+
     // Filter by search
     const query = search.toLowerCase();
     const name = (c.name || '').toLowerCase();
@@ -117,8 +228,8 @@ export default function Customers() {
     return !search || name.includes(query) || email.includes(query) || phone.includes(query);
   });
 
-  // Reset to page 1 whenever search or activeTab changes
-  useEffect(() => { setCurrentPage(1); }, [search, activeTab]);
+  // Reset to page 1 whenever search or filters change
+  useEffect(() => { setCurrentPage(1); }, [search, activeTab, intentFilter, typeFilter, vehicleFilter, dateFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -188,6 +299,71 @@ export default function Customers() {
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (!window.confirm(`Delete ${checkedCustomerIds.size} selected customers (including all their leads and projects)?`)) return;
+    setActioningId('bulk');
+    try {
+      for (const id of checkedCustomerIds) {
+        const customer = customers.find(c => c.id === id);
+        if (customer && customer.email) {
+          await supabase.from('leads').delete().eq('email', customer.email);
+          await supabase.from('projects').delete().eq('client_email', customer.email);
+        }
+      }
+      setCheckedCustomerIds(new Set());
+      toast.success(`Successfully deleted ${checkedCustomerIds.size} customers.`);
+      await loadCustomers();
+    } catch (err) {
+      toast.error('Error deleting customers: ' + err.message);
+    } finally {
+      setActioningId(null);
+    }
+  };
+
+  const handleBulkLaunch = async () => {
+    if (!window.confirm(`Launch Deals/Projects for ${checkedCustomerIds.size} selected customers?`)) return;
+    setActioningId('bulk-launch');
+    try {
+      for (const id of checkedCustomerIds) {
+        const c = customers.find(x => x.id === id);
+        if (c) {
+          const payload = {
+            client_name: c.name || 'Unknown Client',
+            client_email: c.email || null,
+            client_phone: c.phone || null,
+            project_type: 'SELL',
+            target_vehicle: getCustomerCar(c) || '',
+            current_stage: 'Intake & Onboarding',
+            status: 'ACTIVE',
+            notes: 'Bulk launched from Customers page'
+          };
+          await api.createProject(payload).catch(console.error);
+        }
+      }
+      setCheckedCustomerIds(new Set());
+      toast.success(`Successfully launched projects for ${checkedCustomerIds.size} customers.`);
+      await loadCustomers();
+      navigate('/projects');
+    } catch (err) {
+      toast.error('Bulk Launch Error: ' + err.message);
+    } finally {
+      setActioningId(null);
+    }
+  };
+
+  // Bulk Selection Handlers
+  const handleSelectAll = (e) => {
+    if (e.target.checked) setCheckedCustomerIds(new Set(paginated.map(c => c.id)));
+    else setCheckedCustomerIds(new Set());
+  };
+  const handleSelectOne = (e, id) => {
+    e.stopPropagation();
+    const next = new Set(checkedCustomerIds);
+    if (e.target.checked) next.add(id);
+    else next.delete(id);
+    setCheckedCustomerIds(next);
+  };
+
   return (
     <div style={{ maxWidth: 1280, margin: '0 auto' }}>
       {/* Contact Detail Panel */}
@@ -230,40 +406,152 @@ export default function Customers() {
         </div>
       </div>
 
-      {/* Frappe Container */}
-      <div className="frappe-list-container">
-        {/* Toolbar with Filter Tabs and Search */}
-        <div className="table-toolbar">
-          <div className="table-toolbar-left">
-            <div className="tabs-container" style={{ margin: 0, border: 'none', gap: 4 }}>
-              <button
-                className={`tab-btn ${activeTab === 'NEW' ? 'active' : ''}`}
-                onClick={() => setActiveTab('NEW')}
-              >
-                New Clients
-              </button>
-              <button
-                className={`tab-btn ${activeTab === 'REPEAT' ? 'active' : ''}`}
-                onClick={() => setActiveTab('REPEAT')}
-              >
-                Repeat Clients
-              </button>
-            </div>
-          </div>
+      {/* Tabs & Search Outside Container */}
+      <div style={{ marginBottom: 16, padding: '0 4px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
+        <div className="tabs-container" style={{ margin: 0, borderBottom: 'none', gap: 16 }}>
+          <button
+            className={`tab-btn ${activeTab === 'NEW' ? 'active' : ''}`}
+            onClick={() => setActiveTab('NEW')}
+            style={{ padding: '8px 4px', fontSize: '0.9rem' }}
+          >
+            New Clients
+          </button>
+          <button
+            className={`tab-btn ${activeTab === 'REPEAT' ? 'active' : ''}`}
+            onClick={() => setActiveTab('REPEAT')}
+            style={{ padding: '8px 4px', fontSize: '0.9rem' }}
+          >
+            Repeat Clients
+          </button>
+        </div>
 
-          <div className="table-toolbar-right">
-            <div className="input-group" style={{ width: 280 }}>
-              <Search size={14} className="input-icon-left" />
-              <input
-                type="text"
-                className="input input-sm input-with-icon-left"
-                placeholder="Search customers..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
-            </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button 
+            className="btn btn-secondary btn-sm" 
+            style={{ padding: '6px 12px', background: showFilters ? 'var(--bg-surface-subtle)' : 'transparent', border: '1px solid var(--border)' }}
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <Filter size={14} style={{ opacity: 0.6 }} />
+            <span style={{ fontWeight: 500 }}>Filter</span>
+          </button>
+          <div className="input-group" style={{ width: 300, background: 'var(--bg-surface)' }}>
+            <Search size={14} className="input-icon-left" />
+            <input
+              type="text"
+              className="input input-sm input-with-icon-left"
+              placeholder="Search customers..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
           </div>
         </div>
+      </div>
+      
+      {/* Horizontal Filters Bar */}
+      {showFilters && (
+        <div style={{ marginBottom: 16, padding: '12px 16px', background: 'var(--bg-surface-subtle)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Intent</label>
+            <CustomSelect
+              style={{ minWidth: 160 }}
+              value={intentFilter}
+              onChange={setIntentFilter}
+              options={[
+                { value: '', label: 'All Intents' },
+                { value: 'SELL', label: 'Sell Side' },
+                { value: 'BUY', label: 'Buy Side' }
+              ]}
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Type</label>
+            <CustomSelect
+              style={{ minWidth: 160 }}
+              value={typeFilter}
+              onChange={setTypeFilter}
+              options={[
+                { value: '', label: 'All Customers' },
+                { value: 'LEAD', label: 'Lead Only' },
+                { value: 'PROJECT', label: 'Project Only' },
+                { value: 'BOTH', label: 'Lead + Project' }
+              ]}
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Vehicle</label>
+            <CustomSelect
+              style={{ minWidth: 160 }}
+              value={vehicleFilter}
+              onChange={setVehicleFilter}
+              options={[
+                { value: '', label: 'Any' },
+                { value: 'YES', label: 'Has Vehicle' },
+                { value: 'NO', label: 'No Vehicle' }
+              ]}
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Last Active</label>
+            <CustomSelect
+              style={{ minWidth: 160 }}
+              value={dateFilter}
+              onChange={setDateFilter}
+              options={[
+                { value: '', label: 'Any Time' },
+                { value: 'TODAY', label: 'Today' },
+                { value: 'WEEK', label: 'Past 7 Days' },
+                { value: 'MONTH', label: 'Past 30 Days' }
+              ]}
+            />
+          </div>
+          
+          <div style={{ display: 'flex', alignItems: 'flex-end', marginLeft: 'auto' }}>
+            <button className="btn btn-secondary btn-sm" onClick={() => { setIntentFilter(''); setTypeFilter(''); setVehicleFilter(''); setDateFilter(''); }}>
+              Clear Filters
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="frappe-list-container">
+        
+        {/* Bulk Action Bar overlay */}
+        {checkedCustomerIds.size > 0 && (
+          <div className="bulk-action-bar" style={{
+            background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)',
+            padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            animation: 'fadeIn 0.2s ease-out'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span className="badge badge-blue" style={{ fontSize: '0.8rem', padding: '2px 8px' }}>
+                {checkedCustomerIds.size} selected
+              </span>
+              <button 
+                className="btn btn-primary btn-sm" 
+                onClick={handleBulkLaunch} 
+                disabled={actioningId === 'bulk-launch'}
+                style={{ padding: '6px 12px' }}
+              >
+                {actioningId === 'bulk-launch' ? <Loader2 size={13} className="spin" /> : <Briefcase size={13} />}
+                Launch Deal / Project
+              </button>
+              <button 
+                className="btn btn-danger btn-sm btn-icon" 
+                onClick={handleBulkDelete}
+                disabled={actioningId === 'bulk'}
+                title="Delete Selected"
+              >
+                {actioningId === 'bulk' ? <Loader2 size={13} className="spin" /> : <Trash2 size={13} />}
+              </button>
+            </div>
+            <button className="btn btn-secondary btn-sm" onClick={() => setCheckedCustomerIds(new Set())}>
+              Cancel
+            </button>
+          </div>
+        )}
 
         {loading ? (
           <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>
@@ -281,6 +569,13 @@ export default function Customers() {
           <table className="frappe-table">
             <thead>
               <tr>
+                <th style={{ width: 40, textAlign: 'center' }}>
+                  <input 
+                    type="checkbox" 
+                    onChange={handleSelectAll}
+                    checked={paginated.length > 0 && checkedCustomerIds.size === paginated.length}
+                  />
+                </th>
                 <th style={{ width: 220 }}>Client Name</th>
                 <th>Contact Info</th>
                 <th>Vehicle / Interest</th>
@@ -291,8 +586,17 @@ export default function Customers() {
               </tr>
             </thead>
             <tbody>
-              {paginated.map(customer => (
-                <tr key={customer.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedCustomerDetail(customer)}>
+              {paginated.map(customer => {
+                const isChecked = checkedCustomerIds.has(customer.id);
+                return (
+                <tr key={customer.id} className={`crm-row ${isChecked ? 'selected' : ''}`} style={{ cursor: 'pointer' }} onClick={() => setSelectedCustomerDetail(customer)}>
+                  <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                    <input 
+                      type="checkbox" 
+                      checked={isChecked}
+                      onChange={(e) => handleSelectOne(e, customer.id)}
+                    />
+                  </td>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <div className="notranslate" style={{
@@ -320,9 +624,9 @@ export default function Customers() {
                     {(() => {
                       const car = getCustomerCar(customer);
                       return car ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)' }}>
-                          <Car size={13} color="var(--text-secondary)" />
-                          <span>{car}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                          <Car size={13} color="var(--text-secondary)" style={{ flexShrink: 0 }} />
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{car}</span>
                         </div>
                       ) : (
                         <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>—</span>
@@ -353,7 +657,8 @@ export default function Customers() {
                     </button>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         )}

@@ -4,6 +4,10 @@ import { format } from 'date-fns';
 function cleanBodyDisplay(raw) {
   if (!raw) return '—';
   let str = String(raw).replace(/[\ufffd\uFFFD]+/g, ' ');
+  // Aggressively strip style and script tags before parsing to prevent CSS leaks
+  str = str.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+  str = str.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+
   if (/<[a-z][\s\S]*>/i.test(str)) {
     try {
       const doc = new DOMParser().parseFromString(str, 'text/html');
@@ -11,10 +15,7 @@ function cleanBodyDisplay(raw) {
       const clean = doc.body.innerText || doc.body.textContent || '';
       return clean.replace(/\n\s*\n\s*\n+/g, '\n\n').trim();
     } catch {
-      return str.replace(/<style[\s\S]*?<\/style>/gi, '')
-                .replace(/<script[\s\S]*?<\/script>/gi, '')
-                .replace(/<[^>]+>/g, ' ')
-                .replace(/\s+/g, ' ').trim();
+      return str.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     }
   }
   return str.trim();
@@ -23,6 +24,9 @@ function cleanBodyDisplay(raw) {
 function cleanText(raw) {
   if (!raw) return '';
   let str = String(raw).replace(/[\ufffd\uFFFD\u0000-\u0008\u000B\u000C\u000E-\u001F]+/g, ' ');
+  str = str.replace(/<style[\s\S]*?<\/style>/gi, '');
+  str = str.replace(/<script[\s\S]*?<\/script>/gi, '');
+
   if (/<[a-z][\s\S]*>/i.test(str)) {
     try {
       const doc = new DOMParser().parseFromString(str, 'text/html');

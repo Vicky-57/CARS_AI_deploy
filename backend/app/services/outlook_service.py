@@ -470,6 +470,10 @@ def _strip_html(html_str: str) -> str:
     """Strip HTML tags and decode HTML entities to plain text."""
     import html
     import re
+    # Remove style and script blocks completely
+    html_str = re.sub(r'<style[^>]*>[\s\S]*?</style>', '', html_str, flags=re.IGNORECASE)
+    html_str = re.sub(r'<script[^>]*>[\s\S]*?</script>', '', html_str, flags=re.IGNORECASE)
+    
     # Replace common block-level tags with newlines
     html_str = re.sub(r'<br\s*/?>', '\n', html_str, flags=re.IGNORECASE)
     html_str = re.sub(r'</(p|div|tr|li|h[1-6])>', '\n', html_str, flags=re.IGNORECASE)
