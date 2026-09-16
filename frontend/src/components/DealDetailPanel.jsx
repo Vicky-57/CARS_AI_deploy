@@ -6,7 +6,7 @@ import {
 import { api } from '../api/api';
 import EmailViewCard from './EmailViewCard';
 import { format } from 'date-fns';
-import { STAGES, getNormalizedStage } from '../pages/Projects';
+import { STAGES, getNormalizedStage } from '../utils/stageUtils';
 
 function formatDate(d) {
   try { return format(new Date(d), 'dd/MM/yyyy'); } catch { return '—'; }
