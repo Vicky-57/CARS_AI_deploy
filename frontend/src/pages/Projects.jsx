@@ -104,6 +104,8 @@ export default function Projects() {
   const [statusFilter, setStatusFilter] = useState('');
   
   const [advancingCardId, setAdvancingCardId] = useState(null);
+  const [slidingOutCardId, setSlidingOutCardId] = useState(null);
+  const [slidingInCardId, setSlidingInCardId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
 
   // Selected detail drawer
@@ -185,7 +187,12 @@ export default function Projects() {
     if (currentIdx >= STAGES.length - 1) return;
 
     setAdvancingCardId(project.id);
+    setSlidingOutCardId(project.id);
     const nextStage = STAGES[currentIdx + 1];
+    
+    // Wait for slide-out animation to complete before updating data
+    await new Promise(r => setTimeout(r, 300));
+    
     try {
       const nowIso = new Date().toISOString();
       await api.updateProject(project.id, { current_stage: nextStage, updated_at: nowIso });
@@ -195,15 +202,19 @@ export default function Projects() {
         setSelectedProject(prev => ({ ...prev, current_stage: nextStage, updated_at: nowIso }));
       }
 
-      // Scroll logic for mobile
-      if (window.innerWidth <= 768) {
-        setTimeout(() => {
-          const targetCol = document.getElementById(`kanban-col-${currentIdx + 1}`);
-          if (targetCol) {
-            targetCol.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        }, 50);
-      }
+      setSlidingOutCardId(null);
+      setSlidingInCardId(project.id);
+
+      // Scroll to the new column for both mobile and desktop
+      setTimeout(() => {
+        const targetCol = document.getElementById(`kanban-col-${currentIdx + 1}`);
+        if (targetCol) {
+          targetCol.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+      }, 50);
+
+      // Clear slide-in animation state after it completes
+      setTimeout(() => setSlidingInCardId(null), 400);
 
       // Quietly refresh real data in the background
       api.getProjects().then(res => {
@@ -467,7 +478,7 @@ export default function Projects() {
                       return (
                         <div
                           key={p.id}
-                          className="kanban-card"
+                          className={`kanban-card ${slidingOutCardId === p.id ? 'kanban-card-sliding-out' : ''} ${slidingInCardId === p.id ? 'kanban-card-sliding-in' : ''}`}
                           onClick={() => { setSelectedProject(p); setActiveTab('overview'); }}
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
@@ -550,12 +561,12 @@ export default function Projects() {
               <thead>
                 <tr>
                   <th style={{ paddingLeft: 24 }}>Client Name</th>
-                  <th>Vehicle Details</th>
-                  <th>VIN</th>
-                  <th>Pipeline Type</th>
+                  <th className="hide-on-mobile">Vehicle Details</th>
+                  <th className="hide-on-mobile">VIN</th>
+                  <th className="hide-on-mobile">Pipeline Type</th>
                   <th>Current Stage</th>
-                  <th>Created Date</th>
-                  <th>Investment</th>
+                  <th className="hide-on-mobile">Created Date</th>
+                  <th className="hide-on-mobile">Investment</th>
                   <th>Net Profit</th>
                   <th style={{ textAlign: 'right', paddingRight: 24 }}>Actions</th>
                 </tr>
@@ -596,7 +607,7 @@ export default function Projects() {
                             </div>
                           </div>
                         </td>
-                        <td>
+                        <td className="hide-on-mobile">
                           {p.target_vehicle ? (
                             <div style={{ fontSize: '0.82rem', fontWeight: 500, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
                               <Car size={14} color="var(--text-secondary)" />
@@ -606,12 +617,12 @@ export default function Projects() {
                             <span style={{ color: 'var(--text-muted)' }}>—</span>
                           )}
                         </td>
-                        <td>
+                        <td className="hide-on-mobile">
                           <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--text-secondary)', background: 'var(--bg-surface-subtle)', padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border)' }}>
                             {p.vin || '—'}
                           </span>
                         </td>
-                        <td>
+                        <td className="hide-on-mobile">
                           <span className={`badge ${p.project_type === 'BUY' ? 'badge-purple' : 'badge-emerald'}`}>
                             {p.project_type === 'BUY' ? 'Buy Side' : 'Sell Side'}
                           </span>
@@ -651,10 +662,10 @@ export default function Projects() {
                             </div>
                           </div>
                         </td>
-                        <td style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                        <td className="hide-on-mobile" style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
                           {formatDateDDMMYYYY(p.created_at)}
                         </td>
-                        <td style={{ fontSize: '0.82rem', fontWeight: 500, color: 'var(--text-primary)' }}>
+                        <td className="hide-on-mobile" style={{ fontSize: '0.82rem', fontWeight: 500, color: 'var(--text-primary)' }}>
                           €{totalInvestment.toLocaleString()}
                         </td>
                         <td>

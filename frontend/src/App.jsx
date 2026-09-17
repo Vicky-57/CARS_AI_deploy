@@ -107,7 +107,6 @@ function DeskTopbar({ online, userProfile }) {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
-          <div className="desk-search-kbd">⌘K</div>
         </form>
       </div>
     </header>
@@ -132,12 +131,9 @@ function Sidebar({ online, onLogout, userProfile, isOpen, onClose, isCollapsed, 
           style={{ cursor: 'pointer' }}
           title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
         >
-          <div className="sidebar-brand-icon" style={{ background: '#1e293b', width: 30, height: 30 }}>
-            <Car size={18} color="#ffffff" />
-          </div>
+          <img src="/assets/car.png" alt="logo" style={{ width: 24, height: 24, objectFit: 'contain', flexShrink: 0 }} />
           <div className="brand-text">
             <div className="sidebar-brand-name">CAR-AGENTS</div>
-            <div className="sidebar-brand-sub">Desk</div>
           </div>
         </div>
         {!isCollapsed && (
@@ -402,8 +398,11 @@ function AppRoutes({ isAuthenticated, online, userProfile, onLogin, onLogout }) 
             <button className="btn-icon" onClick={() => setSidebarOpen(true)}>
               <Menu size={20} color="var(--text-primary)" />
             </button>
-            <div className="mobile-brand-name">CAR-AGENTS</div>
-            <div style={{ width: 28 }}></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <img src="/assets/car.png" alt="logo" style={{ width: 22, height: 22, objectFit: 'contain' }} />
+              <div className="mobile-brand-name">CAR-AGENTS</div>
+            </div>
+            <GoogleTranslate />
           </div>
 
           {/* Dynamic Page Views */}

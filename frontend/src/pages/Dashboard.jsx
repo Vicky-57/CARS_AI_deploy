@@ -3,7 +3,8 @@ import { NavLink } from 'react-router-dom';
 import {
   Users, FolderKanban, MessageSquare, Calendar,
   ArrowUpRight, ArrowRight, Clock, TrendingUp, FileText,
-  AlertTriangle, CheckCircle, ChevronRight, Plus, ExternalLink
+  AlertTriangle, CheckCircle, ChevronRight, Plus, ExternalLink,
+  Tag, Search
 } from 'lucide-react';
 import { api } from '../api/api';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -45,7 +46,7 @@ export default function Dashboard() {
     {
       label: 'Active SELL Deals',
       value: summary?.active_sell_deals ?? '—',
-      icon: FolderKanban,
+      icon: Tag,
       trend: '+4.5%',
       trendUp: true,
       sub: 'Vermittlung B2C'
@@ -100,7 +101,7 @@ export default function Dashboard() {
           <p className="page-subtitle">Real-time status overview of CAR-AGENTS brokerage operations.</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', background: 'var(--bg-surface)', padding: '6px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', background: 'var(--bg-surface)', padding: '6px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
             {format(new Date(), 'EEEE, dd. MMMM yyyy')}
           </div>
           <NavLink to="/leads" className="btn btn-primary">
@@ -132,7 +133,7 @@ export default function Dashboard() {
       </div>
 
       {/* Main 2-Column Frappe Workspace Layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: 20 }}>
+      <div className="dashboard-main-grid">
         
         {/* Left: Recent Inbound Leads */}
         <div className="card" style={{ overflow: 'hidden' }}>
@@ -165,34 +166,14 @@ export default function Dashboard() {
                 const shortNote = cleanNote.length > 80 ? cleanNote.slice(0, 80) + '…' : cleanNote;
 
                 return (
-                  <div
-                    key={lead.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 14,
-                      padding: '13px 18px',
-                      borderBottom: idx < leads.length - 1 ? '1px solid var(--border)' : 'none',
-                      transition: 'background 0.12s',
-                      cursor: 'default',
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                  >
+                  <div key={lead.id} className="dashboard-lead-row">
                     {/* Avatar */}
-                    <div style={{
-                      width: 36, height: 36, borderRadius: '50%',
-                      background: 'var(--bg-surface-subtle)',
-                      border: '1px solid var(--border)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '0.72rem', fontWeight: 700,
-                      color: 'var(--text-primary)', flexShrink: 0,
-                    }}>
+                    <div className="dashboard-lead-col-avatar">
                       {getInitials(lead.name || lead.email)}
                     </div>
 
                     {/* Name + contact */}
-                    <div style={{ flex: '0 0 180px', minWidth: 0 }}>
+                    <div className="dashboard-lead-col-name">
                       <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {lead.name || 'Anonymous Lead'}
                       </div>
@@ -202,12 +183,12 @@ export default function Dashboard() {
                     </div>
 
                     {/* Intent badge */}
-                    <div style={{ flex: '0 0 90px' }}>
+                    <div className="dashboard-lead-col-intent">
                       {intentBadge(lead.intent)}
                     </div>
 
                     {/* Vehicle / Inquiry note */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="dashboard-lead-col-note">
                       {shortNote ? (
                         <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                           {shortNote}
@@ -218,7 +199,7 @@ export default function Dashboard() {
                     </div>
 
                     {/* Time */}
-                    <div style={{ flex: '0 0 72px', textAlign: 'right', fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                    <div className="dashboard-lead-col-time">
                       {timeAgo(lead.created_at)}
                     </div>
                   </div>
@@ -296,7 +277,7 @@ export default function Dashboard() {
             <div className="card-header">
               <div className="card-title">Quick Operations</div>
             </div>
-            <div className="card-body" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+            <div className="card-body dashboard-quick-ops">
               <NavLink
                 to="/projects"
                 className="btn btn-secondary"

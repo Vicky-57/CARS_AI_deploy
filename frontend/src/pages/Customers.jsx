@@ -577,11 +577,11 @@ export default function Customers() {
                   />
                 </th>
                 <th style={{ width: 220 }}>Client Name</th>
-                <th>Contact Info</th>
+                <th className="hide-on-mobile">Contact Info</th>
                 <th>Vehicle / Interest</th>
-                <th>Activity</th>
-                <th>Category</th>
-                <th>Last Active</th>
+                <th className="hide-on-mobile">Activity</th>
+                <th className="hide-on-mobile">Category</th>
+                <th className="hide-on-mobile">Last Active</th>
                 <th style={{ textAlign: 'right', width: 120 }}>Actions</th>
               </tr>
             </thead>
@@ -614,7 +614,7 @@ export default function Customers() {
                       </div>
                     </div>
                   </td>
-                  <td>
+                  <td className="hide-on-mobile">
                     <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
                       <div>{customer.email || '—'}</div>
                       <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>{customer.phone || ''}</div>
@@ -633,19 +633,19 @@ export default function Customers() {
                       );
                     })()}
                   </td>
-                  <td>
+                  <td className="hide-on-mobile">
                     <span className="badge badge-gray">
                       {customer.interactions.length} {customer.interactions.length === 1 ? 'record' : 'records'}
                     </span>
                   </td>
-                  <td>
+                  <td className="hide-on-mobile">
                     {customer.interactions.length > 1 ? (
                       <span className="badge badge-amber">Repeat</span>
                     ) : (
                       <span className="badge badge-blue">New</span>
                     )}
                   </td>
-                  <td style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                  <td className="hide-on-mobile" style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
                     {customer.last_interaction ? new Date(customer.last_interaction).toLocaleDateString('de-DE') : '—'}
                   </td>
                   <td style={{ textAlign: 'right' }}>

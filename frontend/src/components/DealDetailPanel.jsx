@@ -160,7 +160,7 @@ export default function DealDetailPanel({ project, onClose, onAdvance, advancing
     <>
       <div className="panel-backdrop" onClick={onClose} />
 
-      <aside className="crm-detail-panel" style={{ width: 520 }}>
+      <aside className="crm-detail-panel" style={{ width: '100%', maxWidth: 520 }}>
         {/* ── Header ── */}
         <div className="crm-detail-header">
           <div className="crm-detail-header-info">
@@ -198,7 +198,7 @@ export default function DealDetailPanel({ project, onClose, onAdvance, advancing
         </div>
 
         {/* Stage progress track */}
-        <div style={{ padding: '10px 18px 0', flexShrink: 0 }}>
+        <div style={{ padding: '16px 18px 16px', flexShrink: 0 }}>
           <div className="deal-stage-track">
             {STAGES.map((s, i) => (
               <div

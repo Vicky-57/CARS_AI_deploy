@@ -457,10 +457,10 @@ export default function Leads() {
                     </th>
                     <th style={{ width: 36, padding: '10px 12px' }}></th>
                     <th style={{ minWidth: 200 }}>Lead / Client</th>
-                    <th style={{ width: 120 }}>Intent</th>
+                    <th className="hide-on-mobile" style={{ width: 120 }}>Intent</th>
                     <th>Vehicle / Inquiry</th>
-                    <th style={{ width: 130 }}>Source</th>
-                    <th style={{ width: 120 }}>Received</th>
+                    <th className="hide-on-mobile" style={{ width: 130 }}>Source</th>
+                    <th className="hide-on-mobile" style={{ width: 120 }}>Received</th>
                     <th style={{ width: 120, textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
@@ -517,7 +517,7 @@ export default function Leads() {
                         </td>
 
                         {/* Intent badge */}
-                        <td>
+                        <td className="hide-on-mobile">
                           {isSpam ? (
                             <span className="badge badge-red">Spam</span>
                           ) : isSell ? (
@@ -543,12 +543,12 @@ export default function Leads() {
                         </td>
 
                         {/* Source */}
-                        <td style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                        <td className="hide-on-mobile" style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
                           {lead.channel || 'Manual'}
                         </td>
 
                         {/* Time */}
-                        <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        <td className="hide-on-mobile" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                           {timeAgo(lead.created_at)}
                         </td>
 

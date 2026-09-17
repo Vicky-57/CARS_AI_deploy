@@ -32,7 +32,7 @@ export default function Auth({ onLogin }) {
   };
 
   return (
-    <div style={{
+    <div className="auth-container" style={{
       minHeight: '100vh',
       display: 'flex',
       fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
@@ -40,7 +40,7 @@ export default function Auth({ onLogin }) {
     }}>
 
       {/* ── Left branding panel ── */}
-      <div style={{
+      <div className="auth-left auth-left-hide-mobile" style={{
         width: '46%',
         background: 'linear-gradient(160deg, #0f0f0f 0%, #1a1a1a 60%, #111 100%)',
         display: 'flex',
@@ -133,7 +133,7 @@ export default function Auth({ onLogin }) {
       </div>
 
       {/* ── Right login form ── */}
-      <div style={{
+      <div className="auth-right" style={{
         flex: 1,
         display: 'flex',
         alignItems: 'center',
@@ -142,6 +142,22 @@ export default function Auth({ onLogin }) {
         background: '#FAFAFA',
       }}>
         <div style={{ width: '100%', maxWidth: 380 }}>
+
+          {/* Mobile-only logo header */}
+          <div className="auth-mobile-logo">
+            <div style={{
+              width: 40, height: 40, borderRadius: 10,
+              background: '#171717',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+            }}>
+              <img src="/assets/car.png" alt="Car-Agents Logo" style={{ width: 22, height: 22, objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
+            </div>
+            <div>
+              <div style={{ fontSize: '1rem', fontWeight: 800, color: '#171717', letterSpacing: '-0.3px' }}>CAR-AGENTS</div>
+              <div style={{ fontSize: '0.68rem', color: '#999999', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Broker Desk</div>
+            </div>
+          </div>
 
           {/* Form header */}
           <div style={{ marginBottom: 36 }}>

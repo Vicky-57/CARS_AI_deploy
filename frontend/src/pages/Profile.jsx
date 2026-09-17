@@ -80,28 +80,21 @@ export default function Profile() {
       </div>
 
       {/* Tabs */}
-      <div style={{ 
+      <div className="hide-scrollbar" style={{ 
         display: 'inline-flex', background: 'var(--border)', padding: 2, 
-        borderRadius: 'var(--radius-sm)', marginBottom: 20
+        borderRadius: 'var(--radius-sm)', marginBottom: 20,
+        maxWidth: '100%', overflowX: 'auto'
       }}>
         {tabs.map(tab => (
           <button
             key={tab.id}
             type="button"
+            className="profile-tab"
             onClick={() => setActiveTab(tab.id)}
             style={{
-              padding: '6px 16px',
-              borderRadius: 4,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              fontSize: '0.8125rem',
-              fontWeight: 600,
               color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-muted)',
               background: activeTab === tab.id ? 'var(--surface)' : 'transparent',
               boxShadow: activeTab === tab.id ? 'var(--shadow-xs)' : 'none',
-              border: 'none',
-              cursor: 'pointer',
             }}
           >
             <tab.icon size={14} />
@@ -126,7 +119,7 @@ export default function Profile() {
               <label className="form-label">Email Address</label>
               <input type="email" name="email" className="form-input" value={formData.email} onChange={handleChange} required />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
               <div className="form-group" style={{ margin: 0 }}>
                 <label className="form-label">Phone Number</label>
                 <input type="tel" name="phone" className="form-input" value={formData.phone} onChange={handleChange} />
@@ -235,7 +228,7 @@ function AppConnectionsTab() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Google Drive Integration Card */}
       <div className="card">
-        <div className="card-header" style={{ justifyContent: 'space-between' }}>
+        <div className="card-header" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div>
             <div className="card-title" style={{ fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: 6 }}>
               <Plug size={16} /> Google Drive Cloud Storage Integration
