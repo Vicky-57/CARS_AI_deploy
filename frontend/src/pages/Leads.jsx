@@ -8,7 +8,7 @@ import { api } from '../api/api';
 import LeadModal from '../components/LeadModal';
 import LeadDetailPanel from '../components/LeadDetailPanel';
 import { formatDistanceToNow } from 'date-fns';
-import { cleanText } from '../utils/textUtils';
+import { cleanText, getCleanInitials, formatContactName, isAutomatedSpam } from '../utils/textUtils';
 
 function getLeadVehicleDisplay(lead) {
   if (lead.vehicle_interest) return cleanText(lead.vehicle_interest);
@@ -22,10 +22,8 @@ function getLeadVehicleDisplay(lead) {
 
 const PAGE_SIZE = 15;
 
-
-function getInitials(name) {
-  if (!name) return '?';
-  return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+function getInitials(name, email) {
+  return getCleanInitials(name, email);
 }
 
 function timeAgo(iso) {
@@ -258,7 +256,7 @@ export default function Leads() {
   // Filtering
   const filtered = leads.filter(l => {
     // 1. Status Filter
-    const isSpam = l.status === 'SPAM';
+    const isSpam = l.status === 'SPAM' || isAutomatedSpam(l);
     if (statusFilter === 'SPAM') { if (!isSpam) return false; }
     else if (statusFilter === 'NEW') { if (isSpam || l.status !== 'NEW') return false; }
     else if (statusFilter === '') { if (isSpam) return false; }
@@ -506,17 +504,22 @@ export default function Leads() {
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             fontSize: '0.65rem', fontWeight: 700, flexShrink: 0
                           }}>
-                            {getInitials(lead.name || lead.email)}
+                            {getInitials(lead.name, lead.email)}
                           </div>
                         </td>
 
                         {/* Name + Email */}
                         <td>
-                          <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-                            {lead.name || 'Anonymous Lead'}
+                          <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span>{formatContactName(lead.name, lead.email, vehicle)}</span>
+                            {/-mo-mo@kontakt\.mobile\.de/i.test(lead.email || '') && (
+                              <span className="badge badge-gray" style={{ fontSize: '0.65rem', padding: '1px 5px', fontWeight: 600 }} title="Anonymized proxy relay from mobile.de">
+                                mobile.de
+                              </span>
+                            )}
                           </div>
                           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                            {lead.email || lead.phone || '—'}
+                            {cleanText(lead.email || lead.phone || '—')}
                           </div>
                         </td>
 
@@ -534,14 +537,14 @@ export default function Leads() {
                         {/* Vehicle */}
                         <td>
                           <div style={{ fontSize: '0.82rem', color: 'var(--text-primary)', fontWeight: 500 }}>
-                            {vehicle || lead.subject || 'General Inquiry'}
+                            {cleanText(vehicle || lead.subject || 'General Inquiry')}
                           </div>
                           {(lead.notes || lead.message) && (
                             <div style={{
                               fontSize: '0.72rem', color: 'var(--text-muted)', maxWidth: 320,
                               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
                             }}>
-                              {lead.notes || lead.message}
+                              {cleanText(lead.notes || lead.message)}
                             </div>
                           )}
                         </td>

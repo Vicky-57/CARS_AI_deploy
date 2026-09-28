@@ -1,15 +1,9 @@
 import { X, Mail, Phone, Car, Users, Briefcase, Clock, Trash2, UserPlus, Star } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { cleanText, formatInteractionSummary } from '../utils/textUtils';
+import { cleanText, formatInteractionSummary, formatContactName, getCleanInitials } from '../utils/textUtils';
 
 function timeAgo(iso) {
   try { return formatDistanceToNow(new Date(iso), { addSuffix: true }); } catch { return '—'; }
-}
-
-function getInitials(name, email) {
-  const val = cleanText(name || email);
-  if (!val) return '?';
-  return val.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 }
 
 /**
@@ -24,10 +18,10 @@ function getInitials(name, email) {
 export default function ContactDetailPanel({ customer, getCustomerCar, onClose, onDelete, onLaunchProject }) {
   if (!customer) return null;
 
-  const displayName = cleanText(customer.name) || cleanText(customer.email) || 'Unknown Contact';
-  const initials = getInitials(displayName, customer.email);
-  const isRepeat = (customer.interactions || []).length > 1;
   const vehicle = getCustomerCar ? cleanText(getCustomerCar(customer)) : null;
+  const displayName = formatContactName(customer.name, customer.email, vehicle);
+  const initials = getCleanInitials(displayName, customer.email);
+  const isRepeat = (customer.interactions || []).length > 1;
   const leads    = (customer.interactions || []).filter(i => i.type === 'Lead');
   const projects = (customer.interactions || []).filter(i => i.type === 'Project');
 

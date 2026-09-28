@@ -24,8 +24,8 @@ def clean_text(text):
         text = re.sub(pattern, '\n', text)
         text = re.sub(media_pattern, '\n', text)
 
-    # Eradicate \ufffd characters
-    text = re.sub(r'[\ufffd\uFFFD]+', ' ', text)
+    # Eradicate literal \ufffd, \\ufffd, and unicode \uFFFD characters
+    text = re.sub(r'(\\+u[fF]{3}[dD]|[\ufffd\uFFFD])+', '', text)
 
     # Fix German mojibake
     mojibake = {
@@ -34,6 +34,15 @@ def clean_text(text):
     }
     for m, repl in mojibake.items():
         text = text.replace(m, repl)
+
+    # Fix common German words
+    text = text.replace('Kfz-Sachverstndiger', 'Kfz-Sachverständiger')
+    text = text.replace('Sachverstndiger', 'Sachverständiger')
+    text = text.replace('knnen', 'können')
+    text = text.replace('wrde', 'würde')
+    text = text.replace('Schne Gre', 'Schöne Grüße')
+    text = text.replace('enthlt', 'enthält')
+    text = re.sub(r'\s+fr\s+', ' für ', text)
 
     # Clean raw UUID conversion notes
     text = re.sub(r'Converted from Lead ID\s+[0-9a-fA-F-]{32,36}', 'Converted from Lead (Inquiry logged)', text)

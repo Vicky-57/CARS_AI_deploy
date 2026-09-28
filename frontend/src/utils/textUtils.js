@@ -17,28 +17,110 @@ const MOJIBAKE_MAP = [
 ];
 
 /**
- * Universal text cleaner to eradicate \ufffd, mojibake, HTML entities,
- * and strip ugly raw UUID strings from user-facing screens.
+ * Universal text cleaner to eradicate literal \ufffd, unicode replacement chars,
+ * mojibake, HTML entities, and strip ugly raw UUID strings from user-facing screens.
  */
 export function cleanText(raw) {
   if (raw === null || raw === undefined) return '';
   let str = String(raw);
 
-  // 1. Remove unicode replacement chars and invisible control codes
-  str = str.replace(/[\ufffd\uFFFD\u0000-\u0008\u000B\u000C\u000E-\u001F]+/g, ' ');
+  // 1. Remove literal escaped \ufffd, \\ufffd, and unicode replacement chars/control codes
+  str = str.replace(/(\\+u[fF]{3}[dD]|[\ufffd\uFFFD\u0000-\u0008\u000B\u000C\u000E-\u001F])+/gi, ' ');
 
   // 2. Fix German Mojibake & common HTML entities
   for (const [pattern, replacement] of MOJIBAKE_MAP) {
     str = str.replace(pattern, replacement);
   }
 
-  // 3. Clean up raw UUID lead conversion strings like:
+  // 3. Fix German words where umlaut was corrupted or stripped
+  str = str.replace(/\bKfz-Sachverstndiger\b/gi, 'Kfz-Sachverständiger');
+  str = str.replace(/\bSachverstndiger\b/gi, 'Sachverständiger');
+  str = str.replace(/\bknnen\b/gi, 'können');
+  str = str.replace(/\bwrde\b/gi, 'würde');
+  str = str.replace(/Schne Gre/gi, 'Schöne Grüße');
+  str = str.replace(/\benthlt\b/gi, 'enthält');
+  str = str.replace(/\s+fr\s+/gi, ' für ');
+
+  // 4. Clean up raw UUID lead conversion strings like:
   // "Converted from Lead ID 632437f9-595d-44d6-aab2-f50ca71e3a0a"
   str = str.replace(/Converted from Lead ID\s+[0-9a-fA-F-]{32,36}/gi, 'Converted from Lead (Inquiry transferred to Project)');
   str = str.replace(/Lead ID\s+[0-9a-fA-F-]{32,36}/gi, 'Lead Reference');
 
-  return str.trim();
+  return str.replace(/\s+/g, ' ').trim();
 }
+
+/**
+ * Detects automated newsletters, phishing tickets, and spam addresses.
+ */
+export function isAutomatedSpam(item = {}) {
+  const email = (item.email || '').toLowerCase().trim();
+  const name = (item.name || '').toLowerCase().trim();
+  const subject = (item.subject || '').toLowerCase().trim();
+  const notes = (item.notes || item.message || '').toLowerCase().trim();
+
+  // Spam domains & prefixes
+  const spamKeywords = [
+    'doctolib', 'deutschland ticket', 'ticket', 'commerzbank',
+    'auto1.com', 'finance@kleinanzeigen.de', 'meditation-journal',
+    'enilive.com', 'carvertical.com', 'signselector.de',
+    'no-reply', 'noreply', 'donotreply', 'newsletter', 'bounce', 'mailer-daemon'
+  ];
+
+  if (spamKeywords.some(k => email.includes(k) || name.includes(k) || subject.includes(k))) return true;
+
+  // Random temporary phishing domain extensions (.rrl, .qju, .fqj, .iua, .mhw)
+  if (/@\w+\.(rrl|qju|fqj|iua|mhw)$/i.test(email)) return true;
+
+  // Known notification subjects
+  if (notes.includes('lastschriftankündigung') || notes.includes('rechnung kleinanzeigen') || notes.includes('deine bestellung ist auf dem weg')) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Formats contact name nicely. If the name is a mobile.de hashed proxy address
+ * (e.g. 31hjkl...-mo-mo@kontakt.mobile.de), displays a clean friendly title.
+ */
+export function formatContactName(name, email, vehicle) {
+  const cleaned = cleanText(name);
+  const em = (email || '').toLowerCase().trim();
+
+  // Check if name is a mobile.de relay proxy hash or raw email
+  const isMobileDeRelay = /-mo-mo@kontakt\.mobile\.de/i.test(cleaned) || /-mo-mo@kontakt\.mobile\.de/i.test(em);
+  const isRawEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleaned);
+
+  if (isMobileDeRelay && (isRawEmail || !cleaned || cleaned === em)) {
+    return vehicle && vehicle !== 'General Inquiry' 
+      ? `mobile.de Prospect (${cleanText(vehicle)})` 
+      : 'mobile.de Inquiry';
+  }
+
+  if (isRawEmail) {
+    const userPart = cleaned.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ');
+    return userPart.length > 2 
+      ? userPart.charAt(0).toUpperCase() + userPart.slice(1) 
+      : (vehicle || 'Client Inquiry');
+  }
+
+  return cleaned || 'Client';
+}
+
+/**
+ * Computes clean 1-2 character initials for avatars without ugly slashes or hashes.
+ */
+export function getCleanInitials(name, email) {
+  const clean = cleanText(name);
+  if (!clean || /-mo-mo@kontakt\.mobile\.de/i.test(clean) || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
+    return 'MO'; // mobile.de / inquiry
+  }
+  const parts = clean.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'CL';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 
 /**
  * Formats a clean, human-readable summary for customer interaction logs

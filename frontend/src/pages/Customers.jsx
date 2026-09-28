@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { api, supabase } from '../api/api';
 import CreateProjectModal from '../components/CreateProjectModal';
 import ContactDetailPanel from '../components/ContactDetailPanel';
-import { isValidEmail, isValidPhone, cleanText } from '../utils/textUtils';
+import { isValidEmail, isValidPhone, cleanText, formatContactName, getCleanInitials, isAutomatedSpam } from '../utils/textUtils';
 
 function getCustomerCar(customer) {
   if (!customer || !customer.interactions) return null;
@@ -131,7 +131,8 @@ export default function Customers() {
 
         if (!key) return; // Skip if no identifiable info
 
-        const cleanName = cleanText(name);
+        const carDesc = item.target_vehicle || item.vehicle_interest || item.vehicle;
+        const cleanName = formatContactName(name, email, carDesc);
 
         if (!customerMap.has(key)) {
           customerMap.set(key, {
@@ -146,7 +147,7 @@ export default function Customers() {
 
         const customer = customerMap.get(key);
         // Fill in missing details if this interaction has them
-        if (!customer.name && cleanName) customer.name = cleanName;
+        if ((!customer.name || customer.name === 'Client') && cleanName) customer.name = cleanName;
         if (!customer.email && email) customer.email = email;
         if (!customer.phone && phone) customer.phone = phone;
 
@@ -155,7 +156,7 @@ export default function Customers() {
 
       // Exclude spam, bounce, and automated no-reply leads from polluting the customer directory (CA-003)
       leads.forEach(l => {
-        if (l.status === 'SPAM') return;
+        if (l.status === 'SPAM' || isAutomatedSpam(l)) return;
         const em = (l.email || '').toLowerCase();
         if (em.includes('no-reply') || em.includes('noreply') || em.includes('donotreply') || em.includes('newsletter') || em.includes('bounce')) return;
         addInteraction(l.email, l.phone, l.name, 'Lead', l);
@@ -253,9 +254,7 @@ export default function Customers() {
   };
 
   const getInitials = (name, email) => {
-    const val = name || email;
-    if (!val) return '?';
-    return val.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+    return getCleanInitials(name, email);
   };
 
   const handleAddCustomerSubmit = async (e, andCreateProject = false) => {
@@ -658,15 +657,22 @@ export default function Customers() {
                       }}>
                         {getInitials(customer.name, customer.email)}
                       </div>
-                      <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.85rem' }}>
-                        {customer.name || 'Unknown Client'}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.85rem' }}>
+                          {formatContactName(customer.name, customer.email, getCustomerCar(customer))}
+                        </span>
+                        {/-mo-mo@kontakt\.mobile\.de/i.test(customer.email || '') && (
+                          <span className="badge badge-gray" style={{ fontSize: '0.65rem', padding: '1px 5px', fontWeight: 600 }} title="Anonymized proxy relay from mobile.de">
+                            mobile.de
+                          </span>
+                        )}
                       </div>
                     </div>
                   </td>
                   <td className="hide-on-mobile">
                     <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                      <div>{customer.email || '—'}</div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>{customer.phone || ''}</div>
+                      <div>{cleanText(customer.email || '—')}</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>{cleanText(customer.phone || '')}</div>
                     </div>
                   </td>
                   <td>
