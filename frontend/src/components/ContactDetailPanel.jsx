@@ -15,7 +15,7 @@ function timeAgo(iso) {
  *   onDelete        — fn(e) to delete customer
  *   onLaunchProject — fn to open create project modal
  */
-export default function ContactDetailPanel({ customer, getCustomerCar, onClose, onDelete, onLaunchProject }) {
+export default function ContactDetailPanel({ customer, getCustomerCar, onClose, onDelete, onLaunchProject, onEdit }) {
   if (!customer) return null;
 
   const vehicle = getCustomerCar ? cleanText(getCustomerCar(customer)) : null;
@@ -214,6 +214,7 @@ export default function ContactDetailPanel({ customer, getCustomerCar, onClose, 
             <Trash2 size={13} /> Delete
           </button>
           <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-secondary btn-sm" onClick={() => onEdit && onEdit(customer)}>Edit</button>
             <button className="btn btn-secondary btn-sm" onClick={onClose}>Close</button>
             {onLaunchProject && (
               <button className="btn btn-primary btn-sm" onClick={onLaunchProject} style={{ gap: 6 }}>

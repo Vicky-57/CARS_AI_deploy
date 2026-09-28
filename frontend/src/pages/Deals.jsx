@@ -3,41 +3,6 @@ import { Briefcase, Clock, DollarSign, Plus, Car, Search, SearchX, ChevronLeft, 
 import { api } from '../api/api';
 import CreateProjectModal from '../components/CreateProjectModal';
 
-// --- STATIC FALLBACK MOCK DATA ---
-const MOCK_DEALS = [
-  {
-    id: '1',
-    client_name: 'Max Mustermann',
-    target_vehicle: 'Porsche 911 GT3 (992)',
-    project_type: 'SELL',
-    status: 'COMPLETED',
-    updated_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    project_labor: [
-      { id: 'l1', hours_spent: 2.5, activity_description: 'Initial consultation and valuation', logged_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString() },
-      { id: 'l2', hours_spent: 4.0, activity_description: 'Photography and listing creation', logged_at: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000).toISOString() },
-      { id: 'l3', hours_spent: 1.5, activity_description: 'Handover and contract signing', logged_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString() }
-    ],
-    project_expenses: [
-      { id: 'e1', amount: 150.00, expense_type: 'DETAILING', description: 'Pre-sale interior and exterior detailing', logged_at: new Date(Date.now() - 11 * 24 * 60 * 60 * 1000).toISOString() },
-      { id: 'e2', amount: 89.90, expense_type: 'TUEV_INSPECTION', description: 'TÜV renewal fee', logged_at: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString() }
-    ]
-  },
-  {
-    id: '2',
-    client_name: 'Sarah Schmidt',
-    target_vehicle: 'BMW M3 Competition',
-    project_type: 'BUY',
-    status: 'COMPLETED',
-    updated_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    project_labor: [
-      { id: 'l4', hours_spent: 3.0, activity_description: 'Market research and vehicle sourcing', logged_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString() },
-      { id: 'l5', hours_spent: 2.0, activity_description: 'On-site vehicle inspection', logged_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString() }
-    ],
-    project_expenses: [
-      { id: 'e3', amount: 250.00, expense_type: 'TRANSPORT', description: 'Vehicle transport from Munich to Berlin', logged_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString() }
-    ]
-  }
-];
 
 function getInitials(name) {
   if (!name) return '?';
@@ -67,10 +32,10 @@ export default function Deals() {
     try {
       const allProjects = await api.getProjects();
       const completedDeals = (allProjects || []).filter(p => p.status === 'COMPLETED' || (p.current_stage || '').toLowerCase().includes('handover') || (p.current_stage || '').toLowerCase().includes('close'));
-      setDeals(completedDeals.length > 0 ? completedDeals : allProjects || MOCK_DEALS);
+      setDeals(completedDeals.length > 0 ? completedDeals : (allProjects || []));
     } catch (err) {
       console.error('Failed to load deals:', err);
-      setDeals(MOCK_DEALS);
+      setDeals([]);
     } finally {
       setLoading(false);
     }

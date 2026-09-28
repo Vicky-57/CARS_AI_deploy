@@ -148,6 +148,7 @@ export default function Leads() {
   const [sortOrder, setSortOrder] = useState('newest');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingLead, setEditingLead] = useState(null);
   const [convertingId, setConvertingId] = useState(null);
   const [actioningId, setActioningId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -320,7 +321,7 @@ export default function Leads() {
           <button className="btn btn-secondary btn-sm" onClick={loadLeads} title="Refresh">
             <RefreshCw size={13} className={loading ? 'spin' : ''} /> Refresh
           </button>
-          <button className="btn btn-primary btn-sm" onClick={() => setIsModalOpen(true)}>
+          <button className="btn btn-primary btn-sm" onClick={() => { setEditingLead(null); setIsModalOpen(true); }}>
             <Plus size={13} /> New Lead
           </button>
         </div>
@@ -579,12 +580,20 @@ export default function Leads() {
                               </button>
                             </div>
                           ) : (
-                            <button
-                              className="btn btn-secondary btn-sm"
-                              onClick={() => setSelectedLead(selected ? null : lead)}
-                            >
-                              View <ArrowRight size={11} />
-                            </button>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                onClick={(e) => { e.stopPropagation(); setEditingLead(lead); setIsModalOpen(true); }}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                onClick={(e) => { e.stopPropagation(); setSelectedLead(selected ? null : lead); }}
+                              >
+                                View <ArrowRight size={11} />
+                              </button>
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -627,14 +636,33 @@ export default function Leads() {
           onConvert={handleConvertLeadToProject}
           onRefresh={loadLeads}
           converting={convertingId === selectedLead.id}
+          onEdit={(lead) => { setEditingLead(lead); setIsModalOpen(true); }}
         />
       )}
 
-      {/* ── New Lead Modal ── */}
+      {/* ── New/Edit Lead Modal ── */}
       <LeadModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onCreated={() => { setIsModalOpen(false); loadLeads(); }}
+        initialData={editingLead}
+        onClose={() => { setIsModalOpen(false); setEditingLead(null); }}
+        onLeadCreated={(newOrUpdatedLead) => {
+          setIsModalOpen(false);
+          setEditingLead(null);
+          if (newOrUpdatedLead) {
+            setLeads(prev => {
+              const idx = prev.findIndex(l => l.id === newOrUpdatedLead.id);
+              if (idx > -1) {
+                const newLeads = [...prev];
+                newLeads[idx] = newOrUpdatedLead;
+                return newLeads;
+              }
+              return [newOrUpdatedLead, ...prev];
+            });
+            setSelectedLead(prev => prev?.id === newOrUpdatedLead.id ? newOrUpdatedLead : prev);
+          } else {
+            loadLeads();
+          }
+        }}
       />
     </div>
   );

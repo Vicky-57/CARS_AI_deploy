@@ -30,7 +30,7 @@ function Field({ label, value, fullWidth }) {
  *   onRefresh    — fn to reload leads list
  *   converting   — boolean
  */
-export default function LeadDetailPanel({ lead, onClose, onConvert, onRefresh, converting }) {
+export default function LeadDetailPanel({ lead, onClose, onConvert, onRefresh, converting, onEdit }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [emails,    setEmails]    = useState([]);
   const [emailsLoading, setEmailsLoading] = useState(false);
@@ -263,15 +263,20 @@ export default function LeadDetailPanel({ lead, onClose, onConvert, onRefresh, c
             Cancel
           </button>
           {!isSpam && (
-            <button
-              className="btn btn-primary"
-              onClick={() => onConvert(lead)}
-              disabled={converting}
-              title="Convert this lead to a Deal & Project"
-            >
-              {converting ? <Loader2 size={14} className="spin" /> : <Sparkles size={14} style={{ marginRight: 6 }} />}
-              Convert to Deal
-            </button>
+            <>
+              <button className="btn btn-secondary" onClick={() => onEdit && onEdit(lead)}>
+                Edit Lead
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => onConvert(lead)}
+                disabled={converting}
+                title="Convert this lead to a Deal & Project"
+              >
+                {converting ? <Loader2 size={14} className="spin" /> : <Sparkles size={14} style={{ marginRight: 6 }} />}
+                Convert to Deal
+              </button>
+            </>
           )}
         </div>
       </aside>

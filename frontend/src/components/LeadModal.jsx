@@ -1,27 +1,50 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, User, Car, Contact2, Loader2, CheckCircle2 } from 'lucide-react';
 import { api } from '../api/api';
+import toast from 'react-hot-toast';
 import { isValidVIN, isValidEmail, isValidPhone, cleanText } from '../utils/textUtils';
 
-export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
+export default function LeadModal({ isOpen, onClose, onLeadCreated, initialData = null }) {
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   const [form, setForm] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    intent: 'BUY',
-    channel: 'MANUAL',
-    manufacturer: '',
-    model: '',
-    vin: '',
-    license_plate: '',
-    initial_registration: '',
-    mileage: '',
-    price_limit: '',
-    notes: ''
+    name: initialData?.name || '',
+    email: initialData?.email || '',
+    phone: initialData?.phone || '',
+    intent: initialData?.intent || 'BUY',
+    channel: initialData?.channel || 'MANUAL',
+    manufacturer: initialData?.manufacturer || '',
+    model: initialData?.model || '',
+    vin: initialData?.vin || '',
+    license_plate: initialData?.license_plate || '',
+    initial_registration: initialData?.initial_registration || '',
+    mileage: initialData?.mileage || '',
+    price_limit: initialData?.price_limit || '',
+    notes: initialData?.notes || ''
   });
+
+  // Reset form when initialData changes
+  useEffect(() => {
+    if (isOpen) {
+      setForm({
+        name: initialData?.name || '',
+        email: initialData?.email || '',
+        phone: initialData?.phone || '',
+        intent: initialData?.intent || 'BUY',
+        channel: initialData?.channel || 'MANUAL',
+        manufacturer: initialData?.manufacturer || '',
+        model: initialData?.model || '',
+        vin: initialData?.vin || '',
+        license_plate: initialData?.license_plate || '',
+        initial_registration: initialData?.initial_registration || '',
+        mileage: initialData?.mileage || '',
+        price_limit: initialData?.price_limit || '',
+        notes: initialData?.notes || ''
+      });
+      setErrorMsg('');
+    }
+  }, [isOpen, initialData]);
 
   if (!isOpen) return null;
 
@@ -66,8 +89,19 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
         price_limit: form.price_limit ? parseFloat(form.price_limit) : null,
       };
       delete payload.vehicle;
-      await api.createLead(payload);
-      if (onLeadCreated) onLeadCreated();
+      let result;
+      if (initialData?.id) {
+        result = await api.updateLead(initialData.id, payload);
+        toast.success(`Lead for ${payload.name} updated successfully!`);
+      } else {
+        result = await api.createLead(payload);
+        toast.success(`Lead for ${payload.name} created successfully!`);
+      }
+      
+      // Artificial delay for better UX feeling
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      if (onLeadCreated) onLeadCreated(result);
       onClose();
     } catch (err) {
       setErrorMsg('Failed to save lead: ' + (err.message || 'Supabase database error'));
@@ -81,9 +115,9 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
       <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 580 }}>
         <div className="modal-header">
           <div>
-            <div className="modal-title">New Lead DocType</div>
+            <div className="modal-title">{initialData ? 'Edit Lead' : 'New Lead DocType'}</div>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>
-              Enter prospective buyer or seller inquiry details
+              {initialData ? 'Update prospective buyer or seller details' : 'Enter prospective buyer or seller inquiry details'}
             </div>
           </div>
           <button className="btn-icon" onClick={onClose}><X size={16} /></button>

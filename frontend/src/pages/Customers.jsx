@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, UserPlus, Search, RefreshCw, Mail, Phone, Plus, X, Briefcase, Car, Trash2, Eye, Check, ChevronDown, Filter, Calendar, Loader2 } from 'lucide-react';
+import { Users, UserPlus, Search, RefreshCw, Mail, Phone, Plus, X, Briefcase, Car, Trash2, Eye, Check, ChevronDown, Filter, Calendar, Loader2, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { api, supabase } from '../api/api';
 import CreateProjectModal from '../components/CreateProjectModal';
@@ -97,6 +97,7 @@ export default function Customers() {
   const [selectedCustomerDetail, setSelectedCustomerDetail] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState(null);
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
   const [checkedCustomerIds, setCheckedCustomerIds] = useState(new Set());
   const [actioningId, setActioningId] = useState(null);
@@ -271,6 +272,33 @@ export default function Customers() {
         return;
       }
 
+      if (editingCustomer) {
+        // Edit Mode: Update all associated interactions
+        for (const inter of editingCustomer.interactions) {
+          if (inter.type === 'Lead') {
+            await api.updateLead(inter.details.id, { name: nameVal, email: emailVal || null, phone: phoneVal || null });
+          } else if (inter.type === 'Project') {
+            await api.updateProject(inter.details.id, { client_name: nameVal, client_email: emailVal || null, client_phone: phoneVal || null });
+          }
+        }
+        
+        // Artificial delay for better UX feeling
+        await new Promise(resolve => setTimeout(resolve, 800));
+
+        toast.success(`Customer ${nameVal} updated successfully!`);
+        setIsAddCustomerOpen(false);
+        setEditingCustomer(null);
+        loadCustomers();
+        
+        // If the side panel is open, update it
+        if (selectedCustomerDetail?.id === editingCustomer.id) {
+           setSelectedCustomerDetail(prev => ({
+             ...prev, name: nameVal, email: emailVal || null, phone: phoneVal || null
+           }));
+        }
+        return;
+      }
+
       // Contact requirement: At least email or phone must be provided (CA-030)
       if (!emailVal && !phoneVal) {
         toast.error('Please provide at least one contact channel (Email or Phone).');
@@ -420,6 +448,16 @@ export default function Customers() {
           customer={selectedCustomerDetail}
           getCustomerCar={getCustomerCar}
           onClose={() => setSelectedCustomerDetail(null)}
+          onEdit={() => {
+            setEditingCustomer(selectedCustomerDetail);
+            setNewCustomerForm({
+              name: selectedCustomerDetail.name || '',
+              email: selectedCustomerDetail.email || '',
+              phone: selectedCustomerDetail.phone || '',
+              intent: 'BUY', vehicle: '', year: '', notes: ''
+            });
+            setIsAddCustomerOpen(true);
+          }}
           onDelete={(e) => handleDeleteCustomer(selectedCustomerDetail, e)}
           onLaunchProject={() => {
             const c = selectedCustomerDetail;
@@ -704,12 +742,30 @@ export default function Customers() {
                     {customer.last_interaction ? new Date(customer.last_interaction).toLocaleDateString('de-DE') : '—'}
                   </td>
                   <td style={{ textAlign: 'right' }}>
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      onClick={(e) => { e.stopPropagation(); setSelectedCustomerDetail(customer); }}
-                    >
-                      View
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingCustomer(customer);
+                          setNewCustomerForm({
+                            name: customer.name || '',
+                            email: customer.email || '',
+                            phone: customer.phone || '',
+                            intent: 'BUY', vehicle: '', year: '', notes: ''
+                          });
+                          setIsAddCustomerOpen(true);
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={(e) => { e.stopPropagation(); setSelectedCustomerDetail(customer); }}
+                      >
+                        View <ArrowRight size={11} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
                 );
@@ -753,9 +809,9 @@ export default function Customers() {
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
             <div className="modal-header">
               <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <UserPlus size={20} color="var(--brand-600)" /> Add New Customer / Client
+                <UserPlus size={20} color="var(--brand-600)" /> {editingCustomer ? 'Edit Customer' : 'Add New Customer / Client'}
               </h3>
-              <button className="btn-icon" onClick={() => setIsAddCustomerOpen(false)}><X size={18} /></button>
+              <button className="btn-icon" onClick={() => { setIsAddCustomerOpen(false); setEditingCustomer(null); }}><X size={18} /></button>
             </div>
             <form onSubmit={handleAddCustomerSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
               <div className="modal-body" style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -794,69 +850,81 @@ export default function Customers() {
                   </div>
                 </div>
 
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Customer Intent</label>
-                  <select
-                    className="form-select"
-                    value={newCustomerForm.intent}
-                    onChange={e => setNewCustomerForm({ ...newCustomerForm, intent: e.target.value })}
-                  >
-                    <option value="BUY">Buy Side (Wants to acquire/search a vehicle)</option>
-                    <option value="SELL">Sell Side (Wants to sell/consign a vehicle)</option>
-                  </select>
-                </div>
+                {!editingCustomer && (
+                  <>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label">Customer Intent</label>
+                      <select
+                        className="form-select"
+                        value={newCustomerForm.intent}
+                        onChange={e => setNewCustomerForm({ ...newCustomerForm, intent: e.target.value })}
+                      >
+                        <option value="BUY">Buy Side (Wants to acquire/search a vehicle)</option>
+                        <option value="SELL">Sell Side (Wants to sell/consign a vehicle)</option>
+                      </select>
+                    </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">Vehicle (Make & Model)</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      placeholder="e.g. Porsche 911 Carrera S or BMW 320i"
-                      value={newCustomerForm.vehicle}
-                      onChange={e => setNewCustomerForm({ ...newCustomerForm, vehicle: e.target.value })}
-                    />
-                  </div>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">Year (Baujahr)</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      placeholder="e.g. 2021 or 2017+"
-                      value={newCustomerForm.year}
-                      onChange={e => setNewCustomerForm({ ...newCustomerForm, year: e.target.value })}
-                    />
-                  </div>
-                </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label className="form-label">Vehicle (Make & Model)</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="e.g. Porsche 911 Carrera S or BMW 320i"
+                          value={newCustomerForm.vehicle}
+                          onChange={e => setNewCustomerForm({ ...newCustomerForm, vehicle: e.target.value })}
+                        />
+                      </div>
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label className="form-label">Year (Baujahr)</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="e.g. 2021 or 2017+"
+                          value={newCustomerForm.year}
+                          onChange={e => setNewCustomerForm({ ...newCustomerForm, year: e.target.value })}
+                        />
+                      </div>
+                    </div>
 
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Notes & Initial Inquiry</label>
-                  <textarea
-                    className="form-textarea"
-                    rows={2}
-                    placeholder="Direct phone call inquiry, car specs, or consultation notes..."
-                    value={newCustomerForm.notes}
-                    onChange={e => setNewCustomerForm({ ...newCustomerForm, notes: e.target.value })}
-                  />
-                </div>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label">Notes & Initial Inquiry</label>
+                      <textarea
+                        className="form-textarea"
+                        rows={2}
+                        placeholder="Direct phone call inquiry, car specs, or consultation notes..."
+                        value={newCustomerForm.notes}
+                        onChange={e => setNewCustomerForm({ ...newCustomerForm, notes: e.target.value })}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="modal-footer" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setIsAddCustomerOpen(false)} disabled={savingCustomer}>
+                <button type="button" className="btn btn-secondary" onClick={() => { setIsAddCustomerOpen(false); setEditingCustomer(null); }} disabled={savingCustomer}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-secondary" disabled={savingCustomer}>
-                  Save Customer Only
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={(e) => handleAddCustomerSubmit(e, true)}
-                  disabled={savingCustomer || !newCustomerForm.name}
-                  style={{ gap: 6 }}
-                >
-                  <Briefcase size={15} /> Save & Create Project / Deal
-                </button>
+                {editingCustomer ? (
+                  <button type="submit" className="btn btn-primary" disabled={savingCustomer || !newCustomerForm.name}>
+                    {savingCustomer ? <Loader2 className="spin" size={14} /> : 'Update Customer'}
+                  </button>
+                ) : (
+                  <>
+                    <button type="submit" className="btn btn-secondary" disabled={savingCustomer}>
+                      Save Customer Only
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={(e) => handleAddCustomerSubmit(e, true)}
+                      disabled={savingCustomer || !newCustomerForm.name}
+                      style={{ gap: 6 }}
+                    >
+                      <Briefcase size={15} /> Save & Create Project / Deal
+                    </button>
+                  </>
+                )}
               </div>
             </form>
           </div>
