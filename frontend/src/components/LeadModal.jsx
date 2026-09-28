@@ -110,6 +110,15 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated, initialData 
     }
   };
 
+  const updateField = (field, value) => {
+    setForm(prev => ({ ...prev, [field]: value }));
+    if (errorMsg) setErrorMsg('');
+  };
+
+  const vinLength = (form.vin || '').length;
+  const isVinEntered = vinLength > 0;
+  const isVinValid = isValidVIN(form.vin);
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 580 }}>
@@ -129,9 +138,20 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated, initialData 
             {errorMsg && (
               <div style={{
                 padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca',
-                borderRadius: 8, color: '#b91c1c', fontSize: '0.82rem', lineHeight: 1.4
+                borderRadius: 8, color: '#b91c1c', fontSize: '0.82rem', lineHeight: 1.4,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8
               }}>
-                ⚠️ <strong>Validation Error:</strong> {errorMsg}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>⚠️ <strong>Validation Error:</strong> {errorMsg}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setErrorMsg('')}
+                  style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', padding: 2, display: 'flex' }}
+                  title="Dismiss error"
+                >
+                  <X size={15} />
+                </button>
               </div>
             )}
 
@@ -147,7 +167,7 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated, initialData 
                   required
                   placeholder="e.g. Maximilian Lorenz"
                   value={form.name}
-                  onChange={e => setForm({ ...form, name: e.target.value })}
+                  onChange={e => updateField('name', e.target.value)}
                 />
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
@@ -155,7 +175,7 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated, initialData 
                 <select
                   className="form-select"
                   value={form.intent}
-                  onChange={e => setForm({ ...form, intent: e.target.value })}
+                  onChange={e => updateField('intent', e.target.value)}
                 >
                   <option value="SELL">Sell Side (Vermittlung)</option>
                   <option value="BUY">Buy Side (Beschaffung)</option>
@@ -168,7 +188,7 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated, initialData 
                   type="email"
                   placeholder="client@example.de"
                   value={form.email}
-                  onChange={e => setForm({ ...form, email: e.target.value })}
+                  onChange={e => updateField('email', e.target.value)}
                 />
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
@@ -177,7 +197,7 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated, initialData 
                   className="form-input"
                   placeholder="+49 8404 9385840"
                   value={form.phone}
-                  onChange={e => setForm({ ...form, phone: e.target.value })}
+                  onChange={e => updateField('phone', e.target.value)}
                 />
               </div>
             </div>
@@ -193,7 +213,7 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated, initialData 
                   className="form-input"
                   placeholder="e.g. Porsche / VW"
                   value={form.manufacturer}
-                  onChange={e => setForm({ ...form, manufacturer: e.target.value })}
+                  onChange={e => updateField('manufacturer', e.target.value)}
                 />
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
@@ -202,17 +222,29 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated, initialData 
                   className="form-input"
                   placeholder="e.g. 911 GT3 / Multivan"
                   value={form.model}
-                  onChange={e => setForm({ ...form, model: e.target.value })}
+                  onChange={e => updateField('model', e.target.value)}
                 />
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">VIN (17 characters)</label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <label className="form-label">VIN (17 characters)</label>
+                  {isVinEntered && (
+                    <span style={{
+                      fontSize: '0.68rem',
+                      fontWeight: 600,
+                      color: isVinValid ? '#16a34a' : (vinLength === 17 ? '#dc2626' : '#d97706')
+                    }}>
+                      {isVinValid ? '✓ Valid VIN' : `${vinLength}/17 chars`}
+                    </span>
+                  )}
+                </div>
                 <input
                   className="form-input"
                   placeholder="WV2ZZZ7HZGH056070"
                   maxLength={17}
                   value={form.vin}
-                  onChange={e => setForm({ ...form, vin: e.target.value.toUpperCase().trim() })}
+                  onChange={e => updateField('vin', e.target.value.toUpperCase().trim())}
+                  style={isVinEntered && !isVinValid && vinLength === 17 ? { borderColor: '#ef4444' } : {}}
                 />
                 <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 2, display: 'block' }}>
                   Standard ISO 3779 (17 alphanumeric chars, no I, O, Q)
@@ -224,7 +256,7 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated, initialData 
                   className="form-input"
                   placeholder="e.g. 45000"
                   value={form.price_limit}
-                  onChange={e => setForm({ ...form, price_limit: e.target.value })}
+                  onChange={e => updateField('price_limit', e.target.value)}
                 />
               </div>
             </div>
@@ -236,7 +268,7 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated, initialData 
                 rows={2}
                 placeholder="Additional vehicle specs, inspection requests, or client requirements…"
                 value={form.notes}
-                onChange={e => setForm({ ...form, notes: e.target.value })}
+                onChange={e => updateField('notes', e.target.value)}
               />
             </div>
           </div>
@@ -245,7 +277,7 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated, initialData 
             <button type="button" className="btn btn-secondary btn-sm" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn btn-primary btn-sm" disabled={submitting}>
               {submitting ? <Loader2 size={13} className="spin" /> : <CheckCircle2 size={13} />}
-              <span>Save Lead</span>
+              <span>{initialData ? 'Update Lead' : 'Save Lead'}</span>
             </button>
           </div>
         </form>
