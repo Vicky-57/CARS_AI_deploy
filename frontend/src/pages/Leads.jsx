@@ -8,14 +8,15 @@ import { api } from '../api/api';
 import LeadModal from '../components/LeadModal';
 import LeadDetailPanel from '../components/LeadDetailPanel';
 import { formatDistanceToNow } from 'date-fns';
+import { cleanText } from '../utils/textUtils';
 
 function getLeadVehicleDisplay(lead) {
-  if (lead.vehicle_interest) return lead.vehicle_interest;
-  if (lead.vehicle) return lead.vehicle;
-  if (lead.manufacturer || lead.model) return `${lead.manufacturer || ''} ${lead.model || ''}`.trim();
+  if (lead.vehicle_interest) return cleanText(lead.vehicle_interest);
+  if (lead.vehicle) return cleanText(lead.vehicle);
+  if (lead.manufacturer || lead.model) return cleanText(`${lead.manufacturer || ''} ${lead.model || ''}`.trim());
   const text = `${lead.subject || ''} ${lead.message || ''} ${lead.notes || ''}`;
   const carMatch = text.match(/(Porsche\s+[\w\d\.\s\(\)\-]+|BMW\s+[\w\d\.\s\-]+|Audi\s+[\w\d\.\s\-]+|Mercedes-?Benz?\s+[\w\d\.\s\-]+|VW\s+[\w\d\.\s\-]+|Volkswagen\s+[\w\d\.\s\-]+)/i);
-  if (carMatch) return carMatch[0].split('\n')[0].split('-')[0].trim().slice(0, 35);
+  if (carMatch) return cleanText(carMatch[0].split('\n')[0].split('-')[0].trim().slice(0, 35));
   return null;
 }
 
@@ -189,18 +190,21 @@ export default function Leads() {
   const handleConvertLeadToProject = async (lead, skipNavigate = false) => {
     setConvertingId(lead.id);
     try {
-      const vehicleName = getLeadVehicleDisplay(lead) || 'Vehicle TBD';
-      const pType = (lead.intent || '').toUpperCase().includes('SELL') ? 'SELL' : 'BUY';
+      const cleanNotes = cleanText(lead.notes || lead.message);
+      const conversionNote = cleanNotes
+        ? `${cleanNotes} (Converted from ${pType === 'SELL' ? 'Sell' : 'Buy'} Lead)`
+        : `Converted from ${pType === 'SELL' ? 'Sell' : 'Buy'} Lead: ${vehicleName}`;
+
       await api.createProject({
-        client_name: lead.name || 'Client Lead',
-        client_email: lead.email,
-        client_phone: lead.phone,
+        client_name: cleanText(lead.name) || 'Client Lead',
+        client_email: lead.email || null,
+        client_phone: lead.phone || null,
         project_type: pType,
         target_vehicle: vehicleName,
-        vin: lead.vin,
+        vin: lead.vin || null,
         status: 'ACTIVE',
         current_stage: 'Intake & Onboarding',
-        notes: lead.notes || lead.message || `Converted from Lead ID ${lead.id}`
+        notes: conversionNote
       });
       await api.deleteLead(lead.id).catch(() => { });
       setSelectedLead(null);

@@ -7,6 +7,9 @@ import {
 import { api } from '../api/api';
 import { format } from 'date-fns';
 import DealDetailPanel from '../components/DealDetailPanel';
+import ComplianceGateModal from '../components/ComplianceGateModal';
+import { checkStageTransitionGates } from '../utils/complianceUtils';
+import { isValidVIN, isValidEmail, isValidPhone, cleanText } from '../utils/textUtils';
 
 // Import from shared utils (avoids circular deps with DealDetailPanel)
 export { STAGES, getNormalizedStage } from '../utils/stageUtils';
@@ -112,6 +115,7 @@ export default function Projects() {
   const [selectedProject, setSelectedProject] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [complianceTarget, setComplianceTarget] = useState(null);
 
   const [createProjectForm, setCreateProjectForm] = useState({
     client_name: '',
@@ -127,20 +131,45 @@ export default function Projects() {
 
   const handleCreateProjectSubmit = async (e) => {
     e.preventDefault();
+
+    const clientEmail = (createProjectForm.client_email || '').trim();
+    const clientPhone = (createProjectForm.client_phone || '').trim();
+    const vinVal = (createProjectForm.vin || '').trim().toUpperCase();
+
+    // Contact requirement: At least email or phone must be provided (CA-030)
+    if (!clientEmail && !clientPhone) {
+      alert('Please provide at least one contact channel (Email or Phone).');
+      return;
+    }
+    if (clientEmail && !isValidEmail(clientEmail)) {
+      alert('Please enter a valid email address.');
+      return;
+    }
+    if (clientPhone && !isValidPhone(clientPhone)) {
+      alert('Please enter a valid phone number (at least 6 digits).');
+      return;
+    }
+
+    // Strict 17-character VIN validation (CA-030)
+    if (vinVal && !isValidVIN(vinVal)) {
+      alert(`Invalid VIN "${vinVal}": Must be exactly 17 alphanumeric characters (ISO 3779 standard, excluding letters I, O, and Q).`);
+      return;
+    }
+
     setSubmitting(true);
     try {
       await api.createProject({
-        client_name: createProjectForm.client_name,
-        client_email: createProjectForm.client_email || null,
-        client_phone: createProjectForm.client_phone || null,
+        client_name: cleanText(createProjectForm.client_name),
+        client_email: clientEmail || null,
+        client_phone: clientPhone || null,
         project_type: createProjectForm.project_type,
-        target_vehicle: createProjectForm.target_vehicle || null,
-        vin: createProjectForm.vin || null,
+        target_vehicle: cleanText(createProjectForm.target_vehicle) || null,
+        vin: vinVal || null,
         purchase_price: createProjectForm.purchase_price ? parseFloat(createProjectForm.purchase_price) : 0.0,
         agreed_sale_price: createProjectForm.agreed_sale_price ? parseFloat(createProjectForm.agreed_sale_price) : 0.0,
         status: 'ACTIVE',
         current_stage: 'Intake & Onboarding',
-        notes: createProjectForm.notes || null
+        notes: cleanText(createProjectForm.notes) || null
       });
       setShowCreateModal(false);
       setCreateProjectForm({
@@ -186,9 +215,17 @@ export default function Projects() {
     const currentIdx = STAGES.indexOf(currentStage);
     if (currentIdx >= STAGES.length - 1) return;
 
+    const nextStage = STAGES[currentIdx + 1];
+
+    // Compliance Hard Gates Check (CA-001, CA-029)
+    const gateCheck = checkStageTransitionGates(project, nextStage);
+    if (!gateCheck.allowed) {
+      setComplianceTarget({ project, nextStage });
+      return;
+    }
+
     setAdvancingCardId(project.id);
     setSlidingOutCardId(project.id);
-    const nextStage = STAGES[currentIdx + 1];
     
     // Wait for slide-out animation to complete before updating data
     await new Promise(r => setTimeout(r, 300));
@@ -219,13 +256,24 @@ export default function Projects() {
       // Quietly refresh real data in the background
       api.getProjects().then(res => {
         const fresh = Array.isArray(res) ? res : (res?.projects || []);
-        if (fresh.length > 0) setProjects(fresh);
-      }).catch(() => { });
+        setProjects(fresh);
+      }).catch(() => {});
     } catch (err) {
-      alert('Error advancing stage: ' + err.message);
+      alert('Error updating deal stage: ' + err.message);
+      setSlidingOutCardId(null);
+      setSlidingInCardId(null);
     } finally {
       setAdvancingCardId(null);
     }
+  };
+
+  const handleComplianceAdvanceApproved = (updatedProject) => {
+    setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
+    if (selectedProject && selectedProject.id === updatedProject.id) {
+      setSelectedProject(updatedProject);
+    }
+    setComplianceTarget(null);
+    loadProjects();
   };
 
   // Filtered projects
@@ -916,6 +964,17 @@ export default function Projects() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* COMPLIANCE HARD GATE VERIFICATION MODAL (CA-001, CA-029) */}
+      {complianceTarget && (
+        <ComplianceGateModal
+          isOpen={!!complianceTarget}
+          project={complianceTarget.project}
+          targetStage={complianceTarget.nextStage}
+          onClose={() => setComplianceTarget(null)}
+          onAdvanceApproved={handleComplianceAdvanceApproved}
+        />
       )}
     </div>
   );

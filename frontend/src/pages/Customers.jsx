@@ -5,17 +5,18 @@ import toast from 'react-hot-toast';
 import { api, supabase } from '../api/api';
 import CreateProjectModal from '../components/CreateProjectModal';
 import ContactDetailPanel from '../components/ContactDetailPanel';
+import { isValidEmail, isValidPhone, cleanText } from '../utils/textUtils';
 
 function getCustomerCar(customer) {
   if (!customer || !customer.interactions) return null;
   for (const inter of customer.interactions) {
     const item = inter.details || {};
-    if (item.target_vehicle) return item.target_vehicle;
-    if (item.vehicle) return item.vehicle;
-    if (item.manufacturer || item.model) return `${item.manufacturer || ''} ${item.model || ''}`.trim();
+    if (item.target_vehicle) return cleanText(item.target_vehicle);
+    if (item.vehicle) return cleanText(item.vehicle);
+    if (item.manufacturer || item.model) return cleanText(`${item.manufacturer || ''} ${item.model || ''}`.trim());
     const text = `${item.subject || ''} ${item.message || ''} ${item.notes || ''}`;
     const match = text.match(/(Porsche\s+[\w\d\.\s\(\)\-]+|BMW\s+[\w\d\.\s\-]+|Audi\s+[\w\d\.\s\-]+|Mercedes-?Benz?\s+[\w\d\.\s\-]+|VW\s+[\w\d\.\s\-]+)/i);
-    if (match) return match[0].split('\n')[0].split('-')[0].trim().slice(0, 30);
+    if (match) return cleanText(match[0].split('\n')[0].split('-')[0].trim().slice(0, 30));
   }
   return null;
 }
@@ -125,15 +126,17 @@ export default function Customers() {
       const addInteraction = (email, phone, name, type, item) => {
         // Normalize keys, prioritize email, then phone, then name
         const key = (email || '').toLowerCase().trim() ||
-          (phone || '').trim() ||
+          (phone || '').replace(/\D/g, '') ||
           (name || '').toLowerCase().trim();
 
         if (!key) return; // Skip if no identifiable info
 
+        const cleanName = cleanText(name);
+
         if (!customerMap.has(key)) {
           customerMap.set(key, {
             id: key,
-            name: name || '',
+            name: cleanName || '',
             email: email || '',
             phone: phone || '',
             interactions: [],
@@ -143,14 +146,20 @@ export default function Customers() {
 
         const customer = customerMap.get(key);
         // Fill in missing details if this interaction has them
-        if (!customer.name && name) customer.name = name;
+        if (!customer.name && cleanName) customer.name = cleanName;
         if (!customer.email && email) customer.email = email;
         if (!customer.phone && phone) customer.phone = phone;
 
         customer.interactions.push({ type, date: item.created_at || item.updated_at, details: item });
       };
 
-      leads.forEach(l => addInteraction(l.email, l.phone, l.name, 'Lead', l));
+      // Exclude spam, bounce, and automated no-reply leads from polluting the customer directory (CA-003)
+      leads.forEach(l => {
+        if (l.status === 'SPAM') return;
+        const em = (l.email || '').toLowerCase();
+        if (em.includes('no-reply') || em.includes('noreply') || em.includes('donotreply') || em.includes('newsletter') || em.includes('bounce')) return;
+        addInteraction(l.email, l.phone, l.name, 'Lead', l);
+      });
       projects.forEach(p => addInteraction(p.client_email, p.client_phone, p.client_name, 'Project', p));
 
       const allCustomers = Array.from(customerMap.values());
@@ -253,21 +262,61 @@ export default function Customers() {
     if (e) e.preventDefault();
     setSavingCustomer(true);
     try {
-      const vehicleDesc = [newCustomerForm.vehicle, newCustomerForm.year ? `(${newCustomerForm.year})` : ''].filter(Boolean).join(' ');
+      const emailVal = (newCustomerForm.email || '').trim();
+      const phoneVal = (newCustomerForm.phone || '').trim();
+      const nameVal = cleanText(newCustomerForm.name);
+
+      if (!nameVal) {
+        toast.error('Please enter the customer name.');
+        setSavingCustomer(false);
+        return;
+      }
+
+      // Contact requirement: At least email or phone must be provided (CA-030)
+      if (!emailVal && !phoneVal) {
+        toast.error('Please provide at least one contact channel (Email or Phone).');
+        setSavingCustomer(false);
+        return;
+      }
+
+      if (emailVal && !isValidEmail(emailVal)) {
+        toast.error('Please enter a valid email address.');
+        setSavingCustomer(false);
+        return;
+      }
+
+      if (phoneVal && !isValidPhone(phoneVal)) {
+        toast.error('Please enter a valid phone number (at least 6 digits).');
+        setSavingCustomer(false);
+        return;
+      }
+
+      // Duplicate prevention (CA-005): Check if contact already exists
+      const duplicate = customers.find(c =>
+        (emailVal && c.email?.toLowerCase() === emailVal.toLowerCase()) ||
+        (phoneVal && c.phone && c.phone.replace(/\D/g, '') === phoneVal.replace(/\D/g, ''))
+      );
+      if (duplicate) {
+        toast.error(`A customer with this ${duplicate.email?.toLowerCase() === emailVal.toLowerCase() ? 'email' : 'phone'} already exists: "${duplicate.name || duplicate.email}".`);
+        setSavingCustomer(false);
+        return;
+      }
+
+      const vehicleDesc = [cleanText(newCustomerForm.vehicle), newCustomerForm.year ? `(${newCustomerForm.year})` : ''].filter(Boolean).join(' ');
 
       await api.createLead({
-        name: newCustomerForm.name,
-        email: newCustomerForm.email || null,
-        phone: newCustomerForm.phone || null,
+        name: nameVal,
+        email: emailVal || null,
+        phone: phoneVal || null,
         intent: newCustomerForm.intent,
         channel: 'DIRECT_CALL',
         status: 'NEW',
         notes: newCustomerForm.notes
-          ? `${newCustomerForm.notes}${vehicleDesc ? ` | Vehicle: ${vehicleDesc}` : ''}`
+          ? `${cleanText(newCustomerForm.notes)}${vehicleDesc ? ` | Vehicle: ${vehicleDesc}` : ''}`
           : (vehicleDesc ? `Vehicle requested/offered: ${vehicleDesc}` : 'Added directly from Customers Directory')
       });
 
-      toast.success(`Customer ${newCustomerForm.name} successfully created!`);
+      toast.success(`Customer ${nameVal} successfully created!`);
       setIsAddCustomerOpen(false);
       loadCustomers();
 

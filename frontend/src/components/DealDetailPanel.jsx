@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 import EmailViewCard from './EmailViewCard';
 import { format } from 'date-fns';
 import { STAGES, getNormalizedStage } from '../utils/stageUtils';
+import { cleanText } from '../utils/textUtils';
 
 function formatDate(d) {
   try { return format(new Date(d), 'dd/MM/yyyy'); } catch { return '—'; }
@@ -17,7 +18,7 @@ function Field({ label, value }) {
   return (
     <div className="crm-field">
       <div className="crm-field-label">{label}</div>
-      <div className={`crm-field-value${!value ? ' muted' : ''}`}>{value || '—'}</div>
+      <div className={`crm-field-value${!value ? ' muted' : ''}`}>{cleanText(value) || '—'}</div>
     </div>
   );
 }
@@ -56,22 +57,22 @@ export default function DealDetailPanel({ project, onClose, onAdvance, advancing
   const isLastStage = stageIndex === STAGES.length - 1;
   const nextStage   = !isLastStage ? STAGES[stageIndex + 1] : null;
 
-  // Load emails when Activity tab is opened
+  // Load emails when Activity tab is opened (STRICTLY SCOPED TO THIS CLIENT - CA-002)
   useEffect(() => {
     if (activeTab !== 'activity' || !project) return;
     setEmailsLoading(true);
-    api.getCommunications({ project_id: project.id })
-      .catch(() =>
-        api.getCommunications().then(all =>
-          (all || []).filter(c =>
-            c.sender_contact?.toLowerCase() === (project.client_email || '').toLowerCase()
-          )
-        )
-      )
+    const clientEmail = (project.client_email || '').trim();
+    if (!clientEmail) {
+      setEmails([]);
+      setEmailsLoading(false);
+      return;
+    }
+
+    api.getCommunications({ project_id: project.id, client_email: clientEmail })
       .then(data => setEmails((data || []).slice().reverse()))
       .catch(() => setEmails([]))
       .finally(() => setEmailsLoading(false));
-  }, [activeTab, project?.id]);
+  }, [activeTab, project?.id, project?.client_email]);
 
   // Load Drive URLs when Documents tab is opened
   useEffect(() => {
@@ -109,9 +110,24 @@ export default function DealDetailPanel({ project, onClose, onAdvance, advancing
     e.preventDefault();
     setSubmitting(true);
     try {
+      const hrs = parseFloat(laborForm.hours_spent);
+      if (isNaN(hrs) || hrs <= 0) {
+        toast.error('Please enter a valid positive number of labor hours.');
+        setSubmitting(false);
+        return;
+      }
+      
+      // Enforce 0.25-hour increment rule (CA-020: 0.25, 0.50, 0.75, 1.00, 1.25...)
+      const quarterUnits = Math.round(hrs * 4);
+      if (Math.abs(hrs - quarterUnits / 4) > 0.001) {
+        toast.error('Labor hours must be in 0.25-hour increments (e.g. 0.25, 0.50, 0.75, 1.00, 1.25…). Freeform decimals are not permitted.');
+        setSubmitting(false);
+        return;
+      }
+
       await api.addLabor(project.id, {
-        hours_spent: parseFloat(laborForm.hours_spent) || 0,
-        activity_description: laborForm.activity_description
+        hours_spent: hrs,
+        activity_description: cleanText(laborForm.activity_description)
       });
       setShowLaborModal(false);
       setLaborForm({ hours_spent: '', activity_description: '' });
@@ -558,16 +574,20 @@ export default function DealDetailPanel({ project, onClose, onAdvance, advancing
             <form onSubmit={handleAddLabor}>
               <div className="modal-body">
                 <div className="form-group">
-                  <label className="form-label">Hours Spent *</label>
+                  <label className="form-label">Hours Spent (0.25h increments) *</label>
                   <input
                     className="form-input"
                     type="number"
-                    step="0.5"
+                    step="0.25"
+                    min="0.25"
                     required
-                    placeholder="2.5"
+                    placeholder="0.5"
                     value={laborForm.hours_spent}
                     onChange={e => setLaborForm({ ...laborForm, hours_spent: e.target.value })}
                   />
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                    Mandatory: minimum 0.25h in 15-min increments (0.25, 0.50, 0.75, 1.00…).
+                  </div>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Activity Description *</label>

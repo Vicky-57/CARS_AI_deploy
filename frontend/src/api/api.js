@@ -193,18 +193,36 @@ export const api = {
       hours = payloadOrHours.hours_spent || payloadOrHours.hours;
       desc = payloadOrHours.activity_description || payloadOrHours.description;
     }
+    const numHours = parseFloat(hours);
+    if (isNaN(numHours) || numHours <= 0) {
+      throw new Error('Labor hours must be greater than 0.');
+    }
+    const quarterUnits = Math.round(numHours * 4);
+    if (Math.abs(numHours - quarterUnits / 4) > 0.001) {
+      throw new Error('Labor hours must be in 0.25-hour increments (e.g. 0.25, 0.50, 0.75, 1.00).');
+    }
+
     const { data, error } = await supabase
       .from('project_labor')
-      .insert({ project_id: projectId, hours_spent: hours, activity_description: desc })
+      .insert({ project_id: projectId, hours_spent: numHours, activity_description: desc })
       .select().single();
     if (error) throw error;
     return data;
   },
 
   logLabor: async (projectId, hours, description) => {
+    const numHours = parseFloat(hours);
+    if (isNaN(numHours) || numHours <= 0) {
+      throw new Error('Labor hours must be greater than 0.');
+    }
+    const quarterUnits = Math.round(numHours * 4);
+    if (Math.abs(numHours - quarterUnits / 4) > 0.001) {
+      throw new Error('Labor hours must be in 0.25-hour increments (e.g. 0.25, 0.50, 0.75, 1.00).');
+    }
+
     const { data, error } = await supabase
       .from('project_labor')
-      .insert({ project_id: projectId, hours_spent: hours, activity_description: description })
+      .insert({ project_id: projectId, hours_spent: numHours, activity_description: description })
       .select().single();
     if (error) throw error;
     return data;
@@ -231,8 +249,8 @@ export const api = {
           channel: 'STRATO_EMAIL',
           sender_name: ec.direction === 'inbound' ? (ec.from_email || 'Client') : 'CAR-AGENTS Team',
           sender_contact: ec.direction === 'inbound' ? ec.from_email : ec.to_email,
-          subject: ec.subject,
-          body: ec.body_preview,
+          subject: (ec.subject || '').replace(/[\ufffd\uFFFD]+/g, ' '),
+          body: (ec.body_preview || '').replace(/[\ufffd\uFFFD]+/g, ' '),
           is_inbound: ec.direction === 'inbound',
           intent: ec.intent,
           ai_summary: `Qualification Stage: ${ec.qualification_stage || 'uncontacted'}`,
@@ -248,13 +266,22 @@ export const api = {
 
     // Deduplicate by message body/subject/id
     const seen = new Set();
-    const unique = [];
+    let unique = [];
     for (const item of combined) {
       const key = `${(item.sender_contact || '').toLowerCase()}::${(item.subject || '').toLowerCase()}::${(item.body || '').slice(0, 30)}`;
       if (!seen.has(key)) {
         seen.add(key);
         unique.push(item);
       }
+    }
+
+    // STRICT SCOPING: If client_email filter is provided, ONLY return emails associated with this client (CA-002)
+    const targetEmail = (filters.client_email || '').toLowerCase().trim();
+    if (targetEmail) {
+      unique = unique.filter(item => {
+        const contact = (item.sender_contact || '').toLowerCase();
+        return contact === targetEmail || contact.includes(targetEmail);
+      });
     }
 
     unique.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));

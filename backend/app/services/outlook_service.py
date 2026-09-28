@@ -335,7 +335,7 @@ _IGNORE_KEYWORDS = {
     "immobilien", "wohnung", "miete", "haus kaufen",
 }
 
-# ─── Known automated-only sender domains to always skip ──────────────────────
+# ─── Known automated-only sender domains and prefixes to always skip ──────────
 _BLOCKED_SENDER_DOMAINS = {
     "linkedin.com", "facebook.com", "instagram.com", "twitter.com",
     "x.com", "xing.com", "youtube.com", "tiktok.com",
@@ -348,9 +348,23 @@ _BLOCKED_SENDER_DOMAINS = {
     "slack.com", "notion.so", "atlassian.com",
     "mailchimp.com", "sendgrid.net", "constantcontact.com",
     "hubspot.com", "salesforce.com",
-    "amazon.com", "amazon.de", "ebay.de", "ebay.com",
-    "noreply.de", "no-reply.de",
+    "amazon.com", "amazon.de", "business.amazon.de", "ebay.de", "ebay.com",
+    "noreply.de", "no-reply.de", "sixt.com", "sixt.de", "auto1.com",
+    "sparkasse.de", "postbank.de", "dkb.de", "volksbank.de", "ing.de",
+    "commerzbank.de", "deutsche-bank.de", "santander.de",
 }
+
+_BLOCKED_SENDER_PREFIXES = (
+    "no-reply", "noreply", "donotreply", "do-not-reply", "newsletter",
+    "mailer-daemon", "postmaster", "bounce", "notifications", "alerts",
+    "billing", "invoice", "receipt", "support@", "service@", "kontakt@", "info@"
+)
+
+_AUTOMATED_SUBJECT_KEYWORDS = (
+    "rechnung", "invoice", "kontoauszug", "buchungsbestätigung", "bestellbestätigung",
+    "reservierung", "ihre bestellung", "zahlungseingang", "passwort", "verifizierung",
+    "security alert", "sicherheitswarnung", "ihr beleg", "ihre quittung"
+)
 
 # ── German qualification email templates ──────────────────────────────────────
 _Q1_TEMPLATE = """Sehr geehrte/r {name},
@@ -408,11 +422,25 @@ def _check_rate_limit() -> bool:
     return True
 
 
+def _clean_unicode_artifacts(text: str) -> str:
+    """Removes \ufffd replacement characters and common mojibake sequences."""
+    if not text:
+        return ""
+    text = re.sub(r'[\ufffd\uFFFD]+', ' ', text)
+    mojibake = {
+        'Ã¤': 'ä', 'Ã„': 'Ä', 'Ã¶': 'ö', 'Ã–': 'Ö',
+        'Ã¼': 'ü', 'Ãœ': 'Ü', 'ÃŸ': 'ß', 'â‚¬': '€'
+    }
+    for m, repl in mojibake.items():
+        text = text.replace(m, repl)
+    return text.strip()
+
+
 def _decode_header(raw_value) -> str:
     """
     Safely decode an email header value (Subject, From, etc.).
     Handles RFC2047 encoded-words (=?UTF-8?Q?...?= or =?iso-8859-1?B?...?=).
-    Returns a plain Unicode string.
+    Returns a plain Unicode string clean of \\ufffd artifacts.
     """
     import email.header
     if raw_value is None:
@@ -422,12 +450,19 @@ def _decode_header(raw_value) -> str:
         decoded = []
         for part, enc in parts:
             if isinstance(part, bytes):
-                decoded.append(part.decode(enc or "utf-8", errors="ignore"))
+                enc_name = (enc or "utf-8").lower()
+                try:
+                    decoded.append(part.decode(enc_name))
+                except Exception:
+                    try:
+                        decoded.append(part.decode("iso-8859-1"))
+                    except Exception:
+                        decoded.append(part.decode("utf-8", errors="ignore"))
             else:
                 decoded.append(str(part))
-        return " ".join(decoded).strip()
+        return _clean_unicode_artifacts(" ".join(decoded).strip())
     except Exception:
-        return str(raw_value)
+        return _clean_unicode_artifacts(str(raw_value))
 
 
 def _detect_intent_keywords(subject: str, body: str) -> Optional[str]:
@@ -483,27 +518,26 @@ def _strip_html(html_str: str) -> str:
     html_str = html.unescape(html_str)
     # Collapse multiple blank lines
     html_str = re.sub(r'\n{3,}', '\n\n', html_str)
-    return html_str.strip()
+    return _clean_unicode_artifacts(html_str.strip())
 
 
 def _decode_part(part) -> str:
-    """Decode an email part with proper charset detection (handles UTF-8, latin-1, etc.)."""
+    """Decode an email part with robust charset detection avoiding \\ufffd artifacts."""
     raw = part.get_payload(decode=True)
     if not raw:
         return ""
-    charset = part.get_content_charset() or "utf-8"
-    # Normalise common charset aliases
-    charset = charset.lower().replace("windows-1252", "cp1252")
-    try:
-        return raw.decode(charset, errors="replace")
-    except (LookupError, UnicodeDecodeError):
-        # Fallback chain: try utf-8 → latin-1
-        for fallback in ("utf-8", "latin-1"):
-            try:
-                return raw.decode(fallback, errors="replace")
-            except Exception:
-                continue
-    return raw.decode("utf-8", errors="ignore")
+    charset = (part.get_content_charset() or "utf-8").lower().replace("windows-1252", "cp1252")
+    
+    # Try specified charset first, then try utf-8, iso-8859-1, cp1252
+    candidate_charsets = [charset, "utf-8", "iso-8859-1", "cp1252", "latin-1"]
+    for enc in candidate_charsets:
+        try:
+            decoded = raw.decode(enc)
+            return _clean_unicode_artifacts(decoded)
+        except (LookupError, UnicodeDecodeError):
+            continue
+            
+    return _clean_unicode_artifacts(raw.decode("utf-8", errors="ignore"))
 
 
 def _extract_body(msg) -> str:
@@ -733,11 +767,20 @@ async def poll_outlook_inbound_emails() -> List[Dict]:
                         logger.debug(f"Skipped bulk/newsletter email from {sender_email} (header check)")
                         continue
 
-                    # Check blocked sender domains
-                    sender_domain = sender_email.split("@")[-1].lower() if "@" in sender_email else ""
-                    if sender_domain in _BLOCKED_SENDER_DOMAINS:
+                    # Check blocked sender domains & prefix patterns (CA-003)
+                    sender_lower = sender_email.lower().strip()
+                    sender_domain = sender_lower.split("@")[-1] if "@" in sender_lower else ""
+
+                    if sender_domain in _BLOCKED_SENDER_DOMAINS or any(sender_lower.startswith(pfx) for pfx in _BLOCKED_SENDER_PREFIXES):
                         mail.store(msg_id, "+FLAGS", "\\Seen")
-                        logger.debug(f"Skipped blocked domain: {sender_domain}")
+                        logger.debug(f"Skipped blocked automated sender: {sender_email}")
+                        continue
+
+                    # Check automated transaction subjects (invoices, receipts, booking confirmations)
+                    subject_lower = (subject or "").lower()
+                    if any(kw in subject_lower for kw in _AUTOMATED_SUBJECT_KEYWORDS):
+                        mail.store(msg_id, "+FLAGS", "\\Seen")
+                        logger.debug(f"Skipped automated transaction subject: {subject}")
                         continue
 
                     # Skip very short bodies (automated pings / delivery receipts)

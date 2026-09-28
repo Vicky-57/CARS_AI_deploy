@@ -1,12 +1,13 @@
 import { X, Mail, Phone, Car, Users, Briefcase, Clock, Trash2, UserPlus, Star } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { cleanText, formatInteractionSummary } from '../utils/textUtils';
 
 function timeAgo(iso) {
   try { return formatDistanceToNow(new Date(iso), { addSuffix: true }); } catch { return '—'; }
 }
 
 function getInitials(name, email) {
-  const val = name || email;
+  const val = cleanText(name || email);
   if (!val) return '?';
   return val.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 }
@@ -23,9 +24,10 @@ function getInitials(name, email) {
 export default function ContactDetailPanel({ customer, getCustomerCar, onClose, onDelete, onLaunchProject }) {
   if (!customer) return null;
 
-  const initials = getInitials(customer.name, customer.email);
+  const displayName = cleanText(customer.name) || cleanText(customer.email) || 'Unknown Contact';
+  const initials = getInitials(displayName, customer.email);
   const isRepeat = (customer.interactions || []).length > 1;
-  const vehicle = getCustomerCar ? getCustomerCar(customer) : null;
+  const vehicle = getCustomerCar ? cleanText(getCustomerCar(customer)) : null;
   const leads    = (customer.interactions || []).filter(i => i.type === 'Lead');
   const projects = (customer.interactions || []).filter(i => i.type === 'Project');
 
@@ -42,7 +44,7 @@ export default function ContactDetailPanel({ customer, getCustomerCar, onClose, 
               {initials}
             </div>
             <div>
-              <div className="crm-detail-name">{customer.name || 'Unknown Contact'}</div>
+              <div className="crm-detail-name">{displayName}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}>
                 {isRepeat ? (
                   <span className="badge badge-amber" style={{ fontSize: '0.68rem', display: 'flex', gap: 4 }}>
@@ -144,7 +146,7 @@ export default function ContactDetailPanel({ customer, getCustomerCar, onClose, 
                         <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>{dateStr}</span>
                       </div>
                       <div style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', lineHeight: 1.5 }}>
-                        {inter.details?.subject || inter.details?.notes || inter.details?.message?.slice(0, 120) || 'Inquiry logged'}
+                        {formatInteractionSummary(inter)}
                       </div>
                     </div>
                   );

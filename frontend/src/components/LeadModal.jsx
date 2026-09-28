@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { X, User, Car, Contact2, Loader2, CheckCircle2 } from 'lucide-react';
 import { api } from '../api/api';
+import { isValidVIN, isValidEmail, isValidPhone, cleanText } from '../utils/textUtils';
 
 export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
   const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   const [form, setForm] = useState({
     name: '',
@@ -25,10 +27,42 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrorMsg('');
+
+    // Contact requirement: At least email or phone must be provided
+    const emailVal = form.email.trim();
+    const phoneVal = form.phone.trim();
+    if (!emailVal && !phoneVal) {
+      setErrorMsg('Please provide at least one contact channel (Email address or Phone number).');
+      return;
+    }
+
+    if (emailVal && !isValidEmail(emailVal)) {
+      setErrorMsg('Please enter a valid email address (e.g. client@example.com).');
+      return;
+    }
+
+    if (phoneVal && !isValidPhone(phoneVal)) {
+      setErrorMsg('Please enter a valid phone number with country/area code (at least 6 digits).');
+      return;
+    }
+
+    // Strict 17-character VIN validation according to ISO 3779
+    const vinVal = form.vin.trim().toUpperCase();
+    if (vinVal && !isValidVIN(vinVal)) {
+      setErrorMsg('Invalid VIN: Must be exactly 17 alphanumeric characters (ISO 3779 standard, excluding letters I, O, and Q). Input was: "' + vinVal + '".');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const payload = {
         ...form,
+        name: cleanText(form.name) || (emailVal ? emailVal.split('@')[0] : 'Client Lead'),
+        email: emailVal || null,
+        phone: phoneVal || null,
+        vin: vinVal || null,
+        notes: cleanText(form.notes),
         price_limit: form.price_limit ? parseFloat(form.price_limit) : null,
       };
       delete payload.vehicle;
@@ -36,7 +70,7 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
       if (onLeadCreated) onLeadCreated();
       onClose();
     } catch (err) {
-      alert('Failed to save lead: ' + (err.message || 'Supabase database error'));
+      setErrorMsg('Failed to save lead: ' + (err.message || 'Supabase database error'));
     } finally {
       setSubmitting(false);
     }
@@ -58,9 +92,18 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
           <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
+            {errorMsg && (
+              <div style={{
+                padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca',
+                borderRadius: 8, color: '#b91c1c', fontSize: '0.82rem', lineHeight: 1.4
+              }}>
+                ⚠️ <strong>Validation Error:</strong> {errorMsg}
+              </div>
+            )}
+
             {/* Client Info */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              <Contact2 size={13} /> Client Contact Details
+              <Contact2 size={13} /> Client Contact Details (Email or Phone required)
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
@@ -129,13 +172,17 @@ export default function LeadModal({ isOpen, onClose, onLeadCreated }) {
                 />
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">VIN (17-digit)</label>
+                <label className="form-label">VIN (17 characters)</label>
                 <input
                   className="form-input"
                   placeholder="WV2ZZZ7HZGH056070"
+                  maxLength={17}
                   value={form.vin}
-                  onChange={e => setForm({ ...form, vin: e.target.value })}
+                  onChange={e => setForm({ ...form, vin: e.target.value.toUpperCase().trim() })}
                 />
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 2, display: 'block' }}>
+                  Standard ISO 3779 (17 alphanumeric chars, no I, O, Q)
+                </span>
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Budget / Limit (€)</label>

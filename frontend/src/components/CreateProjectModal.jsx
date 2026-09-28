@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Car, Tag, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { api } from '../api/api';
+import { isValidVIN, isValidEmail, isValidPhone, cleanText } from '../utils/textUtils';
 
 export default function CreateProjectModal({ isOpen, onClose, onCreated, defaultStatus = 'ACTIVE', defaultType = 'SELL' }) {
   const [existingCustomers, setExistingCustomers] = useState([]);
@@ -101,23 +102,61 @@ export default function CreateProjectModal({ isOpen, onClose, onCreated, default
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitting(true);
 
+    const clientEmail = (formData.client_email || '').trim();
+    const clientPhone = (formData.client_phone || '').trim();
+    const vinVal = (formData.vin || '').trim().toUpperCase();
+
+    // 1. Mandatory contact channel: At least email or phone must be provided
+    if (!clientEmail && !clientPhone) {
+      toast.error('Please provide at least one contact channel (Email or Phone).');
+      return;
+    }
+    if (clientEmail && !isValidEmail(clientEmail)) {
+      toast.error('Please provide a valid email address (e.g. client@example.com).');
+      return;
+    }
+    if (clientPhone && !isValidPhone(clientPhone)) {
+      toast.error('Please provide a valid phone number (at least 6 digits).');
+      return;
+    }
+
+    // 2. Strict 17-character VIN validation (ISO 3779)
+    if (vinVal && !isValidVIN(vinVal)) {
+      toast.error(`Invalid VIN "${vinVal}": Must be exactly 17 alphanumeric characters (ISO 3779 standard, excluding letters I, O, and Q).`);
+      return;
+    }
+
+    // 3. Duplicate check if entering a new customer
+    if (selectedCustomerId === 'NEW') {
+      const duplicateContact = existingCustomers.find(c =>
+        (clientEmail && c.email?.toLowerCase() === clientEmail.toLowerCase()) ||
+        (clientPhone && c.phone && c.phone.replace(/\D/g, '') === clientPhone.replace(/\D/g, ''))
+      );
+      if (duplicateContact) {
+        const proceed = window.confirm(
+          `A contact with this email/phone already exists: "${duplicateContact.name || duplicateContact.email}".\n\nClick OK to link this project to that customer profile, or Cancel to review.`
+        );
+        if (!proceed) return;
+      }
+    }
+
+    setSubmitting(true);
     try {
       const initialStage = 'Intake & Onboarding';
 
       const payload = {
-        client_name: formData.client_name,
-        client_email: formData.client_email || null,
-        client_phone: formData.client_phone || null,
+        client_name: cleanText(formData.client_name),
+        client_email: clientEmail || null,
+        client_phone: clientPhone || null,
         project_type: formData.project_type,
-        target_vehicle: formData.target_vehicle,
-        vin: formData.vin || null,
+        target_vehicle: cleanText(formData.target_vehicle),
+        vin: vinVal || null,
         purchase_price: formData.purchase_price ? parseFloat(formData.purchase_price) : 0,
         target_price: formData.target_price ? parseFloat(formData.target_price) : 0,
         current_stage: initialStage,
         status: formData.status,
-        notes: formData.notes || null
+        notes: cleanText(formData.notes) || null
       };
 
       const created = await api.createProject(payload);
@@ -219,17 +258,30 @@ export default function CreateProjectModal({ isOpen, onClose, onCreated, default
               </div>
             </div>
 
-            {/* Target Vehicle Details */}
-            <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Target Vehicle *</label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="e.g. Porsche 911 Carrera S or VW Multivan"
-                value={formData.target_vehicle}
-                onChange={e => setFormData({ ...formData, target_vehicle: e.target.value })}
-                required
-              />
+            {/* Target Vehicle Details & VIN */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 12 }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Target Vehicle *</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Porsche 911 Carrera S"
+                  value={formData.target_vehicle}
+                  onChange={e => setFormData({ ...formData, target_vehicle: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">VIN (17 characters)</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="WV2ZZZ7HZGH056070"
+                  maxLength={17}
+                  value={formData.vin}
+                  onChange={e => setFormData({ ...formData, vin: e.target.value.toUpperCase().trim() })}
+                />
+              </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
