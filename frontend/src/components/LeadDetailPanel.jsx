@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { X, Mail, Phone, Car, User, Tag, Clock, ArrowRight, Loader2, Sparkles } from 'lucide-react';
+import { X, Mail, Phone, Car, User, Tag, Clock, ArrowRight, Loader2, Sparkles, ShieldCheck } from 'lucide-react';
 import { api } from '../api/api';
 import EmailViewCard from './EmailViewCard';
 import { formatDistanceToNow } from 'date-fns';
+import { cleanText, formatContactName } from '../utils/textUtils';
 
 function timeAgo(iso) {
   try { return formatDistanceToNow(new Date(iso), { addSuffix: true }); } catch { return ''; }
@@ -60,6 +61,7 @@ export default function LeadDetailPanel({ lead, onClose, onConvert, onRefresh, c
   const intentLabel = isSell ? 'Sell Side' : 'Buy Side';
   const intentBadge = isSell ? 'badge badge-green' : 'badge badge-purple';
   const isSpam = lead.status === 'SPAM';
+  const isMobileRelay = /-mo-mo@kontakt\.mobile\.de/i.test(lead.email || '');
 
   return (
     <>
@@ -70,16 +72,18 @@ export default function LeadDetailPanel({ lead, onClose, onConvert, onRefresh, c
         {/* ── Header ── */}
         <div className="crm-detail-header">
           <div className="crm-detail-header-info">
-            <div className="crm-detail-name">{lead.name || 'Anonymous Lead'}</div>
+            <div className="crm-detail-name">{formatContactName(lead.name, lead.email, lead.vehicle_interest || lead.model)}</div>
             <div className="crm-detail-meta">
               {lead.email && (
                 <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Mail size={11} /> {lead.email}
+                  <Mail size={11} />
+                  {isMobileRelay ? 'mobile.de Relay' : cleanText(lead.email)}
+                  {isMobileRelay && <span className="badge badge-gray" style={{ fontSize: '0.62rem', padding: '1px 5px', fontWeight: 600 }}>Encrypted</span>}
                 </span>
               )}
               {lead.phone && (
                 <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Phone size={11} /> {lead.phone}
+                  <Phone size={11} /> {cleanText(lead.phone)}
                 </span>
               )}
               <span className={intentBadge}>{intentLabel}</span>
@@ -121,10 +125,28 @@ export default function LeadDetailPanel({ lead, onClose, onConvert, onRefresh, c
                   <User size={12} /> Contact Information
                 </div>
                 <div className="crm-field-grid">
-                  <Field label="Full Name"  value={lead.name} />
+                  <Field label="Full Name"  value={formatContactName(lead.name, lead.email, lead.vehicle_interest || lead.model)} />
                   <Field label="Intent"     value={intentLabel} />
-                  <Field label="Email"      value={lead.email} />
-                  <Field label="Phone"      value={lead.phone} />
+                  {isMobileRelay ? (
+                    <div className="crm-field" style={{ gridColumn: '1 / -1' }}>
+                      <div className="crm-field-label">Email (mobile.de Proxy Relay)</div>
+                      <div className="crm-field-value" style={{ wordBreak: 'break-all' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                          <span className="badge badge-gray" style={{ fontSize: '0.68rem', fontWeight: 600 }}>via mobile.de Relay</span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Working Inbound & Outbound Relay</span>
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
+                          {lead.email}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                          ℹ️ Anonymized proxy address provided by mobile.de. Any replies or quotes sent to this address forward directly to the customer's private inbox.
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <Field label="Email" value={cleanText(lead.email)} />
+                  )}
+                  <Field label="Phone"      value={cleanText(lead.phone)} />
                 </div>
               </div>
 
@@ -173,7 +195,7 @@ export default function LeadDetailPanel({ lead, onClose, onConvert, onRefresh, c
                         className="crm-field-value"
                         style={{ fontSize: '0.82rem', lineHeight: 1.6, whiteSpace: 'pre-wrap', fontWeight: 400 }}
                       >
-                        {lead.notes || lead.message}
+                        {cleanText(lead.notes || lead.message)}
                       </div>
                     </div>
                   </div>

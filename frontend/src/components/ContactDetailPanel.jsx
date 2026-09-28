@@ -64,17 +64,24 @@ export default function ContactDetailPanel({ customer, getCustomerCar, onClose, 
           {/* Email & Phone cards */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '16px 18px', borderBottom: '1px solid var(--border)' }}>
             <div style={{ padding: '12px 14px', background: 'var(--bg-surface-subtle)', borderRadius: 10, border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Email</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email</span>
+                {/-mo-mo@kontakt\.mobile\.de/i.test(customer.email || '') && (
+                  <span className="badge badge-gray" style={{ fontSize: '0.62rem', padding: '1px 5px', fontWeight: 600 }} title="Anonymized proxy relay from mobile.de marketplace">
+                    mobile.de Relay
+                  </span>
+                )}
+              </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)', wordBreak: 'break-all' }}>
                 <Mail size={13} color="#f47c3c" style={{ flexShrink: 0 }} />
-                {customer.email || '—'}
+                <span>{cleanText(customer.email || '—')}</span>
               </div>
             </div>
             <div style={{ padding: '12px 14px', background: 'var(--bg-surface-subtle)', borderRadius: 10, border: '1px solid var(--border)' }}>
               <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Phone</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                 <Phone size={13} color="#f47c3c" style={{ flexShrink: 0 }} />
-                {customer.phone || '—'}
+                {cleanText(customer.phone || '—')}
               </div>
             </div>
           </div>
