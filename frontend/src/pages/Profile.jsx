@@ -126,7 +126,10 @@ export default function Profile() {
               </div>
               <div className="form-group" style={{ margin: 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <label className="form-label" style={{ margin: 0 }}>WhatsApp Number</label>
+                  <label className="form-label" style={{ margin: 0, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <img src="/assets/whatsapp.png" alt="WhatsApp" style={{ width: 14, height: 14, objectFit: 'contain' }} />
+                    WhatsApp Number
+                  </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.72rem', color: 'var(--text-muted)', cursor: 'pointer' }}>
                     <input type="checkbox" checked={syncWhatsapp} onChange={handleSyncToggle} style={{ width: 13, height: 13, margin: 0 }} /> Same as Phone
                   </label>

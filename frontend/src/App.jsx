@@ -33,9 +33,7 @@ const NAV = [
     section: 'CRM & Brokerage',
     items: [
       { path: '/leads', icon: Users, label: 'Leads' },
-      { path: '/customers', icon: Users, label: 'Customers' },
       { path: '/projects', icon: FolderKanban, label: 'Deals & Projects' },
-      { path: '/communications', icon: MessageSquare, label: 'Communications' },
     ],
   },
   {
@@ -63,7 +61,7 @@ function DeskTopbar({ online, userProfile }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  
+
   const crumbs = BREADCRUMB_MAP[location.pathname] || ['Portal', 'Overview'];
 
   const handleSearchSubmit = (e) => {
@@ -311,7 +309,7 @@ export default function App() {
             localStorage.setItem('car_agents_user', JSON.stringify(profile));
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   }, []);
 
@@ -325,7 +323,7 @@ export default function App() {
   const handleLogout = () => {
     localStorage.removeItem('car_agents_user');
     localStorage.removeItem('car_agents_token');
-    supabase.auth.signOut().catch(() => {});
+    supabase.auth.signOut().catch(() => { });
     setUserProfile(null);
     setIsAuthenticated(false);
   };
@@ -370,11 +368,11 @@ function AppRoutes({ isAuthenticated, online, userProfile, onLogin, onLogout }) 
     <>
 
       <div className="portal-layout">
-        <Sidebar 
-          online={online} 
-          onLogout={onLogout} 
-          userProfile={userProfile} 
-          isOpen={sidebarOpen} 
+        <Sidebar
+          online={online}
+          onLogout={onLogout}
+          userProfile={userProfile}
+          isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           isCollapsed={sidebarCollapsed && typeof window !== 'undefined' && window.innerWidth > 768}
           onToggleCollapse={() => {
@@ -388,7 +386,7 @@ function AppRoutes({ isAuthenticated, online, userProfile, onLogin, onLogout }) 
           }}
         />
         {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)}></div>}
-        
+
         <div className="main-content">
           {/* Frappe Desk Topbar */}
           <DeskTopbar online={online} userProfile={userProfile} />

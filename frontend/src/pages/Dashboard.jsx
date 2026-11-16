@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
-  Users, FolderKanban, MessageSquare, Calendar,
-  ArrowUpRight, ArrowRight, Clock, TrendingUp, FileText,
-  AlertTriangle, CheckCircle, ChevronRight, Plus, ExternalLink,
-  Tag, Search
+  Users, FolderKanban, Calendar,
+  ArrowUpRight, TrendingUp, FileText,
+  CheckCircle, ChevronRight, Plus, ExternalLink,
+  Tag, Wifi, WifiOff, Clock, AlertCircle, MessageCircle, Inbox
 } from 'lucide-react';
 import { api } from '../api/api';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -14,19 +14,22 @@ export default function Dashboard() {
   const [leads, setLeads] = useState([]);
   const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [waStatus, setWaStatus] = useState(null); // WhatsApp status
 
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const [summaryRes, leadsRes, meetingsRes] = await Promise.allSettled([
+        const [summaryRes, leadsRes, meetingsRes, waRes] = await Promise.allSettled([
           api.getPipelineSummary(),
           api.getLeads({}, 6),
           api.getMeetings({}, 4),
+          api.getWhatsAppStatus ? api.getWhatsAppStatus() : Promise.resolve(null),
         ]);
 
         if (summaryRes.status === 'fulfilled') setSummary(summaryRes.value);
         if (leadsRes.status === 'fulfilled') setLeads(leadsRes.value.slice(0, 6));
         if (meetingsRes.status === 'fulfilled') setMeetings(meetingsRes.value.slice(0, 4));
+        if (waRes.status === 'fulfilled' && waRes.value) setWaStatus(waRes.value);
       } finally {
         setLoading(false);
       }
@@ -132,15 +135,83 @@ export default function Dashboard() {
         ))}
       </div>
 
+      {/* WhatsApp Status Bar */}
+      <div className="wa-status-bar">
+        {/* Brand + connection status */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', borderRight: '1px solid var(--border)', minWidth: 210 }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: 'var(--radius-sm)',
+            background: 'var(--bg-surface-subtle)', border: '1px solid var(--border)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+          }}>
+            <img src="/assets/whatsapp.png" alt="WhatsApp" style={{ width: 20, height: 20, objectFit: 'contain' }} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)', lineHeight: 1.2 }}>
+              WhatsApp Channel
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 }}>
+              {waStatus?.connected === false ? (
+                <>
+                  <WifiOff size={11} color="var(--status-red-text)" />
+                  <span style={{ fontSize: '0.72rem', color: 'var(--status-red-text)', fontWeight: 500 }}>Not connected</span>
+                </>
+              ) : waStatus?.connected ? (
+                <>
+                  <div className="wa-status-dot" style={{ background: 'var(--status-green-text)' }} />
+                  <span style={{ fontSize: '0.72rem', color: 'var(--status-green-text)', fontWeight: 500 }}>Connected</span>
+                </>
+              ) : (
+                <>
+                  <Clock size={11} color="var(--text-muted)" />
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500 }}>Pending Meta approval</span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Morning briefing */}
+        <div className="wa-status-bar-segment">
+          <div className="wa-status-label">Morning Briefing</div>
+          <div className="wa-status-value" style={{ color: waStatus?.briefing_sent ? 'var(--status-green-text)' : 'var(--text-secondary)' }}>
+            {waStatus?.briefing_sent
+              ? <CheckCircle size={13} color="var(--status-green-text)" />
+              : <Clock size={13} color="var(--text-muted)" />}
+            {waStatus?.briefing_sent ? 'Sent today' : 'Pending'}
+          </div>
+        </div>
+
+        {/* Hot leads awaiting reply */}
+        <div className="wa-status-bar-segment">
+          <div className="wa-status-label">Hot — No Reply</div>
+          <div className="wa-status-value"
+            style={{ color: (waStatus?.hot_no_reply || 0) > 0 ? 'var(--status-red-text)' : 'var(--text-secondary)' }}>
+            {(waStatus?.hot_no_reply || 0) > 0
+              ? <AlertCircle size={13} color="var(--status-red-text)" />
+              : <CheckCircle size={13} color="var(--text-muted)" />}
+            {waStatus?.hot_no_reply != null ? `${waStatus.hot_no_reply} leads` : '—'}
+          </div>
+        </div>
+
+        {/* CTA */}
+        <div style={{ display: 'flex', alignItems: 'center', padding: '14px 20px', marginLeft: 'auto' }}>
+          <NavLink to="/leads" className="btn btn-secondary btn-sm" style={{ gap: 5 }}>
+            <Inbox size={13} />
+            View Leads
+            <ChevronRight size={12} />
+          </NavLink>
+        </div>
+      </div>
+
       {/* Main 2-Column Frappe Workspace Layout */}
       <div className="dashboard-main-grid">
-        
         {/* Left: Recent Inbound Leads */}
         <div className="card" style={{ overflow: 'hidden' }}>
           {/* Header */}
           <div className="card-header">
             <div className="card-title">
-              <MessageSquare size={15} color="var(--text-secondary)" /> Recent Inbound Inquiries
+              <MessageCircle size={15} color="var(--text-secondary)" /> Recent Inbound Inquiries
             </div>
             <NavLink to="/leads" className="btn btn-ghost btn-sm">
               View all leads <ChevronRight size={13} />
@@ -211,7 +282,7 @@ export default function Dashboard() {
 
         {/* Right: Today's Schedule & Quick Actions */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          
+
           {/* Today's Schedule Card */}
           <div className="card">
             <div className="card-header">
@@ -298,17 +369,6 @@ export default function Dashboard() {
                   <FileText size={14} /> Contracts
                 </div>
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>1-Click PDF generation</div>
-              </NavLink>
-
-              <NavLink
-                to="/customers"
-                className="btn btn-secondary"
-                style={{ justifyContent: 'flex-start', padding: '10px 12px', height: 'auto', flexDirection: 'column', alignItems: 'flex-start' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: 'var(--text-primary)' }}>
-                  <Users size={14} /> Customer Master
-                </div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>Client profiles & history</div>
               </NavLink>
 
               <NavLink

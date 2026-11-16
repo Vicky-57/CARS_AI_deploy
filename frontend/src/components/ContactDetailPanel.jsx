@@ -1,4 +1,8 @@
-import { X, Mail, Phone, Car, Users, Briefcase, Clock, Trash2, UserPlus, Star } from 'lucide-react';
+import { useState } from 'react';
+import {
+  X, Mail, Phone, Car, Users, Briefcase, Clock, Trash2, UserPlus,
+  Star, ExternalLink, Copy, Check
+} from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cleanText, formatInteractionSummary, formatContactName, getCleanInitials } from '../utils/textUtils';
 
@@ -7,131 +11,202 @@ function timeAgo(iso) {
 }
 
 /**
- * ContactDetailPanel — Full Frappe CRM-style right-side slide panel.
- * Props:
- *   customer        — customer object
- *   getCustomerCar  — fn(customer) => string | null
- *   onClose         — fn to close
- *   onDelete        — fn(e) to delete customer
- *   onLaunchProject — fn to open create project modal
+ * ContactDetailPanel — Executive contact and relationship detail drawer.
  */
 export default function ContactDetailPanel({ customer, getCustomerCar, onClose, onDelete, onLaunchProject, onEdit }) {
+  const [copiedField, setCopiedField] = useState(null);
+
   if (!customer) return null;
 
   const vehicle = getCustomerCar ? cleanText(getCustomerCar(customer)) : null;
   const displayName = formatContactName(customer.name, customer.email, vehicle);
   const initials = getCleanInitials(displayName, customer.email);
   const isRepeat = (customer.interactions || []).length > 1;
-  const leads    = (customer.interactions || []).filter(i => i.type === 'Lead');
+  const leads = (customer.interactions || []).filter(i => i.type === 'Lead');
   const projects = (customer.interactions || []).filter(i => i.type === 'Project');
+  const isMobileRelay = /-mo-mo@kontakt\.mobile\.de/i.test(customer.email || '');
+
+  const copyToClipboard = (text, fieldName) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldName);
+    setTimeout(() => setCopiedField(null), 1800);
+  };
 
   return (
     <>
       <div className="panel-backdrop" onClick={onClose} />
 
       <aside className="crm-detail-panel">
-        {/* ── Top bar ── */}
-        <div className="crm-detail-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {/* Avatar */}
-            <div className="contact-profile-avatar" style={{ width: 42, height: 42, fontSize: '0.9rem' }}>
+        {/* ── Top Header ── */}
+        <div className="crm-panel-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0, flex: 1 }}>
+            {/* Initials avatar tile */}
+            <div className={`crm-header-avatar ${isRepeat ? 'contact' : 'contact-new'}`}>
               {initials}
             </div>
-            <div>
-              <div className="crm-detail-name">{displayName}</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}>
+
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="crm-header-title" title={displayName}>
+                {displayName}
+              </div>
+              <div className="crm-header-meta-row">
                 {isRepeat ? (
-                  <span className="badge badge-amber" style={{ fontSize: '0.68rem', display: 'flex', gap: 4 }}>
-                    <Star size={10} fill="currentColor" /> Repeat Client
+                  <span className="crm-tag crm-tag-amber">
+                    <Star size={11} fill="currentColor" /> Repeat Client
                   </span>
                 ) : (
-                  <span className="badge badge-blue" style={{ fontSize: '0.68rem', display: 'flex', gap: 4 }}>
-                    <UserPlus size={10} /> New Client
+                  <span className="crm-tag crm-tag-blue">
+                    <UserPlus size={11} /> New Client
                   </span>
                 )}
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                  · {(customer.interactions || []).length} interaction{(customer.interactions || []).length !== 1 ? 's' : ''}
+                <span className="crm-tag crm-tag-slate">
+                  {(customer.interactions || []).length} Interaction{(customer.interactions || []).length !== 1 ? 's' : ''}
                 </span>
               </div>
             </div>
           </div>
-          <button className="btn btn-ghost btn-icon" onClick={onClose}><X size={16} /></button>
+
+          <button className="crm-close-btn" onClick={onClose} title="Close Panel">
+            <X size={16} />
+          </button>
         </div>
 
-        {/* ── Scrollable body ── */}
+        {/* ── Scrollable Body ── */}
         <div className="crm-detail-body">
 
-          {/* Email & Phone cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '16px 18px', borderBottom: '1px solid var(--border)' }}>
-            <div style={{ padding: '12px 14px', background: 'var(--bg-surface-subtle)', borderRadius: 10, border: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email</span>
-                {/-mo-mo@kontakt\.mobile\.de/i.test(customer.email || '') && (
-                  <span className="badge badge-gray" style={{ fontSize: '0.62rem', padding: '1px 5px', fontWeight: 600 }} title="Anonymized proxy relay from mobile.de marketplace">
-                    mobile.de Relay
+          {/* Quick Metrics Bar */}
+          <div className="panel-metric-bar">
+            <div className="panel-metric-card">
+              <span className="panel-metric-label">Relationship</span>
+              <span className="panel-metric-value">{isRepeat ? 'Repeat' : 'New'}</span>
+            </div>
+            <div className="panel-metric-card">
+              <span className="panel-metric-label">Deals</span>
+              <span className="panel-metric-value">{projects.length}</span>
+            </div>
+            <div className="panel-metric-card">
+              <span className="panel-metric-label">Inquiries</span>
+              <span className="panel-metric-value">{leads.length}</span>
+            </div>
+            <div className="panel-metric-card">
+              <span className="panel-metric-label">Last Active</span>
+              <span className="panel-metric-value" style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' }}>
+                {timeAgo(customer.last_interaction)}
+              </span>
+            </div>
+          </div>
+
+          {/* Contact Direct Connection Card */}
+          <div className="crm-section">
+            <div className="crm-section-title">
+              <Users size={12} /> Contact & Communication
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              {/* Email Card */}
+              <div style={{ padding: '12px 14px', background: 'var(--bg-surface-subtle)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Email
                   </span>
+                  {isMobileRelay && (
+                    <span className="badge badge-gray" style={{ fontSize: '0.62rem', padding: '1px 5px', fontWeight: 600 }}>
+                      mobile.de Relay
+                    </span>
+                  )}
+                </div>
+                {customer.email ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                    <a href={`mailto:${customer.email}`} style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--primary)', wordBreak: 'break-all', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Mail size={13} color="var(--primary)" style={{ flexShrink: 0 }} />
+                      <span>{cleanText(customer.email)}</span>
+                    </a>
+                    <button
+                      className="btn btn-ghost btn-icon"
+                      style={{ padding: 2 }}
+                      onClick={() => copyToClipboard(customer.email, 'email')}
+                      title="Copy email"
+                    >
+                      {copiedField === 'email' ? <Check size={11} color="var(--status-green-text)" /> : <Copy size={11} />}
+                    </button>
+                  </div>
+                ) : (
+                  <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>—</span>
                 )}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)', wordBreak: 'break-all' }}>
-                <Mail size={13} color="#f47c3c" style={{ flexShrink: 0 }} />
-                <span>{cleanText(customer.email || '—')}</span>
-              </div>
-            </div>
-            <div style={{ padding: '12px 14px', background: 'var(--bg-surface-subtle)', borderRadius: 10, border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Phone</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                <Phone size={13} color="#f47c3c" style={{ flexShrink: 0 }} />
-                {cleanText(customer.phone || '—')}
+
+              {/* Phone Card */}
+              <div style={{ padding: '12px 14px', background: 'var(--bg-surface-subtle)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Phone
+                  </span>
+                </div>
+                {customer.phone ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                    <a href={`tel:${customer.phone}`} style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--status-green-text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Phone size={13} color="var(--status-green-text)" style={{ flexShrink: 0 }} />
+                      <span>{cleanText(customer.phone)}</span>
+                    </a>
+                    <button
+                      className="btn btn-ghost btn-icon"
+                      style={{ padding: 2 }}
+                      onClick={() => copyToClipboard(customer.phone, 'phone')}
+                      title="Copy phone"
+                    >
+                      {copiedField === 'phone' ? <Check size={11} color="var(--status-green-text)" /> : <Copy size={11} />}
+                    </button>
+                  </div>
+                ) : (
+                  <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>—</span>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Vehicle interest banner */}
+          {/* Target Vehicle Interest Banner */}
           {vehicle && (
-            <div style={{ margin: '12px 18px', padding: '14px 16px', background: 'linear-gradient(to right, #fff7ed, #ffffff)', borderRadius: 10, border: '1px solid #ffedd5', display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div style={{ padding: 10, background: '#ffedd5', borderRadius: 10, flexShrink: 0 }}>
-                <Car size={20} color="#ea580c" />
+            <div style={{
+              padding: '14px 16px',
+              background: 'var(--bg-surface)',
+              borderRadius: 'var(--radius)',
+              border: '1px solid var(--border)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              boxShadow: 'var(--shadow-xs)'
+            }}>
+              <div style={{
+                width: 38, height: 38,
+                background: 'var(--bg-surface-subtle)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <Car size={18} color="var(--primary)" />
               </div>
-              <div>
-                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#ea580c', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Target Vehicle / Car Interest</div>
-                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1a1a1a', marginTop: 3 }}>{vehicle}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Target Vehicle Interest
+                </div>
+                <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: 2 }}>
+                  {vehicle}
+                </div>
               </div>
             </div>
           )}
 
-          {/* Contact Info fields */}
+          {/* Interaction History Card */}
           <div className="crm-section">
-            <div className="crm-section-title"><Users size={12} /> Contact Information</div>
-            <div className="crm-field-grid">
-              <div className="crm-field">
-                <span className="crm-field-label">Full Name</span>
-                <span className="crm-field-value">{customer.name || '—'}</span>
-              </div>
-              <div className="crm-field">
-                <span className="crm-field-label">Email</span>
-                <span className="crm-field-value">{customer.email || '—'}</span>
-              </div>
-              <div className="crm-field">
-                <span className="crm-field-label">Phone</span>
-                <span className="crm-field-value">{customer.phone || '—'}</span>
-              </div>
-              <div className="crm-field">
-                <span className="crm-field-label">Last Active</span>
-                <span className="crm-field-value">{timeAgo(customer.last_interaction)}</span>
-              </div>
-              <div className="crm-field">
-                <span className="crm-field-label">Total Records</span>
-                <span className="crm-field-value">{(customer.interactions || []).length}</span>
-              </div>
+            <div className="crm-section-title">
+              <Clock size={12} /> Client Interaction History ({customer.interactions?.length || 0})
             </div>
-          </div>
-
-          {/* Interaction History */}
-          <div className="crm-section">
-            <div className="crm-section-title"><Clock size={12} /> Client Interaction History</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {(customer.interactions || []).length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-muted)', fontSize: '0.82rem' }}>No interactions yet.</div>
+                <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                  No logged interactions yet.
+                </div>
               ) : (
                 (customer.interactions || []).map((inter, idx) => {
                   const isProject = inter.type === 'Project' || inter.type === 'PROJECT';
@@ -139,14 +214,19 @@ export default function ContactDetailPanel({ customer, getCustomerCar, onClose, 
                   const d = new Date(inter.date || Date.now());
                   const dateStr = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
                   return (
-                    <div key={idx} style={{ padding: '12px 14px', background: 'var(--bg-surface)', borderRadius: 8, border: '1px solid var(--border)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                        <span className={`badge ${isProject ? 'badge-blue' : 'badge-green'}`} style={{ display: 'flex', gap: 5, alignItems: 'center', fontSize: '0.68rem' }}>
-                          <Icon size={11} /> {inter.type}
+                    <div key={idx} style={{
+                      padding: '12px 14px',
+                      background: 'var(--bg-surface-subtle)',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--border)'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                        <span className={`badge ${isProject ? 'badge-blue' : 'badge-green'}`} style={{ display: 'inline-flex', gap: 4, alignItems: 'center', fontSize: '0.68rem' }}>
+                          <Icon size={10} /> {inter.type}
                         </span>
                         <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>{dateStr}</span>
                       </div>
-                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', lineHeight: 1.5 }}>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', lineHeight: 1.4 }}>
                         {formatInteractionSummary(inter)}
                       </div>
                     </div>
@@ -156,23 +236,35 @@ export default function ContactDetailPanel({ customer, getCustomerCar, onClose, 
             </div>
           </div>
 
-          {/* Related Leads */}
-          {leads.length > 0 && (
+          {/* Related Deals Card */}
+          {projects.length > 0 && (
             <div className="crm-section">
-              <div className="crm-section-title"><Users size={12} /> Related Leads ({leads.length})</div>
-              <div className="crm-related-list">
-                {leads.map((inter, i) => {
+              <div className="crm-section-title">
+                <Briefcase size={12} /> Associated Deals ({projects.length})
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {projects.map((inter, i) => {
                   const d = inter.details || {};
-                  const intent = (d.intent || '').toUpperCase().includes('SELL') ? 'Sell Side' : 'Buy Side';
-                  const veh = d.manufacturer || d.model ? `${d.manufacturer || ''} ${d.model || ''}`.trim() : d.vehicle_interest || d.subject || 'General Inquiry';
                   return (
-                    <div key={i} className="crm-related-item">
-                      <Users size={13} color="var(--text-muted)" style={{ flexShrink: 0 }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{veh}</div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{intent} · {timeAgo(inter.date)}</div>
+                    <div key={i} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
+                      background: 'var(--bg-surface-subtle)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                        <Car size={14} color="var(--text-muted)" style={{ flexShrink: 0 }} />
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {d.target_vehicle || d.vehicle || 'Vehicle TBD'}
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                            Stage: {d.current_stage || 'Intake'} · {timeAgo(inter.date)}
+                          </div>
+                        </div>
                       </div>
-                      <span className={`badge ${intent === 'Sell Side' ? 'badge-green' : 'badge-blue'}`} style={{ fontSize: '0.65rem' }}>{intent}</span>
+                      <span className={`badge ${d.status === 'COMPLETED' ? 'badge-green' : 'badge-blue'}`} style={{ fontSize: '0.65rem' }}>
+                        {d.status || 'Active'}
+                      </span>
                     </div>
                   );
                 })}
@@ -180,21 +272,37 @@ export default function ContactDetailPanel({ customer, getCustomerCar, onClose, 
             </div>
           )}
 
-          {/* Related Deals / Projects */}
-          {projects.length > 0 && (
+          {/* Related Leads Card */}
+          {leads.length > 0 && (
             <div className="crm-section">
-              <div className="crm-section-title"><Briefcase size={12} /> Related Deals ({projects.length})</div>
-              <div className="crm-related-list">
-                {projects.map((inter, i) => {
+              <div className="crm-section-title">
+                <Users size={12} /> Inbound Leads ({leads.length})
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {leads.map((inter, i) => {
                   const d = inter.details || {};
+                  const intent = (d.intent || '').toUpperCase().includes('SELL') ? 'Sell Side' : 'Buy Side';
+                  const veh = d.manufacturer || d.model ? `${d.manufacturer || ''} ${d.model || ''}`.trim() : d.vehicle_interest || d.subject || 'General Inquiry';
                   return (
-                    <div key={i} className="crm-related-item">
-                      <Car size={13} color="var(--text-muted)" style={{ flexShrink: 0 }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.target_vehicle || d.vehicle || 'Vehicle TBD'}</div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Stage: {d.current_stage || 'Intake'} · {timeAgo(inter.date)}</div>
+                    <div key={i} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
+                      background: 'var(--bg-surface-subtle)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                        <Users size={14} color="var(--text-muted)" style={{ flexShrink: 0 }} />
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {veh}
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                            {intent} · {timeAgo(inter.date)}
+                          </div>
+                        </div>
                       </div>
-                      <span className={`badge ${d.status === 'COMPLETED' ? 'badge-green' : 'badge-blue'}`} style={{ fontSize: '0.65rem' }}>{d.status || 'Active'}</span>
+                      <span className={`badge ${intent === 'Sell Side' ? 'badge-green' : 'badge-purple'}`} style={{ fontSize: '0.65rem' }}>
+                        {intent}
+                      </span>
                     </div>
                   );
                 })}
@@ -204,21 +312,27 @@ export default function ContactDetailPanel({ customer, getCustomerCar, onClose, 
 
         </div>
 
-        {/* ── Footer buttons ── */}
-        <div style={{ padding: '14px 18px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#FFFFFF', flexShrink: 0 }}>
+        {/* ── Fixed Footer Action Bar ── */}
+        <div className="crm-detail-footer" style={{ justifyContent: 'space-between' }}>
           <button
             className="btn btn-secondary btn-sm"
             onClick={onDelete}
-            style={{ color: '#ef4444', borderColor: '#fca5a5', gap: 6 }}
+            style={{ color: 'var(--status-red-text)', borderColor: 'var(--status-red-border)', gap: 6 }}
           >
             <Trash2 size={13} /> Delete
           </button>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-secondary btn-sm" onClick={() => onEdit && onEdit(customer)}>Edit</button>
-            <button className="btn btn-secondary btn-sm" onClick={onClose}>Close</button>
+            {onEdit && (
+              <button className="btn btn-secondary btn-sm" onClick={() => onEdit(customer)}>
+                Edit
+              </button>
+            )}
+            <button className="btn btn-secondary btn-sm" onClick={onClose}>
+              Close
+            </button>
             {onLaunchProject && (
               <button className="btn btn-primary btn-sm" onClick={onLaunchProject} style={{ gap: 6 }}>
-                <Briefcase size={13} /> Launch Project / Deal
+                <Briefcase size={13} /> Launch Deal
               </button>
             )}
           </div>

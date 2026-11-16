@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Plus, Search, RefreshCw, RotateCcw, Trash2,
-  ChevronLeft, ChevronRight, ArrowRight, Filter, ArrowDownUp, Columns, MoreHorizontal, Check, ChevronDown, Sparkles
+  ChevronLeft, ChevronRight, ArrowRight, Filter, ArrowDownUp,
+  MoreHorizontal, Check, ChevronDown, Sparkles,
+  AlertCircle, Clock, CheckCircle, MessageCircle, Mail, Pencil
 } from 'lucide-react';
 import { api } from '../api/api';
 import LeadModal from '../components/LeadModal';
@@ -145,7 +147,8 @@ export default function Leads() {
   const [statusFilter, setStatusFilter] = useState('');
   const [intentFilter, setIntentFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
-  const [sortOrder, setSortOrder] = useState('newest');
+  const [labelFilter, setLabelFilter] = useState('');
+  const [sortOrder, setSortOrder] = useState('label');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLead, setEditingLead] = useState(null);
@@ -271,7 +274,13 @@ export default function Leads() {
     const lSource = (l.channel || 'MANUAL').toUpperCase();
     if (sourceFilter && lSource !== sourceFilter) return false;
 
-    // 4. Search Query
+    // 4. Label Filter (Hot / Warm / Cold)
+    if (labelFilter) {
+      const lLabel = (l.label || '').toLowerCase();
+      if (lLabel !== labelFilter.toLowerCase()) return false;
+    }
+
+    // 5. Search Query
     const query = search.toLowerCase();
     if (query) {
       const name = (l.name || '').toLowerCase();
@@ -283,14 +292,21 @@ export default function Leads() {
     return true;
   });
 
-  // Sorting
+  // Sorting — Hot first by default, then by date
+  const LABEL_ORDER = { hot: 0, warm: 1, cold: 2, '': 3 };
   filtered.sort((a, b) => {
+    if (sortOrder === 'label') {
+      const lA = LABEL_ORDER[(a.label || '').toLowerCase()] ?? 3;
+      const lB = LABEL_ORDER[(b.label || '').toLowerCase()] ?? 3;
+      if (lA !== lB) return lA - lB;
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    }
     const tA = new Date(a.created_at || 0).getTime();
     const tB = new Date(b.created_at || 0).getTime();
     return sortOrder === 'newest' ? tB - tA : tA - tB;
   });
 
-  useEffect(() => { setCurrentPage(1); setCheckedLeadIds(new Set()); }, [search, statusFilter, intentFilter, sourceFilter]);
+  useEffect(() => { setCurrentPage(1); setCheckedLeadIds(new Set()); }, [search, statusFilter, intentFilter, sourceFilter, labelFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -375,6 +391,7 @@ export default function Leads() {
               </button>
 
               <DropdownMenu icon={ArrowDownUp} label="Sort" align="right">
+                <DropdownItem active={sortOrder === 'label'} onClick={() => setSortOrder('label')}>🔥 Hot First</DropdownItem>
                 <DropdownItem active={sortOrder === 'newest'} onClick={() => setSortOrder('newest')}>Newest First</DropdownItem>
                 <DropdownItem active={sortOrder === 'oldest'} onClick={() => setSortOrder('oldest')}>Oldest First</DropdownItem>
               </DropdownMenu>
@@ -420,7 +437,8 @@ export default function Leads() {
                   onChange={setSourceFilter}
                   options={[
                     { value: '', label: 'All Sources' },
-                    { value: 'STRATO_EMAIL', label: 'Strato' },
+                    { value: 'WHATSAPP', label: 'WhatsApp' },
+                    { value: 'STRATO_EMAIL', label: 'Email' },
                     { value: 'MANUAL', label: 'Manual' },
                     { value: 'TELEGRAM', label: 'Telegram' },
                     { value: 'DIRECT_CALL', label: 'Direct Call' }
@@ -428,8 +446,23 @@ export default function Leads() {
                 />
               </div>
 
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Label</label>
+                <CustomSelect
+                  style={{ minWidth: 160 }}
+                  value={labelFilter}
+                  onChange={setLabelFilter}
+                  options={[
+                    { value: '', label: 'All Labels' },
+                    { value: 'Hot', label: '🔥 Hot' },
+                    { value: 'Warm', label: '🟡 Warm' },
+                    { value: 'Cold', label: '❄️ Cold' },
+                  ]}
+                />
+              </div>
+
               <div style={{ display: 'flex', alignItems: 'flex-end', marginLeft: 'auto' }}>
-                <button className="btn btn-secondary btn-sm" onClick={() => { setStatusFilter(''); setIntentFilter(''); setSourceFilter(''); }}>
+                <button className="btn btn-secondary btn-sm" onClick={() => { setStatusFilter(''); setIntentFilter(''); setSourceFilter(''); setLabelFilter(''); }}>
                   Clear Filters
                 </button>
               </div>
@@ -461,6 +494,7 @@ export default function Leads() {
                     <th style={{ width: 36, padding: '10px 12px' }}></th>
                     <th style={{ minWidth: 200 }}>Lead / Client</th>
                     <th className="hide-on-mobile" style={{ width: 120 }}>Intent</th>
+                    <th className="hide-on-mobile" style={{ width: 110 }}>Label</th>
                     <th>Vehicle / Inquiry</th>
                     <th className="hide-on-mobile" style={{ width: 130 }}>Source</th>
                     <th className="hide-on-mobile" style={{ width: 120 }}>Received</th>
@@ -474,6 +508,59 @@ export default function Leads() {
                     const vehicle = getLeadVehicleDisplay(lead);
                     const selected = selectedLead?.id === lead.id;
                     const isChecked = checkedLeadIds.has(lead.id);
+
+                    // Label badge helper — lucide icons, no emojis
+                    const labelKey = (lead.label || '').toLowerCase();
+                    const labelBadge = labelKey === 'hot'
+                      ? (
+                        <span className="badge badge-red" title={lead.label_reason || 'Hot lead'}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 600 }}>
+                          <AlertCircle size={9} /> Hot
+                        </span>
+                      )
+                      : labelKey === 'warm'
+                        ? (
+                          <span className="badge badge-amber" title={lead.label_reason || 'Warm lead'}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 600 }}>
+                            <Clock size={9} /> Warm
+                          </span>
+                        )
+                        : labelKey === 'cold'
+                          ? (
+                            <span className="badge badge-gray" title={lead.label_reason || 'Cold lead'}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                              <CheckCircle size={9} /> Cold
+                            </span>
+                          )
+                          : null;
+
+                    // Source badge helper — lucide icons
+                    const srcRaw = (lead.source || lead.channel || 'MANUAL').toUpperCase();
+                    const sourceBadge = srcRaw.includes('WHATSAPP')
+                      ? (
+                        <span className="badge badge-green" title="WhatsApp"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <img src="/assets/whatsapp.png" alt="WhatsApp" style={{ width: 11, height: 11, objectFit: 'contain' }} />
+                          WhatsApp
+                        </span>
+                      )
+                      : srcRaw.includes('EMAIL') || srcRaw.includes('STRATO')
+                        ? (
+                          <span className="badge badge-blue" style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                            <Mail size={9} /> Email
+                          </span>
+                        )
+                        : srcRaw === 'TELEGRAM'
+                          ? (
+                            <span className="badge badge-purple" style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                              <MessageCircle size={9} /> Telegram
+                            </span>
+                          )
+                          : (
+                            <span className="badge badge-gray" style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                              <Pencil size={9} /> {lead.source || lead.channel || 'Manual'}
+                            </span>
+                          );
 
                     return (
                       <tr
@@ -535,6 +622,11 @@ export default function Leads() {
                           )}
                         </td>
 
+                        {/* Label (Hot / Warm / Cold) */}
+                        <td className="hide-on-mobile">
+                          {labelBadge || <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>—</span>}
+                        </td>
+
                         {/* Vehicle */}
                         <td>
                           <div style={{ fontSize: '0.82rem', color: 'var(--text-primary)', fontWeight: 500 }}>
@@ -551,8 +643,8 @@ export default function Leads() {
                         </td>
 
                         {/* Source */}
-                        <td className="hide-on-mobile" style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                          {lead.channel || 'Manual'}
+                        <td className="hide-on-mobile">
+                          {sourceBadge}
                         </td>
 
                         {/* Time */}
