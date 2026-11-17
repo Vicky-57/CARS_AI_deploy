@@ -101,7 +101,17 @@ async def handle_twilio_payload(form: Dict) -> None:
         logger.exception("Error handling Twilio WhatsApp message")
 
 
-_OWNER_CMDS = {"help", "/help", "leads", "anfragen", "deals", "projekte", "projects", "summary", "zusammenfassung", "status", "reset", "/reset", "customer", "kunde", "find"}
+_OWNER_CMDS = {
+    "help", "/help", "hilfe", "?",
+    "leads", "anfragen", "/leads",
+    "deals", "projekte", "projects", "/deals",
+    "summary", "zusammenfassung", "status", "/summary",
+    "reset", "/reset",
+    "customer", "kunde", "find", "/customer",
+    "convert", "/convert",
+    "stage", "/stage",
+    "1", "2", "3",
+}
 
 
 def _is_owner_command(text: Optional[str]) -> bool:
@@ -187,15 +197,27 @@ def _missing_basics(specs: Dict) -> List[str]:
 # ─── Founder side ─────────────────────────────────────────────────────────
 
 HELP_TEXT = (
-    "CAR-AGENTS assistant - commands:\n"
-    "• leads - latest leads with quality label\n"
-    "• deals - active deals and stages\n"
-    "• summary - quick overview\n"
-    "• customer <name> - find a customer/lead/deal\n"
-    "• reset - restart customer qualification test\n"
-    "• Send a photo or PDF of a vehicle document - I read it for you\n"
-    "• help - this list"
+    "🚗 *CAR-AGENTS Assistant — Founder Cockpit*\n\n"
+    "📊 *CRM Quick Views:*\n"
+    "• `summary` — KPI snapshot & active deals\n"
+    "• `leads` — Latest 10 leads with quality tags\n"
+    "• `deals` — Active deals and Kanban stages\n"
+    "• `customer <name>` — Find customer, lead, or deal\n\n"
+    "⚡ *CRM Actions (POST/Update):*\n"
+    "• `convert <lead>` — Convert lead into active deal\n"
+    "• `stage <client> <stage>` — Update deal stage\n"
+    "   _(Stages: Intake, Sourcing, Negotiation, Marketing, Completed)_\n\n"
+    "📄 *Vehicle Document OCR:*\n"
+    "• Send a photo or PDF of a Fahrzeugschein to extract specs\n\n"
+    "🔄 *Testing:*\n"
+    "• `reset` — Restart customer qualification test"
 )
+
+OWNER_BUTTONS = [
+    ("summary", "📊 Summary"),
+    ("leads", "👥 Leads"),
+    ("deals", "🚗 Deals"),
+]
 
 
 def _lead_label(lead: Dict) -> str:
@@ -233,7 +255,7 @@ def format_summary(leads: List[Dict], projects: List[Dict]) -> str:
     for p in projects:
         stages[p.get("current_stage") or "n/a"] = stages.get(p.get("current_stage") or "n/a", 0) + 1
     stage_txt = "\n".join(f"   • {k}: {v}" for k, v in stages.items()) or "   none"
-    return (f"Summary:\n• New leads: {new_leads}\n• Hot leads: {hot}\n• Active deals: {len(projects)}\n{stage_txt}")
+    return (f"📊 *Summary:*\n• New leads: {new_leads}\n• Hot leads: {hot}\n• Active deals: {len(projects)}\n{stage_txt}")
 
 
 async def _owner_text(inp: Dict) -> Optional[str]:
@@ -256,38 +278,101 @@ async def handle_owner(phone: str, inp: Dict) -> None:
     if inp["type"] in ("image", "document"):
         specs = await _specs_from_media(inp)
         if not specs:
-            await send_message(phone, "I could not read that document. Please send a clear photo or PDF.")
+            await send_message(phone, "I could not read that document. Please send a clear photo or PDF.", buttons=OWNER_BUTTONS)
             return
         miss = _missing_basics(specs)
-        await send_message(phone, f"📄 {_specs_line(specs)}" + (f"\nMissing: {', '.join(miss)}" if miss else "\nAll key fields found ✅"))
+        reply = f"📄 {_specs_line(specs)}" + (f"\nMissing: {', '.join(miss)}" if miss else "\nAll key fields found ✅")
+        await send_message(phone, reply, buttons=OWNER_BUTTONS)
         return
 
+    btn_id = (inp.get("reply_id") or "").lower().strip()
     text = (await _owner_text(inp) or "").strip()
     low = text.lower()
-    cmd, _, arg = low.partition(" ")
 
-    if cmd in ("reset", "/reset"):
+    if btn_id:
+        cmd, arg = btn_id, ""
+    elif low in ("1", "summary", "📊 summary", "/summary", "zusammenfassung", "status"):
+        cmd, arg = "summary", ""
+    elif low in ("2", "leads", "👥 leads", "/leads", "anfragen"):
+        cmd, arg = "leads", ""
+    elif low in ("3", "deals", "🚗 deals", "/deals", "projekte", "projects"):
+        cmd, arg = "deals", ""
+    elif low in ("reset", "/reset", "🔄 reset"):
+        cmd, arg = "reset", ""
+    elif low in ("help", "/help", "hilfe", "?"):
+        cmd, arg = "help", ""
+    else:
+        cmd, _, arg = low.partition(" ")
+        arg = arg.strip()
+
+    buttons = OWNER_BUTTONS
+
+    if cmd == "reset":
         store.delete_session(phone)
-        reply = "🔄 Session reset! Send a customer message (e.g. 'Hallo, ich möchte ein Auto kaufen') to test lead qualification, or 'help' for founder commands."
-    elif cmd in ("leads", "anfragen"):
+        reply = "🔄 Session reset! Send a customer message (e.g. 'Hallo, ich möchte ein Auto kaufen') to test lead qualification, or choose a founder command:"
+        buttons = OWNER_BUTTONS
+    elif cmd == "leads":
         reply = format_leads(store.list_leads(10))
-    elif cmd in ("deals", "projekte", "projects"):
+        buttons = [("summary", "📊 Summary"), ("deals", "🚗 Deals"), ("reset", "🔄 Reset")]
+    elif cmd == "deals":
         reply = format_deals(store.list_active_projects())
-    elif cmd in ("summary", "zusammenfassung", "status"):
+        buttons = [("summary", "📊 Summary"), ("leads", "👥 Leads"), ("reset", "🔄 Reset")]
+    elif cmd == "summary":
         reply = format_summary(store.list_leads(200), store.list_active_projects(100))
-    elif cmd in ("customer", "kunde", "find") and arg.strip():
-        found = store.search_leads_and_projects(arg.strip())
+        buttons = [("leads", "👥 Leads"), ("deals", "🚗 Deals"), ("reset", "🔄 Reset")]
+    elif cmd in ("customer", "kunde", "find") and arg:
+        found = store.search_leads_and_projects(arg)
         reply = "\n\n".join(x for x in (
             format_leads(found["leads"]) if found["leads"] else "",
-            format_deals(found["projects"]) if found["projects"] else "") if x) or f"Nothing found for '{arg.strip()}'."
+            format_deals(found["projects"]) if found["projects"] else "") if x) or f"Nothing found for '{arg}'."
+        buttons = OWNER_BUTTONS
+    elif cmd in ("convert", "/convert") and arg:
+        proj = store.convert_lead_to_project(arg)
+        if proj:
+            reply = (
+                f"✅ *Lead Converted to Active Deal!*\n\n"
+                f"👤 Client: {proj.get('client_name')}\n"
+                f"🚗 Vehicle: {proj.get('target_vehicle') or 'TBD'}\n"
+                f"📌 Type: {proj.get('project_type')}\n"
+                f"🔄 Stage: {proj.get('current_stage')}\n\n"
+                f"View in portal: https://car-agents-omega.vercel.app/deals"
+            )
+        else:
+            reply = f"❌ No matching lead found for '{arg}'. Use `leads` to view available leads."
+        buttons = [("deals", "🚗 View Deals"), ("leads", "👥 Leads"), ("summary", "📊 Summary")]
+    elif cmd in ("stage", "/stage") and arg:
+        parts = arg.split(maxsplit=1)
+        client_name = parts[0]
+        stage_name = parts[1] if len(parts) > 1 else ""
+        if not stage_name:
+            reply = (
+                "Usage: `stage <client_name> <new_stage>`\n"
+                "Example: `stage Carlos Negotiation`\n"
+                "Valid stages: Intake, Sourcing, Negotiation, Marketing, Completed"
+            )
+        else:
+            updated = store.update_project_stage(client_name, stage_name)
+            if updated:
+                proj, stg = updated
+                reply = (
+                    f"✅ *Stage Updated!*\n\n"
+                    f"👤 Client: {proj.get('client_name')}\n"
+                    f"🚗 Vehicle: {proj.get('target_vehicle') or 'TBD'}\n"
+                    f"🔄 New Stage: *{stg}*"
+                )
+            else:
+                reply = f"❌ Could not update stage. Check client name ('{client_name}') or stage ('{stage_name}')."
+        buttons = [("deals", "🚗 View Deals"), ("summary", "📊 Summary"), ("leads", "👥 Leads")]
     else:
         reply = HELP_TEXT
-    await send_message(phone, reply)
+        buttons = OWNER_BUTTONS
+
+    await send_message(phone, reply, buttons=buttons)
 
 
 async def notify_owner(text: str) -> None:
     for p in owner_phones():
-        await send_whatsapp_message(p, text)
+        await send_message(p, text, buttons=[("leads", "👥 Leads"), ("deals", "🚗 Deals"), ("summary", "📊 Summary")])
 
 
 # ─── Customer side ────────────────────────────────────────────────────────

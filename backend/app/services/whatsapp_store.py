@@ -12,7 +12,7 @@ fallback so the flow can be tested without a database.
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger("whatsapp_store")
 
@@ -152,7 +152,16 @@ def search_leads_and_projects(term: str, limit: int = 5) -> Dict[str, List[Dict]
     return {"leads": leads, "projects": projects}
 
 
-# ─── Projects (read only, for founder commands) ───────────────────────────
+# ─── Projects (Founder CRM Actions) ───────────────────────────────────────
+
+VALID_STAGES = [
+    "Intake & Onboarding",
+    "Sourcing & Inspection",
+    "Negotiation & Contract",
+    "Marketing & Listing",
+    "Completed & Delivered",
+]
+
 
 def list_active_projects(limit: int = 15) -> List[Dict]:
     if MEMORY:
@@ -161,6 +170,77 @@ def list_active_projects(limit: int = 15) -> List[Dict]:
         _sb().table("projects").select("*").eq("status", "ACTIVE")
         .order("created_at", desc=True).limit(limit).execute().data or []
     )
+
+
+def convert_lead_to_project(lead_query: str) -> Optional[Dict]:
+    """Convert an existing lead into an active CRM project/deal (POST mutation)."""
+    if MEMORY:
+        for lid, l in list(_mem_leads.items()):
+            if lead_query.lower() in (l.get("name") or "").lower():
+                proj = {
+                    "id": str(uuid.uuid4()),
+                    "client_name": l.get("name"),
+                    "client_phone": l.get("phone"),
+                    "project_type": "SELL" if "sell" in (l.get("intent") or "").lower() else "BUY",
+                    "target_vehicle": l.get("model") or "Vehicle TBD",
+                    "status": "ACTIVE",
+                    "current_stage": "Intake & Onboarding",
+                    "created_at": _now(),
+                }
+                _mem_projects.append(proj)
+                return proj
+        return None
+
+    sb = _sb()
+    leads_res = sb.table("leads").select("*").ilike("name", f"*{lead_query}*").limit(1).execute()
+    if not leads_res.data:
+        leads_res = sb.table("leads").select("*").ilike("phone", f"*{lead_query}*").limit(1).execute()
+    if not leads_res.data:
+        return None
+
+    lead = leads_res.data[0]
+    p_type = "SELL" if "sell" in (lead.get("intent") or "").lower() else "BUY"
+    veh = lead.get("vehicle_interest") or f"{lead.get('manufacturer') or ''} {lead.get('model') or ''}".strip() or "Vehicle TBD"
+    project_data = {
+        "client_name": lead.get("name") or "New Customer",
+        "client_phone": lead.get("phone"),
+        "client_email": lead.get("email"),
+        "project_type": p_type,
+        "target_vehicle": veh,
+        "status": "ACTIVE",
+        "current_stage": "Intake & Onboarding",
+        "notes": lead.get("notes") or f"Converted from WhatsApp lead {lead.get('id')}",
+    }
+    proj_res = sb.table("projects").insert(project_data).execute()
+    return proj_res.data[0] if proj_res.data else project_data
+
+
+def update_project_stage(client_query: str, target_stage_str: str) -> Optional[Tuple[Dict, str]]:
+    """Update active deal stage (PUT/PATCH mutation)."""
+    matched_stage = None
+    t_low = target_stage_str.lower()
+    for s in VALID_STAGES:
+        if t_low in s.lower():
+            matched_stage = s
+            break
+    if not matched_stage:
+        return None
+
+    if MEMORY:
+        for p in _mem_projects:
+            if client_query.lower() in (p.get("client_name") or "").lower():
+                p["current_stage"] = matched_stage
+                return p, matched_stage
+        return None
+
+    sb = _sb()
+    proj_res = sb.table("projects").select("*").ilike("client_name", f"*{client_query}*").eq("status", "ACTIVE").limit(1).execute()
+    if not proj_res.data:
+        return None
+    proj = proj_res.data[0]
+    sb.table("projects").update({"current_stage": matched_stage}).eq("id", proj["id"]).execute()
+    proj["current_stage"] = matched_stage
+    return proj, matched_stage
 
 
 # ─── Communications log ───────────────────────────────────────────────────
