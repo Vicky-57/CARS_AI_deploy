@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Car, CheckCircle, ChevronLeft, ChevronRight, Loader } from 'lucide-react';
 import { api } from '../api/api';
+import FormStepper from '../components/FormStepper';
 
 function Field({ label, de, type = 'text', required = false, placeholder = '', full = false, value, onChange, disabled = false }) {
   const id = (label + de).replace(/\s+/g, '-').toLowerCase();
@@ -185,11 +186,11 @@ export default function SellForm() {
   };
 
   const steps = [
-    { n: 1, label: 'Personal Details' },
-    { n: 2, label: 'Vehicle Specs' },
-    { n: 3, label: 'Condition' },
-    { n: 4, label: 'Price & Package' },
-    { n: 5, label: 'Handover' },
+    { n: 1, label: 'Personal Details', de: 'Persönliche Daten' },
+    { n: 2, label: 'Vehicle Specs', de: 'Fahrzeugdaten' },
+    { n: 3, label: 'Condition', de: 'Zustand & TÜV' },
+    { n: 4, label: 'Price & Package', de: 'Preis & Konditionen' },
+    { n: 5, label: 'Mandate', de: 'Bestätigung' },
   ];
 
   if (saved) {
@@ -207,7 +208,7 @@ export default function SellForm() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-canvas)', padding: '32px 16px', fontFamily: 'inherit' }}>
+    <div className="intake-page-wrapper">
       <div style={{ maxWidth: 780, margin: '0 auto' }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
@@ -227,35 +228,11 @@ export default function SellForm() {
         </div>
 
         {/* Step Progress Bar */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 24, background: 'var(--border)', padding: 3, borderRadius: 'var(--radius-sm)' }}>
-          {steps.map((s) => (
-            <button
-              key={s.n}
-              type="button"
-              onClick={() => setStep(s.n)}
-              style={{
-                flex: 1,
-                padding: '8px 4px',
-                borderRadius: 4,
-                border: 'none',
-                background: step === s.n ? 'var(--surface)' : 'transparent',
-                color: step === s.n ? 'var(--text-primary)' : 'var(--text-muted)',
-                boxShadow: step === s.n ? 'var(--shadow-xs)' : 'none',
-                fontWeight: step === s.n ? 700 : 500,
-                fontSize: '0.75rem',
-                cursor: 'pointer',
-                textAlign: 'center',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              Step {s.n}: {s.label}
-            </button>
-          ))}
-        </div>
+        <FormStepper steps={steps} currentStep={step} onStepChange={setStep} />
 
         {/* Card Form */}
-        <div className="card" style={{ padding: '24px 28px' }}>
-          <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px' }}>
+        <div className="card intake-form-card">
+          <form onSubmit={handleSubmit} className="intake-form-grid">
             {/* STEP 1: Personal */}
             {step === 1 && (
               <>

@@ -448,17 +448,17 @@ export default function Contracts() {
             <div className="modal-body" style={{ overflowY: 'auto', padding: '24px 28px' }}>
               {EDITABLE_FIELDS.map(group => (
                 <div key={group.group} style={{ marginBottom: 28 }}>
-                  <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0f172a', marginBottom: 16, borderBottom: '2px solid #fed7aa', paddingBottom: 8, display: 'inline-block' }}>
+                  <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0f172a', marginBottom: 16, borderBottom: '2px solid #171717', paddingBottom: 8, display: 'inline-block' }}>
                     {group.group}
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div className="contract-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                     {group.fields.map(f => (
                       <div className="form-group" key={f.key} style={f.key.includes('agreement') || f.key === 'notes' ? { gridColumn: '1 / -1' } : undefined}>
                         <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: 6 }}>{f.label}</label>
                         <input
                           className="form-input"
                           style={{ padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', color: '#0f172a', fontSize: '0.9rem', width: '100%', background: '#f8fafc', transition: 'all 0.2s', outline: 'none' }}
-                          onFocus={e => { e.target.style.borderColor = '#ea580c'; e.target.style.background = '#ffffff'; e.target.style.boxShadow = '0 0 0 3px rgba(234, 88, 12, 0.1)'; }}
+                          onFocus={e => { e.target.style.borderColor = '#171717'; e.target.style.background = '#ffffff'; e.target.style.boxShadow = '0 0 0 3px rgba(23, 23, 23, 0.08)'; }}
                           onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.background = '#f8fafc'; e.target.style.boxShadow = 'none'; }}
                           value={editor.fieldData[f.key] ?? ''}
                           onChange={e => setEditor(prev => ({ ...prev, fieldData: { ...prev.fieldData, [f.key]: e.target.value } }))}
@@ -471,7 +471,7 @@ export default function Contracts() {
             </div>
             <div className="modal-footer" style={{ background: '#f8fafc', borderTop: '1px solid #e2e8f0', padding: '20px 28px', display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
               <button className="btn" style={{ padding: '10px 20px', background: '#ffffff', color: '#475569', border: '1.5px solid #e2e8f0', borderRadius: 10, fontWeight: 700, fontSize: '0.85rem' }} onClick={() => setEditor(null)}>Cancel</button>
-              <button className="btn" onClick={handleSaveEditor} disabled={busy === 'save'} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 20px', background: 'linear-gradient(135deg, #f97316, #ea580c)', color: 'white', border: 'none', borderRadius: 10, fontWeight: 800, fontSize: '0.85rem', boxShadow: '0 4px 12px rgba(234, 88, 12, 0.25)' }}>
+              <button className="btn btn-primary" onClick={handleSaveEditor} disabled={busy === 'save'} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 20px', background: '#171717', color: '#ffffff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '0.85rem', boxShadow: '0 4px 14px rgba(0, 0, 0, 0.2)' }}>
                 {busy === 'save' ? <Loader size={16} className="spin" /> : <Save size={16} />} Save Template
               </button>
             </div>
@@ -513,21 +513,39 @@ export default function Contracts() {
 
       {/* Custom Alert/Success Popup */}
       {alertConfig.isOpen && (
-        <div className="modal-overlay" style={{ background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(6px)', zIndex: 1200 }}>
-          <div className="custom-alert-card" style={{
-            width: '90%',
-            maxWidth: 400,
-            borderRadius: 24,
-            background: 'var(--surface)',
-            border: '1px solid var(--border)',
-            boxShadow: 'var(--shadow-lg)',
-            textAlign: 'center',
-            padding: '32px 24px 24px',
+        <div
+          className="modal-overlay alert-modal-overlay"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.45)',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
+            zIndex: 1300,
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
-            animation: 'slideUp .2s ease'
-          }}>
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+        >
+          <div
+            className="custom-alert-card"
+            style={{
+              width: 'min(380px, 90vw)',
+              maxWidth: 380,
+              borderRadius: 24,
+              background: '#ffffff',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              textAlign: 'center',
+              padding: '32px 24px 24px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              margin: 'auto',
+              animation: 'modalScaleIn .2s ease-out'
+            }}
+          >
             {/* Icon */}
             <div style={{
               width: 60,
