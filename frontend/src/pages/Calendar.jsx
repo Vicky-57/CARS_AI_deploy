@@ -215,7 +215,7 @@ function EventPill({ m, onClick }) {
   const isGoogle = m.source === 'google';
   const isOutlook = m.source === 'outlook';
   const isOnsite = m.location_type === 'OFFLINE_ONSITE';
-  
+
   const bg = isGoogle || isOutlook ? '#f0fdf4' : isOnsite ? '#fffbeb' : '#f8fafc';
   const color = isGoogle || isOutlook ? '#166534' : isOnsite ? '#92400e' : '#18181b';
   const border = isGoogle || isOutlook ? '#bbf7d0' : isOnsite ? '#fde68a' : '#e5e7eb';
@@ -256,37 +256,37 @@ function WeekView({ meetings, weekStart, onEventClick, onDayClick }) {
   return (
     <div className="calendar-scroll-wrap">
       <div className="calendar-week-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8 }}>
-      {days.map(day => {
-        const dayMeetings = meetings.filter(m => {
-          try { return isSameDay(new Date(m.start_time), day); } catch { return false; }
-        }).sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
-        const isToday = isSameDay(day, today);
-        return (
-          <div
-            key={day.toISOString()}
-            onClick={() => onDayClick && onDayClick(day)}
-            style={{
-              borderRadius: 'var(--radius)',
-              border: isToday ? '1.5px solid var(--primary)' : '1px solid var(--border)',
-              background: isToday ? 'var(--surface-active)' : 'var(--surface)',
-              minHeight: 180,
-              padding: 10,
-              display: 'flex', flexDirection: 'column',
-              cursor: 'pointer',
-              transition: 'border-color 0.15s ease',
-            }}
-          >
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: isToday ? 'var(--primary)' : 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase' }}>
-              {format(day, 'EEE')}<br />
-              <span style={{ fontSize: '1.25rem', color: isToday ? 'var(--primary)' : 'var(--text-primary)', fontWeight: 800 }}>{format(day, 'd')}</span>
+        {days.map(day => {
+          const dayMeetings = meetings.filter(m => {
+            try { return isSameDay(new Date(m.start_time), day); } catch { return false; }
+          }).sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+          const isToday = isSameDay(day, today);
+          return (
+            <div
+              key={day.toISOString()}
+              onClick={() => onDayClick && onDayClick(day)}
+              style={{
+                borderRadius: 'var(--radius)',
+                border: isToday ? '1.5px solid var(--primary)' : '1px solid var(--border)',
+                background: isToday ? 'var(--surface-active)' : 'var(--surface)',
+                minHeight: 180,
+                padding: 10,
+                display: 'flex', flexDirection: 'column',
+                cursor: 'pointer',
+                transition: 'border-color 0.15s ease',
+              }}
+            >
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: isToday ? 'var(--primary)' : 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase' }}>
+                {format(day, 'EEE')}<br />
+                <span style={{ fontSize: '1.25rem', color: isToday ? 'var(--primary)' : 'var(--text-primary)', fontWeight: 800 }}>{format(day, 'd')}</span>
+              </div>
+              {dayMeetings.map(m => <EventPill key={m.id} m={m} onClick={onEventClick} />)}
+              {dayMeetings.length === 0 && (
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 'auto', textAlign: 'center', paddingBottom: 8 }}>—</div>
+              )}
             </div>
-            {dayMeetings.map(m => <EventPill key={m.id} m={m} onClick={onEventClick} />)}
-            {dayMeetings.length === 0 && (
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 'auto', textAlign: 'center', paddingBottom: 8 }}>—</div>
-            )}
-          </div>
-        );
-      })}
+          );
+        })}
       </div>
     </div>
   );
@@ -307,40 +307,40 @@ function MonthView({ meetings, currentMonth, onEventClick, onDayClick }) {
   return (
     <div className="calendar-scroll-wrap">
       <div className="calendar-month-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
-      {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(dow => (
-        <div key={dow} style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', textAlign: 'center', padding: '4px 0', textTransform: 'uppercase' }}>{dow}</div>
-      ))}
-      {days.map(day => {
-        const inMonth = day.getMonth() === currentMonth.getMonth();
-        const dayMeetings = meetings.filter(m => {
-          try { return isSameDay(new Date(m.start_time), day); } catch { return false; }
-        }).sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
-        const isToday = isSameDay(day, today);
-        return (
-          <div
-            key={day.toISOString()}
-            onClick={() => onDayClick && onDayClick(day)}
-            style={{
-              borderRadius: 'var(--radius-sm)',
-              border: `1px solid ${isToday ? 'var(--primary)' : 'var(--border)'}`,
-              background: isToday ? 'var(--surface-active)' : (inMonth ? 'var(--surface)' : 'var(--bg-canvas)'),
-              padding: '6px 6px',
-              minHeight: 88,
-              opacity: inMonth ? 1 : 0.45,
-              cursor: 'pointer',
-              transition: 'background 0.15s ease',
-            }}
-          >
-            <div style={{ fontSize: '0.75rem', fontWeight: isToday ? 800 : 600, color: isToday ? 'var(--primary)' : (inMonth ? 'var(--text-primary)' : 'var(--text-muted)'), marginBottom: 4, textAlign: 'center' }}>
-              {format(day, 'd')}
+        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(dow => (
+          <div key={dow} style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', textAlign: 'center', padding: '4px 0', textTransform: 'uppercase' }}>{dow}</div>
+        ))}
+        {days.map(day => {
+          const inMonth = day.getMonth() === currentMonth.getMonth();
+          const dayMeetings = meetings.filter(m => {
+            try { return isSameDay(new Date(m.start_time), day); } catch { return false; }
+          }).sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+          const isToday = isSameDay(day, today);
+          return (
+            <div
+              key={day.toISOString()}
+              onClick={() => onDayClick && onDayClick(day)}
+              style={{
+                borderRadius: 'var(--radius-sm)',
+                border: `1px solid ${isToday ? 'var(--primary)' : 'var(--border)'}`,
+                background: isToday ? 'var(--surface-active)' : (inMonth ? 'var(--surface)' : 'var(--bg-canvas)'),
+                padding: '6px 6px',
+                minHeight: 88,
+                opacity: inMonth ? 1 : 0.45,
+                cursor: 'pointer',
+                transition: 'background 0.15s ease',
+              }}
+            >
+              <div style={{ fontSize: '0.75rem', fontWeight: isToday ? 800 : 600, color: isToday ? 'var(--primary)' : (inMonth ? 'var(--text-primary)' : 'var(--text-muted)'), marginBottom: 4, textAlign: 'center' }}>
+                {format(day, 'd')}
+              </div>
+              {dayMeetings.slice(0, 3).map(m => <EventPill key={m.id} m={m} onClick={onEventClick} />)}
+              {dayMeetings.length > 3 && (
+                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600, textAlign: 'center' }}>+{dayMeetings.length - 3} more</div>
+              )}
             </div>
-            {dayMeetings.slice(0, 3).map(m => <EventPill key={m.id} m={m} onClick={onEventClick} />)}
-            {dayMeetings.length > 3 && (
-              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600, textAlign: 'center' }}>+{dayMeetings.length - 3} more</div>
-            )}
-          </div>
-        );
-      })}
+          );
+        })}
       </div>
     </div>
   );
@@ -371,46 +371,46 @@ function DayPanel({ day, meetings, onEdit, onDelete, onClose }) {
               <Calendar size={32} style={{ opacity: 0.3, marginBottom: 12 }} /><br />
               No meetings scheduled for this day
             </div>
-        ) : dayMeetings.map(m => {
-          const isGoogle = m.source === 'google';
-          const isOutlook = m.source === 'outlook';
-          const isOnsite = m.location_type === 'OFFLINE_ONSITE';
-          return (
-            <div key={m.id} style={{
-              background: 'var(--bg-canvas)',
-              borderRadius: 'var(--radius)',
-              border: '1px solid var(--border)',
-              padding: '14px', 
-              marginBottom: 12,
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-                <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-primary)' }}>
-                  {m.title}
-                </div>
-                {!isGoogle && !isOutlook && (
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <button className="btn-icon" onClick={() => onEdit(m)} title="Edit" style={{ padding: 4 }}><Pencil size={13} color="var(--text-muted)" /></button>
-                    <button className="btn-icon" onClick={() => onDelete(m.id)} title="Delete" style={{ padding: 4 }}><Trash2 size={13} color="var(--danger)" /></button>
+          ) : dayMeetings.map(m => {
+            const isGoogle = m.source === 'google';
+            const isOutlook = m.source === 'outlook';
+            const isOnsite = m.location_type === 'OFFLINE_ONSITE';
+            return (
+              <div key={m.id} style={{
+                background: 'var(--bg-canvas)',
+                borderRadius: 'var(--radius)',
+                border: '1px solid var(--border)',
+                padding: '14px',
+                marginBottom: 12,
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-primary)' }}>
+                    {m.title}
                   </div>
-                )}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Clock size={13} /> {format(new Date(m.start_time), 'HH:mm')} – {format(new Date(m.end_time), 'HH:mm')}
+                  {!isGoogle && !isOutlook && (
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button className="btn-icon" onClick={() => onEdit(m)} title="Edit" style={{ padding: 4 }}><Pencil size={13} color="var(--text-muted)" /></button>
+                      <button className="btn-icon" onClick={() => onDelete(m.id)} title="Delete" style={{ padding: 4 }}><Trash2 size={13} color="var(--danger)" /></button>
+                    </div>
+                  )}
                 </div>
-                {m.client_name && <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}><User size={13} color="var(--text-muted)" /> {m.client_name}</div>}
-                {m.location_address && <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}><MapPin size={13} color="var(--text-muted)" /> {m.location_address}</div>}
-                {m.notes && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2, fontStyle: 'italic' }}>{m.notes}</div>}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Clock size={13} /> {format(new Date(m.start_time), 'HH:mm')} – {format(new Date(m.end_time), 'HH:mm')}
+                  </div>
+                  {m.client_name && <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}><User size={13} color="var(--text-muted)" /> {m.client_name}</div>}
+                  {m.location_address && <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}><MapPin size={13} color="var(--text-muted)" /> {m.location_address}</div>}
+                  {m.notes && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2, fontStyle: 'italic' }}>{m.notes}</div>}
+                </div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 10, display: 'flex', alignItems: 'center', gap: 4, fontWeight: 500 }}>
+                  {isOnsite ? <MapPin size={11} /> : (isGoogle || isOutlook) ? <Calendar size={11} /> : <Video size={11} />}
+                  {isOnsite ? 'Onsite' : isGoogle ? 'Google Calendar' : isOutlook ? 'Outlook Calendar' : 'Online Portal'}
+                </div>
               </div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 10, display: 'flex', alignItems: 'center', gap: 4, fontWeight: 500 }}>
-                {isOnsite ? <MapPin size={11} /> : (isGoogle || isOutlook) ? <Calendar size={11} /> : <Video size={11} />}
-                {isOnsite ? 'Onsite' : isGoogle ? 'Google Calendar' : isOutlook ? 'Outlook Calendar' : 'Online Portal'}
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
-    </div>
     </>
   );
 }
@@ -635,7 +635,7 @@ export default function CalendarPage() {
                     display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
                     cursor: 'pointer',
                   }}
-                  onClick={() => handleEventClick(m)}
+                    onClick={() => handleEventClick(m)}
                   >
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>

@@ -4,10 +4,25 @@ import {
   Users, FolderKanban, Calendar,
   ArrowUpRight, TrendingUp, FileText,
   CheckCircle, ChevronRight, Plus, ExternalLink,
-  Tag, Wifi, WifiOff, Clock, AlertCircle, MessageCircle, Inbox
+  Tag, WifiOff, Clock, AlertCircle, MessageCircle, Inbox
 } from 'lucide-react';
 import { api } from '../api/api';
 import { format, formatDistanceToNow } from 'date-fns';
+
+const greeting = () => {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+};
+
+const intentKind = (intent) => {
+  if (intent === 'BUY_INTENT' || intent === 'BUY') return 'buy';
+  if (intent === 'SELL_INTENT' || intent === 'SELL') return 'sell';
+  return 'new';
+};
+
+const INTENT_LABEL = { buy: 'Buy intent', sell: 'Sell intent', new: 'New lead' };
 
 export default function Dashboard() {
   const [summary, setSummary] = useState(null);
@@ -37,50 +52,40 @@ export default function Dashboard() {
     fetchAll();
   }, []);
 
+  const sellDeals = summary?.active_sell_deals || 0;
+  const buyDeals = summary?.active_buy_deals || 0;
+  const totalDeals = sellDeals + buyDeals;
+  const newLeads = summary?.new_leads_24h;
+
   const stats = [
     {
-      label: 'New Inquiries (24h)',
-      value: summary?.new_leads_24h ?? '—',
+      label: 'New inquiries (24h)',
+      value: newLeads ?? '—',
       icon: Users,
+      tone: 'blue',
       trend: '+12%',
       trendUp: true,
-      sub: 'vs last week'
+      sub: 'vs last week',
     },
     {
-      label: 'Active SELL Deals',
+      label: 'Active SELL deals',
       value: summary?.active_sell_deals ?? '—',
       icon: Tag,
+      tone: 'green',
       trend: '+4.5%',
       trendUp: true,
-      sub: 'Vermittlung B2C'
+      sub: 'Vermittlung B2C',
     },
     {
-      label: 'Active BUY Deals',
+      label: 'Active BUY deals',
       value: summary?.active_buy_deals ?? '—',
       icon: FolderKanban,
+      tone: 'violet',
       trend: 'Steady',
       trendUp: false,
-      sub: 'Beschaffung Passiv'
-    },
-    {
-      label: 'Total Active Projects',
-      value: summary ? ((summary.active_sell_deals || 0) + (summary.active_buy_deals || 0)) : '—',
-      icon: TrendingUp,
-      trend: '+8.4%',
-      trendUp: true,
-      sub: 'Active portfolio'
+      sub: 'Beschaffung Passiv',
     },
   ];
-
-  const intentBadge = (intent) => {
-    if (intent === 'BUY_INTENT' || intent === 'BUY') {
-      return <span className="badge badge-purple">Buy Intent</span>;
-    }
-    if (intent === 'SELL_INTENT' || intent === 'SELL') {
-      return <span className="badge badge-emerald">Sell Intent</span>;
-    }
-    return <span className="badge badge-blue">New Lead</span>;
-  };
 
   const formatTime = (iso) => {
     try { return format(new Date(iso), 'HH:mm'); } catch { return '—'; }
@@ -95,184 +100,199 @@ export default function Dashboard() {
     return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
   };
 
-  return (
-    <div style={{ maxWidth: 1280, margin: '0 auto' }}>
-      {/* Frappe Workspace Header */}
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Executive Workspace</h1>
-          <p className="page-subtitle">Real-time status overview of CAR-AGENTS brokerage operations.</p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', background: 'var(--bg-surface)', padding: '6px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
-            {format(new Date(), 'EEEE, dd. MMMM yyyy')}
-          </div>
-          <NavLink to="/leads" className="btn btn-primary">
-            <Plus size={14} /> New Lead
-          </NavLink>
-        </div>
-      </div>
+  const waConnected = waStatus?.connected === true;
+  const waDown = waStatus?.connected === false;
+  const hotNoReply = waStatus?.hot_no_reply || 0;
 
-      {/* Frappe Number Cards (Stats Grid) */}
-      <div className="stats-grid">
-        {stats.map(({ label, value, icon: Icon, trend, trendUp, sub }) => (
-          <div key={label} className="stat-card">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span className="stat-label">{label}</span>
-              <div style={{ width: 28, height: 28, borderRadius: 'var(--radius-xs)', background: 'var(--bg-surface-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Icon size={14} color="var(--text-secondary)" />
+  return (
+    <div className="dash">
+      {/* ── Hero ───────────────────────────────────────────────────────────── */}
+      <section className="dash-hero">
+        <div className="dash-hero-copy">
+          <div>
+            <div className="dash-hero-date">
+              <Calendar size={13} />
+              {format(new Date(), 'EEEE, dd. MMMM yyyy')}
+            </div>
+            <h1 className="dash-hero-title">{greeting()}.<br />Here’s your brokerage today.</h1>
+            <p className="dash-hero-sub">
+              {loading ? (
+                'Loading the latest numbers…'
+              ) : newLeads != null ? (
+                <>
+                  <strong>{newLeads} new {newLeads === 1 ? 'inquiry' : 'inquiries'}</strong> in the last 24 hours
+                  {meetings.length > 0 && <> and <strong>{meetings.length} {meetings.length === 1 ? 'appointment' : 'appointments'}</strong> on the calendar</>}.
+                </>
+              ) : (
+                'Real-time status overview of CAR-AGENTS brokerage operations.'
+              )}
+            </p>
+          </div>
+          <div className="dash-hero-actions">
+            <NavLink to="/leads" className="dash-btn dash-btn-primary">
+              <Plus size={15} /> New lead
+            </NavLink>
+            <NavLink to="/projects" className="dash-btn dash-btn-secondary">
+              Open pipeline <ChevronRight size={14} />
+            </NavLink>
+          </div>
+        </div>
+
+        <div className="dash-pipeline">
+          <div className="dash-pipeline-label">Total active projects</div>
+          <div className="dash-pipeline-total">
+            {loading ? <span className="dash-skel" style={{ width: '2ch' }} /> : (summary ? totalDeals : '—')}
+          </div>
+
+          <div className="dash-split" role="img" aria-label={`${sellDeals} sell deals, ${buyDeals} buy deals`}>
+            {totalDeals > 0 ? (
+              <>
+                {sellDeals > 0 && <div className="dash-split-seg sell" style={{ flexGrow: sellDeals }} />}
+                {buyDeals > 0 && <div className="dash-split-seg buy" style={{ flexGrow: buyDeals }} />}
+              </>
+            ) : (
+              <div className="dash-split-seg empty" />
+            )}
+          </div>
+
+          <div className="dash-split-legend">
+            <div className="dash-legend-item">
+              <b><span className="dash-dot sell" />{summary ? sellDeals : '—'}</b>
+              SELL · Vermittlung
+            </div>
+            <div className="dash-legend-item">
+              <b><span className="dash-dot buy" />{summary ? buyDeals : '—'}</b>
+              BUY · Beschaffung
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Stat cards ─────────────────────────────────────────────────────── */}
+      <div className="dash-stats">
+        {stats.map(({ label, value, icon: Icon, tone, trend, trendUp, sub }) => (
+          <div key={label} className="dash-card dash-stat">
+            <div className={`dash-stat-icon ${tone}`}>
+              <Icon size={20} />
+            </div>
+            <div className="dash-stat-body">
+              <div className="dash-stat-label">{label}</div>
+              <div className="dash-stat-value">
+                {loading ? <span className="dash-skel" style={{ width: '2.5ch' }} /> : value}
               </div>
-            </div>
-            <div className="stat-value" style={{ marginTop: 8 }}>
-              {loading ? <span style={{ fontSize: '1.1rem', color: 'var(--text-muted)' }}>Loading...</span> : value}
-            </div>
-            <div className="stat-trend" style={{ color: trendUp ? 'var(--status-green-text)' : 'var(--text-secondary)' }}>
-              {trendUp && <ArrowUpRight size={12} />}
-              <span style={{ fontWeight: 600 }}>{trend}</span>
-              <span style={{ color: 'var(--text-muted)', marginLeft: 4 }}>{sub}</span>
+              <div className="dash-stat-meta">
+                <span className={`dash-trend ${trendUp ? 'up' : ''}`}>
+                  {trendUp && <ArrowUpRight size={11} />}
+                  {trend}
+                </span>
+                {sub}
+              </div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* WhatsApp Status Bar */}
-      <div className="wa-status-bar">
-        {/* Brand + connection status */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', borderRight: '1px solid var(--border)', minWidth: 210 }}>
-          <div style={{
-            width: 34, height: 34, borderRadius: 'var(--radius-sm)',
-            background: 'var(--bg-surface-subtle)', border: '1px solid var(--border)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-          }}>
-            <img src="/assets/whatsapp.png" alt="WhatsApp" style={{ width: 20, height: 20, objectFit: 'contain' }} />
+      {/* ── WhatsApp channel strip ─────────────────────────────────────────── */}
+      <div className="dash-card dash-channel">
+        <div className="dash-channel-brand">
+          <div className="dash-channel-logo">
+            <img src="/assets/whatsapp.png" alt="WhatsApp" />
           </div>
           <div>
-            <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)', lineHeight: 1.2 }}>
-              WhatsApp Channel
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 }}>
-              {waStatus?.connected === false ? (
-                <>
-                  <WifiOff size={11} color="var(--status-red-text)" />
-                  <span style={{ fontSize: '0.72rem', color: 'var(--status-red-text)', fontWeight: 500 }}>Not connected</span>
-                </>
-              ) : waStatus?.connected ? (
-                <>
-                  <div className="wa-status-dot" style={{ background: 'var(--status-green-text)' }} />
-                  <span style={{ fontSize: '0.72rem', color: 'var(--status-green-text)', fontWeight: 500 }}>Connected</span>
-                </>
-              ) : (
-                <>
-                  <Clock size={11} color="var(--text-muted)" />
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500 }}>Pending Meta approval</span>
-                </>
-              )}
-            </div>
+            <div className="dash-channel-name">WhatsApp channel</div>
+            {waDown ? (
+              <div className="dash-status bad"><WifiOff size={11} /> Not connected</div>
+            ) : waConnected ? (
+              <div className="dash-status ok"><span className="dash-live" /> Connected</div>
+            ) : (
+              <div className="dash-status"><Clock size={11} /> Pending Meta approval</div>
+            )}
           </div>
         </div>
 
-        {/* Morning briefing */}
-        <div className="wa-status-bar-segment">
-          <div className="wa-status-label">Morning Briefing</div>
-          <div className="wa-status-value" style={{ color: waStatus?.briefing_sent ? 'var(--status-green-text)' : 'var(--text-secondary)' }}>
+        <div className="dash-channel-item">
+          <small>Morning briefing</small>
+          <span className={waStatus?.briefing_sent ? 'good' : ''}>
             {waStatus?.briefing_sent
-              ? <CheckCircle size={13} color="var(--status-green-text)" />
-              : <Clock size={13} color="var(--text-muted)" />}
+              ? <CheckCircle size={14} />
+              : <Clock size={14} color="var(--text-muted)" />}
             {waStatus?.briefing_sent ? 'Sent today' : 'Pending'}
-          </div>
+          </span>
         </div>
 
-        {/* Hot leads awaiting reply */}
-        <div className="wa-status-bar-segment">
-          <div className="wa-status-label">Hot — No Reply</div>
-          <div className="wa-status-value"
-            style={{ color: (waStatus?.hot_no_reply || 0) > 0 ? 'var(--status-red-text)' : 'var(--text-secondary)' }}>
-            {(waStatus?.hot_no_reply || 0) > 0
-              ? <AlertCircle size={13} color="var(--status-red-text)" />
-              : <CheckCircle size={13} color="var(--text-muted)" />}
-            {waStatus?.hot_no_reply != null ? `${waStatus.hot_no_reply} leads` : '—'}
-          </div>
+        <div className="dash-channel-item">
+          <small>Hot leads without reply</small>
+          <span className={hotNoReply > 0 ? 'warn' : ''}>
+            {hotNoReply > 0
+              ? <AlertCircle size={14} />
+              : <CheckCircle size={14} color="var(--text-muted)" />}
+            {waStatus?.hot_no_reply != null ? `${waStatus.hot_no_reply} ${waStatus.hot_no_reply === 1 ? 'lead' : 'leads'}` : '—'}
+          </span>
         </div>
 
-        {/* CTA */}
-        <div style={{ display: 'flex', alignItems: 'center', padding: '14px 20px', marginLeft: 'auto' }}>
-          <NavLink to="/leads" className="btn btn-secondary btn-sm" style={{ gap: 5 }}>
-            <Inbox size={13} />
-            View Leads
-            <ChevronRight size={12} />
-          </NavLink>
-        </div>
+        <NavLink to="/leads" className="dash-link dash-channel-cta">
+          <Inbox size={14} style={{ marginRight: 4 }} /> View leads <ChevronRight size={13} />
+        </NavLink>
       </div>
 
-      {/* Main 2-Column Frappe Workspace Layout */}
-      <div className="dashboard-main-grid">
-        {/* Left: Recent Inbound Leads */}
-        <div className="card" style={{ overflow: 'hidden' }}>
-          {/* Header */}
-          <div className="card-header">
-            <div className="card-title">
-              <MessageCircle size={15} color="var(--text-secondary)" /> Recent Inbound Inquiries
+      {/* ── Main grid ──────────────────────────────────────────────────────── */}
+      <div className="dash-grid">
+        {/* Recent inquiries */}
+        <div className="dash-card" style={{ overflow: 'hidden' }}>
+          <div className="dash-card-head">
+            <div className="dash-card-title">
+              <MessageCircle size={16} color="var(--text-secondary)" /> Recent inbound inquiries
             </div>
-            <NavLink to="/leads" className="btn btn-ghost btn-sm">
-              View all leads <ChevronRight size={13} />
+            <NavLink to="/leads" className="dash-link">
+              View all <ChevronRight size={13} />
             </NavLink>
           </div>
 
           {loading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-              Loading recent inquiries...
+            <div>
+              {[0, 1, 2, 3].map(i => (
+                <div key={i} className="dash-skel-row">
+                  <span className="dash-skel" style={{ width: 40, height: 40, borderRadius: 12 }} />
+                  <div style={{ flex: 1 }}>
+                    <span className="dash-skel block" style={{ width: '40%', marginBottom: 6 }} />
+                    <span className="dash-skel block" style={{ width: '65%', height: '0.8em' }} />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : leads.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
-              <Users size={32} style={{ margin: '0 auto 10px', opacity: 0.3 }} />
-              <div style={{ fontWeight: 500, fontSize: '0.85rem' }}>No inquiries logged yet</div>
-              <div style={{ fontSize: '0.75rem', marginTop: 4 }}>Inbound emails and WhatsApp messages will appear here.</div>
+            <div className="dash-empty">
+              <div className="dash-empty-icon"><Users size={22} /></div>
+              <div className="dash-empty-title">No inquiries yet</div>
+              <div className="dash-empty-sub">Inbound emails and WhatsApp messages will show up here as they arrive.</div>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {leads.map((lead, idx) => {
+            <div>
+              {leads.map((lead) => {
                 // Truncate notes — strip HTML tags first
                 const rawNote = lead.car_details || lead.notes || '';
                 const cleanNote = rawNote.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
                 const shortNote = cleanNote.length > 80 ? cleanNote.slice(0, 80) + '…' : cleanNote;
+                const kind = intentKind(lead.intent);
 
                 return (
-                  <div key={lead.id} className="dashboard-lead-row">
-                    {/* Avatar */}
-                    <div className="dashboard-lead-col-avatar">
+                  <div key={lead.id} className="dash-lead">
+                    <div className={`dash-avatar ${kind}`}>
                       {getInitials(lead.name || lead.email)}
                     </div>
 
-                    {/* Name + contact */}
-                    <div className="dashboard-lead-col-name">
-                      <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {lead.name || 'Anonymous Lead'}
-                      </div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 2 }}>
-                        {lead.email || lead.phone || 'No contact info'}
-                      </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div className="dash-lead-name">{lead.name || 'Anonymous lead'}</div>
+                      <div className="dash-lead-contact">{lead.email || lead.phone || 'No contact info'}</div>
                     </div>
 
-                    {/* Intent badge */}
-                    <div className="dashboard-lead-col-intent">
-                      {intentBadge(lead.intent)}
+                    <span className={`dash-pill ${kind}`}>{INTENT_LABEL[kind]}</span>
+
+                    <div className="dash-lead-note">
+                      {shortNote || <span style={{ color: 'var(--text-muted)' }}>—</span>}
                     </div>
 
-                    {/* Vehicle / Inquiry note */}
-                    <div className="dashboard-lead-col-note">
-                      {shortNote ? (
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                          {shortNote}
-                        </div>
-                      ) : (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>—</span>
-                      )}
-                    </div>
-
-                    {/* Time */}
-                    <div className="dashboard-lead-col-time">
-                      {timeAgo(lead.created_at)}
-                    </div>
+                    <div className="dash-lead-time">{timeAgo(lead.created_at)}</div>
                   </div>
                 );
               })}
@@ -280,112 +300,86 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Right: Today's Schedule & Quick Actions */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-          {/* Today's Schedule Card */}
-          <div className="card">
-            <div className="card-header">
-              <div className="card-title">
-                <Calendar size={15} color="var(--text-secondary)" /> Today's Appointments
+        {/* Right column */}
+        <div className="dash-col">
+          {/* Today's appointments */}
+          <div className="dash-card" style={{ overflow: 'hidden' }}>
+            <div className="dash-card-head">
+              <div className="dash-card-title">
+                <Calendar size={16} color="var(--text-secondary)" /> Today’s appointments
               </div>
-              <NavLink to="/calendar" className="btn btn-ghost btn-sm">
-                Open Calendar <ChevronRight size={13} />
+              <NavLink to="/calendar" className="dash-link">
+                Calendar <ChevronRight size={13} />
               </NavLink>
             </div>
-            <div className="card-body" style={{ padding: '14px 18px' }}>
-              {loading ? (
-                <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)' }}>Loading schedule...</div>
-              ) : meetings.length === 0 ? (
-                <div style={{ padding: '24px 10px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  <div style={{ fontWeight: 500, fontSize: '0.85rem' }}>No meetings scheduled for today</div>
-                  <div style={{ fontSize: '0.75rem', marginTop: 4 }}>Sync with Outlook ICS in Settings to auto-import your day.</div>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {meetings.map((m, idx) => (
-                    <div
-                      key={m.name || idx}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
-                        padding: '10px 12px',
-                        background: 'var(--bg-surface-subtle)',
-                        borderRadius: 'var(--radius-sm)',
-                        border: '1px solid var(--border)'
-                      }}
-                    >
-                      <div style={{
-                        padding: '4px 8px',
-                        background: 'var(--bg-surface)',
-                        border: '1px solid var(--border)',
-                        borderRadius: 'var(--radius-xs)',
-                        fontWeight: 700,
-                        fontSize: '0.78rem',
-                        color: 'var(--text-primary)'
-                      }}>
-                        {formatTime(m.starts_on || m.start_time)}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: '0.82rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {m.subject || m.title || 'Client Appointment'}
-                        </div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                          {m.location || 'Mindelstetten Office'}
-                        </div>
-                      </div>
-                      <span className="badge badge-emerald">Confirmed</span>
+
+            {loading ? (
+              <ul className="dash-agenda">
+                {[0, 1].map(i => (
+                  <li key={i} className="dash-meeting">
+                    <span className="dash-skel" style={{ width: 44 }} />
+                    <div><span className="dash-skel block" style={{ width: '70%' }} /></div>
+                    <span />
+                  </li>
+                ))}
+              </ul>
+            ) : meetings.length === 0 ? (
+              <div className="dash-empty">
+                <div className="dash-empty-icon"><Calendar size={22} /></div>
+                <div className="dash-empty-title">Nothing scheduled today</div>
+                <div className="dash-empty-sub">Sync your Outlook ICS in Settings to import your day automatically.</div>
+              </div>
+            ) : (
+              <ul className="dash-agenda">
+                {meetings.map((m, idx) => (
+                  <li key={m.name || idx} className="dash-meeting">
+                    <div className="dash-meeting-time">{formatTime(m.starts_on || m.start_time)}</div>
+                    <div style={{ minWidth: 0 }}>
+                      <div className="dash-meeting-title">{m.subject || m.title || 'Client appointment'}</div>
+                      <div className="dash-meeting-place">{m.location || 'Mindelstetten Office'}</div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                    <span className="dash-pill ok">Confirmed</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
-          {/* Frappe Quick Action Links Card */}
-          <div className="card">
-            <div className="card-header">
-              <div className="card-title">Quick Operations</div>
+          {/* Quick operations */}
+          <div className="dash-card" style={{ overflow: 'hidden' }}>
+            <div className="dash-card-head">
+              <div className="dash-card-title">Quick operations</div>
             </div>
-            <div className="card-body dashboard-quick-ops">
-              <NavLink
-                to="/projects"
-                className="btn btn-secondary"
-                style={{ justifyContent: 'flex-start', padding: '10px 12px', height: 'auto', flexDirection: 'column', alignItems: 'flex-start' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: 'var(--text-primary)' }}>
-                  <FolderKanban size={14} /> Active Deals
+            <div className="dash-ops">
+              <NavLink to="/projects" className="dash-op">
+                <div className="dash-op-icon"><FolderKanban size={17} /></div>
+                <div className="dash-op-text">
+                  <div className="dash-op-title">Active deals</div>
+                  <div className="dash-op-sub">Kanban pipeline &amp; stages</div>
                 </div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>Kanban pipeline & stages</div>
+                <ChevronRight size={16} className="dash-op-arrow" />
               </NavLink>
 
-              <NavLink
-                to="/contracts"
-                className="btn btn-secondary"
-                style={{ justifyContent: 'flex-start', padding: '10px 12px', height: 'auto', flexDirection: 'column', alignItems: 'flex-start' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: 'var(--text-primary)' }}>
-                  <FileText size={14} /> Contracts
+              <NavLink to="/contracts" className="dash-op">
+                <div className="dash-op-icon"><FileText size={17} /></div>
+                <div className="dash-op-text">
+                  <div className="dash-op-title">Contracts</div>
+                  <div className="dash-op-sub">1-click PDF generation</div>
                 </div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>1-Click PDF generation</div>
+                <ChevronRight size={16} className="dash-op-arrow" />
               </NavLink>
 
-              <NavLink
-                to="/profile"
-                className="btn btn-secondary"
-                style={{ justifyContent: 'flex-start', padding: '10px 12px', height: 'auto', flexDirection: 'column', alignItems: 'flex-start' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: 'var(--text-primary)' }}>
-                  <ExternalLink size={14} /> Integrations
+              <NavLink to="/profile" className="dash-op">
+                <div className="dash-op-icon"><ExternalLink size={17} /></div>
+                <div className="dash-op-text">
+                  <div className="dash-op-title">Integrations</div>
+                  <div className="dash-op-sub">Google Drive &amp; Outlook</div>
                 </div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>Google Drive & Outlook</div>
+                <ChevronRight size={16} className="dash-op-arrow" />
               </NavLink>
             </div>
           </div>
-
         </div>
-
       </div>
     </div>
   );

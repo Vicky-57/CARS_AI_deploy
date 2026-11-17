@@ -18,7 +18,7 @@ function formatDate(d) {
 function Field({ label, value, isCode, fullWidth }) {
   return (
     <div className={`crm-field${fullWidth ? ' full-width' : ''}`}
-         style={fullWidth ? { gridColumn: '1 / -1' } : {}}>
+      style={fullWidth ? { gridColumn: '1 / -1' } : {}}>
       <div className="crm-field-label">{label}</div>
       <div className={`crm-field-value${!value ? ' muted' : ''}${isCode ? ' code-text' : ''}`}>
         {cleanText(value) || '—'}
@@ -193,7 +193,7 @@ export default function DealDetailPanel({ project, onClose, onAdvance, advancing
                 {vehicleTitle}
               </div>
               <div className="crm-header-meta-row">
-                <span className={`crm-tag ${isSell ? 'crm-tag-green' : 'crm-tag-blue'}`}>
+                <span className={`crm-tag ${isSell ? 'crm-tag-green' : 'crm-tag-purple'}`}>
                   {typeLabel}
                 </span>
                 <span className="crm-tag crm-tag-slate">
@@ -443,7 +443,7 @@ export default function DealDetailPanel({ project, onClose, onAdvance, advancing
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {/* 3 Metrics Cards */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                <div className="financials-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
                   <div className="panel-metric-card">
                     <span className="panel-metric-label">Expenses</span>
                     <span className="panel-metric-value" style={{ color: 'var(--status-amber-text)' }}>
@@ -472,7 +472,7 @@ export default function DealDetailPanel({ project, onClose, onAdvance, advancing
                 </div>
 
                 {/* Quick Actions */}
-                <div style={{ display: 'flex', gap: 10 }}>
+                <div className="financials-action-row" style={{ display: 'flex', gap: 10 }}>
                   <button className="btn btn-secondary btn-sm" onClick={() => setShowExpenseModal(true)} style={{ gap: 6 }}>
                     <Receipt size={13} /> Log Expense / Receipt
                   </button>
@@ -586,7 +586,7 @@ export default function DealDetailPanel({ project, onClose, onAdvance, advancing
                   <div className="crm-section-title">
                     <Folder size={12} /> Cloud Drive Folders
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+                  <div className="drive-folder-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
                     {Object.entries(driveUrls).filter(([k]) => k !== 'success' && k !== 'project_id').map(([folder, url]) => (
                       <a
                         key={folder}

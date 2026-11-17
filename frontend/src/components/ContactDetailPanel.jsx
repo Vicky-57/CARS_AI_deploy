@@ -56,7 +56,7 @@ export default function ContactDetailPanel({ customer, getCustomerCar, onClose, 
                     <Star size={11} fill="currentColor" /> Repeat Client
                   </span>
                 ) : (
-                  <span className="crm-tag crm-tag-blue">
+                  <span className="crm-tag crm-tag-purple">
                     <UserPlus size={11} /> New Client
                   </span>
                 )}
@@ -102,7 +102,7 @@ export default function ContactDetailPanel({ customer, getCustomerCar, onClose, 
             <div className="crm-section-title">
               <Users size={12} /> Contact & Communication
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="contact-comm-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               {/* Email Card */}
               <div style={{ padding: '12px 14px', background: 'var(--bg-surface-subtle)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -212,7 +212,7 @@ export default function ContactDetailPanel({ customer, getCustomerCar, onClose, 
                   const isProject = inter.type === 'Project' || inter.type === 'PROJECT';
                   const Icon = isProject ? Briefcase : UserPlus;
                   const d = new Date(inter.date || Date.now());
-                  const dateStr = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+                  const dateStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
                   return (
                     <div key={idx} style={{
                       padding: '12px 14px',
@@ -221,7 +221,7 @@ export default function ContactDetailPanel({ customer, getCustomerCar, onClose, 
                       border: '1px solid var(--border)'
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                        <span className={`badge ${isProject ? 'badge-blue' : 'badge-green'}`} style={{ display: 'inline-flex', gap: 4, alignItems: 'center', fontSize: '0.68rem' }}>
+                        <span className={`badge ${isProject ? 'badge-purple' : 'badge-green'}`} style={{ display: 'inline-flex', gap: 4, alignItems: 'center', fontSize: '0.68rem' }}>
                           <Icon size={10} /> {inter.type}
                         </span>
                         <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>{dateStr}</span>
@@ -262,7 +262,7 @@ export default function ContactDetailPanel({ customer, getCustomerCar, onClose, 
                           </div>
                         </div>
                       </div>
-                      <span className={`badge ${d.status === 'COMPLETED' ? 'badge-green' : 'badge-blue'}`} style={{ fontSize: '0.65rem' }}>
+                      <span className={`badge ${d.status === 'COMPLETED' ? 'badge-green' : 'badge-purple'}`} style={{ fontSize: '0.65rem' }}>
                         {d.status || 'Active'}
                       </span>
                     </div>

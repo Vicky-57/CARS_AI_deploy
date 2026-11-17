@@ -104,7 +104,7 @@ export default function LeadDetailPanel({ lead, onClose, onConvert, onRefresh, c
                 {displayName}
               </div>
               <div className="crm-header-meta-row">
-                <span className={`crm-tag ${isSell ? 'crm-tag-green' : 'crm-tag-blue'}`}>
+                <span className={`crm-tag ${isSell ? 'crm-tag-green' : 'crm-tag-purple'}`}>
                   {intentLabel}
                 </span>
 
