@@ -18,6 +18,7 @@ import imaplib
 import email as email_lib
 import logging
 import os
+import re
 import urllib.request
 from html import escape as _h
 from datetime import datetime, timedelta, timezone

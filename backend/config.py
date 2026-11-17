@@ -32,7 +32,16 @@ class Settings(BaseSettings):
     WHATSAPP_PHONE_NUMBER_ID: str = ""
     WHATSAPP_BUSINESS_ACCOUNT_ID: str = ""
     WHATSAPP_VERIFY_TOKEN: str = ""
+    WHATSAPP_APP_SECRET: str = ""            # Meta App Secret -> verifies X-Hub-Signature-256
+    WHATSAPP_OWNER_PHONES: str = ""          # Comma-separated founder numbers allowed to run commands
+    WHATSAPP_DRY_RUN: bool = False           # True = never call Meta/Twilio, log/collect outbound messages
+    WHATSAPP_API_VERSION: str = "v21.0"
     BRIEFING_WHATSAPP_RECIPIENT: str = ""
+
+    # Twilio WhatsApp Sandbox / API
+    TWILIO_ACCOUNT_SID: str = ""
+    TWILIO_AUTH_TOKEN: str = ""
+    TWILIO_WHATSAPP_FROM: str = ""
     BRIEFING_EMAIL_RECIPIENT: str = "info@car-agents.de"
 
     # Local AI Services
