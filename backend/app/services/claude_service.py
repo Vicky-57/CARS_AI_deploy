@@ -219,3 +219,63 @@ Respond ONLY with this JSON (no markdown):
         "suggested_reply": result.get("suggested_reply", ""),
         "task_title": result.get("task_title", "Voice Note"),
     }
+
+
+async def extract_vehicle_specs_from_image(image_bytes: bytes, media_type: str = "image/jpeg") -> dict:
+    """Extract vehicle specs directly from document image using Claude multimodal vision."""
+    import base64
+    b64 = base64.b64encode(image_bytes).decode("utf-8")
+    valid_mime = media_type if media_type in ("image/jpeg", "image/png", "image/gif", "image/webp") else "image/jpeg"
+
+    headers = {
+        "x-api-key": settings.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+    prompt = """You are an expert German automotive document scanner for CAR-AGENTS Germany.
+Analyze this image of a vehicle document (Fahrzeugschein / Zulassungsbescheinigung Teil I / Fahrzeugdatenträger).
+Extract the following vehicle specifications:
+- vin (17-character vehicle identification number / FIN)
+- manufacturer (Marke, Feld D.1)
+- model (Handelsbezeichnung / Typ, Feld D.3)
+- licence_plate (Amtliches Kennzeichen, Feld A)
+- initial_registration (Erstzulassung, Feld B, e.g. DD.MM.YYYY)
+- tuv_expiry (HU / TÜV expiry, e.g. MM.YYYY)
+- power_ps (Leistung in PS, Feld P.2/P.4)
+- displacement_ccm (Hubraum in ccm, Feld P.1)
+- mileage (Kilometerstand if visible)
+
+Respond ONLY with this exact JSON format (no markdown):
+{
+  "vin": null,
+  "manufacturer": null,
+  "model": null,
+  "licence_plate": null,
+  "initial_registration": null,
+  "tuv_expiry": null,
+  "power_ps": null,
+  "displacement_ccm": null,
+  "mileage": null
+}"""
+    body = {
+        "model": MODEL,
+        "max_tokens": 600,
+        "messages": [{
+            "role": "user",
+            "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": valid_mime, "data": b64}},
+                {"type": "text", "text": prompt}
+            ]
+        }]
+    }
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            res = await client.post("https://api.anthropic.com/v1/messages", headers=headers, json=body)
+            res.raise_for_status()
+            raw = res.json()["content"][0]["text"]
+            result = _parse_json(raw)
+            return {k: v for k, v in result.items() if v is not None}
+    except Exception as e:
+        import logging
+        logging.getLogger("claude_service").error(f"Claude Vision vehicle extraction failed: {e}")
+        return {}

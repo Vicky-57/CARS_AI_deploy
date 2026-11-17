@@ -34,7 +34,8 @@ logger = logging.getLogger("whatsapp_service")
 OUTBOX: List[Dict] = []
 
 # Per-request collector used when replying synchronously to a Twilio webhook via TwiML.
-_twilio_collector: contextvars.ContextVar[Optional[List[str]]] = contextvars.ContextVar(
+# Holds (target_phone_digits, bucket_list) so only messages for the caller are returned in TwiML.
+_twilio_collector: contextvars.ContextVar[Optional[Tuple[Optional[str], List[str]]]] = contextvars.ContextVar(
     "_twilio_collector", default=None
 )
 
@@ -42,10 +43,15 @@ Button = Tuple[str, str]  # (id, title) - title max 20 chars on WhatsApp
 
 
 @contextmanager
-def collect_twilio_replies():
-    """Capture all outgoing WhatsApp messages in this async context for TwiML output."""
+def collect_twilio_replies(target_phone: Optional[str] = None):
+    """
+    Capture outgoing WhatsApp messages intended FOR THE CALLER of the inbound Twilio webhook.
+    Any message to other numbers (e.g. notify_owner alert to founder) will NOT leak into
+    the customer's TwiML response.
+    """
     bucket: List[str] = []
-    token = _twilio_collector.set(bucket)
+    norm_target = normalize_phone(target_phone) if target_phone else None
+    token = _twilio_collector.set((norm_target, bucket))
     try:
         yield bucket
     finally:
@@ -106,12 +112,18 @@ def _headers() -> Dict[str, str]:
 
 
 async def _send_via_twilio(to_digits: str, body: str, media_url: Optional[str] = None) -> Dict:
-    bucket = _twilio_collector.get()
-    if bucket is not None:
-        text_out = f"{body}\n{media_url}" if media_url else body
-        bucket.append(text_out)
-        logger.info(f"[TwiML] Queued reply for +{to_digits} ({len(text_out)} chars)")
-        return {"status": "twiml_queued"}
+    collector_info = _twilio_collector.get()
+    if collector_info is not None:
+        target_sender, bucket = collector_info
+        if target_sender is None or to_digits == target_sender:
+            text_out = f"{body}\n{media_url}" if media_url else body
+            bucket.append(text_out)
+            logger.info(f"[TwiML] Queued reply for +{to_digits} ({len(text_out)} chars)")
+            return {"status": "twiml_queued"}
+        else:
+            logger.info(f"[TwiML] Skipping TwiML capture for non-caller +{to_digits} (caller is +{target_sender})")
+            # Don't try sending unsolicited trial REST messages to prevent 21654 errors
+            return {"status": "skipped_twiml"}
 
     sid = settings.TWILIO_ACCOUNT_SID
     token = settings.TWILIO_AUTH_TOKEN

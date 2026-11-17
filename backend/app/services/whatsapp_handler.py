@@ -110,7 +110,6 @@ _OWNER_CMDS = {
     "customer", "kunde", "find", "/customer",
     "convert", "/convert",
     "stage", "/stage",
-    "1", "2", "3",
 }
 
 
@@ -130,10 +129,17 @@ async def handle_message(msg: Dict, profile_name: Optional[str] = None) -> None:
         text = (inp.get("text") or "").strip()
         session = store.get_session(phone)
         in_active_flow = session is not None and not session.get("done")
-        # Allow owner to test customer qualification on the same phone when not running a founder command
+
+        # Founder testing the qualification flow:
+        # If in active flow, route all input to customer qualification UNLESS founder explicitly types an exit command
+        explicit_exit = text.lower() in ("reset", "/reset", "help", "/help", "leads", "deals", "summary")
+        if in_active_flow and not explicit_exit:
+            await handle_customer(phone, profile_name or "WhatsApp Client", inp)
+            return
+
+        # Not in active flow: if starting qualification test (e.g. "Hallo, ich möchte ein Auto kaufen"):
         if not _is_owner_command(text) and (
-            in_active_flow
-            or flow.detect_intent(text) in ("BUY", "SELL")
+            flow.detect_intent(text) in ("BUY", "SELL")
             or text.lower() in ("hi", "hallo", "hello", "test")
         ):
             await handle_customer(phone, profile_name or "WhatsApp Client", inp)
@@ -146,17 +152,35 @@ async def handle_message(msg: Dict, profile_name: Optional[str] = None) -> None:
 # ─── OCR (reuses the existing document pipeline) ──────────────────────────
 
 async def ocr_extract(data: bytes, mime: str) -> Dict:
-    """Bytes -> vehicle specs dict. Separate function so tests can replace it."""
-    from app.services.pdf_service import extract_document_text
-    from app.services.claude_service import extract_vehicle_specs
+    """Bytes -> vehicle specs dict. Uses Claude Vision for images/scans and text extraction for digital PDFs."""
+    from app.services.claude_service import extract_vehicle_specs, extract_vehicle_specs_from_image
 
-    suffix = _MIME_SUFFIX.get(mime, ".jpg")
+    # Image format (JPEG, PNG): use Claude Vision directly for maximum accuracy
+    if (mime or "").startswith("image/"):
+        return await extract_vehicle_specs_from_image(data, mime)
+
+    # PDF format: try digital extraction first
+    from app.services.pdf_service import extract_document_text
+    suffix = _MIME_SUFFIX.get(mime, ".pdf")
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(data)
         path = tmp.name
     try:
         text = await asyncio.to_thread(extract_document_text, path)
-        return await extract_vehicle_specs(text) if text.strip() else {}
+        if text.strip():
+            specs = await extract_vehicle_specs(text)
+            if specs:
+                return specs
+        # If digital text was empty (scanned PDF), rasterize page 0 and use Claude Vision
+        try:
+            import fitz
+            doc = fitz.open(path)
+            if len(doc) > 0:
+                pix = doc[0].get_pixmap(dpi=150)
+                return await extract_vehicle_specs_from_image(pix.tobytes("jpeg"), "image/jpeg")
+        except Exception as e:
+            logger.warning(f"PDF page rasterization failed: {e}")
+        return {}
     finally:
         if os.path.exists(path):
             os.unlink(path)
@@ -466,6 +490,17 @@ async def _after_done(phone: str, name: str, lead_id: str, inp: Dict) -> None:
         specs = await _specs_from_media(inp)
         if specs:
             store.update_lead(lead_id, _specs_to_lead_fields(specs))
+            await send_message(phone, _ack_document("de", specs))
             await notify_owner(f"📄 {name} (+{phone}) sent a document: {_specs_line(specs)}")
             return
+        else:
+            await send_message(phone, "Danke! Wir haben Ihre Datei erhalten.")
+            await notify_owner(f"📎 {name} (+{phone}) sent a {inp['type']} (could not be read automatically).")
+            return
+
+    # Acknowledge customer so they know their message reached the team
+    await send_message(
+        phone,
+        "Vielen Dank für Ihre Nachricht! Unser Team hat Ihre Nachricht erhalten und meldet sich schnellstmöglich persönlich bei Ihnen."
+    )
     await notify_owner(f"💬 {name} (+{phone}): {inp['text'] or '[' + inp['type'] + ']'}")
