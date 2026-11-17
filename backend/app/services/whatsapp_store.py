@@ -139,8 +139,16 @@ def search_leads_and_projects(term: str, limit: int = 5) -> Dict[str, List[Dict]
         projects = [p for p in _mem_projects if term_l in (p.get("client_name") or "").lower()][:limit]
         return {"leads": leads, "projects": projects}
     sb = _sb()
-    leads = sb.table("leads").select("*").ilike("name", f"%{term}%").limit(limit).execute().data or []
-    projects = sb.table("projects").select("*").ilike("client_name", f"%{term}%").limit(limit).execute().data or []
+    leads = []
+    projects = []
+    try:
+        leads = sb.table("leads").select("*").ilike("name", f"*{term}*").limit(limit).execute().data or []
+    except Exception as e:
+        logger.warning(f"Search leads failed: {e}")
+    try:
+        projects = sb.table("projects").select("*").ilike("client_name", f"*{term}*").limit(limit).execute().data or []
+    except Exception as e:
+        logger.warning(f"Search projects failed: {e}")
     return {"leads": leads, "projects": projects}
 
 
