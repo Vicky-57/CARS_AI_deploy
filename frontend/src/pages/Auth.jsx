@@ -139,32 +139,31 @@ export default function Auth({ onLogin }) {
         alignItems: 'center',
         justifyContent: 'center',
         padding: '48px 40px',
-        background: '#FAFAFA',
       }}>
-        <div style={{ width: '100%', maxWidth: 380 }}>
-
-          {/* Mobile-only logo header */}
+        <div className="auth-card" style={{ width: '100%', maxWidth: 380 }}>
+          {/* Logo header inside the card for mobile */}
           <div className="auth-mobile-logo">
-            <div style={{
+            <div className="auth-mobile-logo-icon" style={{
               width: 40, height: 40, borderRadius: 10,
               background: '#171717',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+              boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
+              flexShrink: 0,
             }}>
               <img src="/assets/car.png" alt="Car-Agents Logo" style={{ width: 22, height: 22, objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
             </div>
             <div>
-              <div style={{ fontSize: '1rem', fontWeight: 800, color: '#171717', letterSpacing: '-0.3px' }}>CAR-AGENTS</div>
-              <div style={{ fontSize: '0.68rem', color: '#999999', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Broker Desk</div>
+              <div className="auth-mobile-logo-title" style={{ fontSize: '1.05rem', fontWeight: 800, color: '#171717', letterSpacing: '-0.3px' }}>CAR-AGENTS</div>
+              <div className="auth-mobile-logo-sub" style={{ fontSize: '0.68rem', color: '#737373', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Broker Desk</div>
             </div>
           </div>
 
           {/* Form header */}
-          <div style={{ marginBottom: 36 }}>
-            <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#171717', margin: '0 0 8px', letterSpacing: '-0.4px' }}>
+          <div style={{ marginBottom: 28 }}>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#171717', margin: '0 0 6px', letterSpacing: '-0.4px' }}>
               Welcome back
             </h2>
-            <p style={{ fontSize: '0.85rem', color: '#999999', margin: 0 }}>
+            <p style={{ fontSize: '0.84rem', color: '#737373', margin: 0 }}>
               Sign in to your CAR-AGENTS broker account.
             </p>
           </div>
@@ -311,7 +310,7 @@ export default function Auth({ onLogin }) {
           </form>
 
           {/* Footer */}
-          <div style={{ marginTop: 32, textAlign: 'center', fontSize: '0.72rem', color: '#B5B5B5' }}>
+          <div className="auth-footer-text" style={{ marginTop: 24, textAlign: 'center', fontSize: '0.72rem', color: '#8C8C8C' }}>
             CAR-AGENTS Broker Portal · Fast, compliant B2B vehicle desk
           </div>
         </div>

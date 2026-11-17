@@ -114,7 +114,7 @@ export default function Dashboard() {
               <Calendar size={13} />
               {format(new Date(), 'EEEE, dd. MMMM yyyy')}
             </div>
-            <h1 className="dash-hero-title">{greeting()}.<br />Here’s your brokerage today.</h1>
+            <h1 className="dash-hero-title">{greeting()}.<span className="dash-hero-br"><br /></span>Here’s your brokerage today.</h1>
             <p className="dash-hero-sub">
               {loading ? (
                 'Loading the latest numbers…'
@@ -276,7 +276,12 @@ export default function Dashboard() {
                 const kind = intentKind(lead.intent);
 
                 return (
-                  <div key={lead.id} className="dash-lead">
+                  <NavLink
+                    key={lead.id}
+                    to="/leads"
+                    className="dash-lead"
+                    style={{ textDecoration: 'none', color: 'inherit', cursor: 'pointer' }}
+                  >
                     <div className={`dash-avatar ${kind}`}>
                       {getInitials(lead.name || lead.email)}
                     </div>
@@ -293,7 +298,7 @@ export default function Dashboard() {
                     </div>
 
                     <div className="dash-lead-time">{timeAgo(lead.created_at)}</div>
-                  </div>
+                  </NavLink>
                 );
               })}
             </div>
