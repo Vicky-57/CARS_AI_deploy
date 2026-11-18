@@ -49,7 +49,8 @@ async def verify_whatsapp_webhook(
 async def receive_twilio_whatsapp(request: Request):
     """Twilio WhatsApp webhook (form-encoded). Runs handler and returns TwiML <Response><Message>..."""
     form = dict(await request.form())
-    with collect_twilio_replies() as replies:
+    from_phone = form.get("From")
+    with collect_twilio_replies(target_phone=from_phone) as replies:
         await handle_twilio_payload(form)
     return Response(content=build_twiml(replies), media_type="text/xml")
 
@@ -59,7 +60,8 @@ async def receive_whatsapp_message(request: Request, background_tasks: Backgroun
     content_type = (request.headers.get("content-type") or "").lower()
     if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
         form = dict(await request.form())
-        with collect_twilio_replies() as replies:
+        from_phone = form.get("From")
+        with collect_twilio_replies(target_phone=from_phone) as replies:
             await handle_twilio_payload(form)
         return Response(content=build_twiml(replies), media_type="text/xml")
 
