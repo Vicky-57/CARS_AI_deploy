@@ -46,6 +46,32 @@ const isWhatsAppHotLead = (lead) => {
   return srcRaw.includes('WHATSAPP') && labelKey === 'hot';
 };
 
+const formatPhoneDisplay = (raw) => {
+  if (!raw) return '';
+  const str = cleanText(raw);
+  if (str.includes('@')) return str;
+  const digits = str.replace(/\D/g, '');
+  if (digits.length < 7) return str;
+  if (digits.length === 12 && digits.startsWith('91')) {
+    return `+91 ${digits.slice(2, 7)} ${digits.slice(7)}`;
+  }
+  if (digits.startsWith('49') && digits.length >= 11) {
+    return `+49 ${digits.slice(2, 5)} ${digits.slice(5)}`;
+  }
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `+1 ${digits.slice(1, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
+  }
+  return str.startsWith('+') ? str : `+${digits}`;
+};
+
+const shortTimeAgo = (iso) => {
+  try {
+    return formatDistanceToNow(new Date(iso), { addSuffix: true }).replace(/^about\s+/i, '');
+  } catch {
+    return '';
+  }
+};
+
 export default function Dashboard() {
   const [summary, setSummary] = useState(null);
   const [allLeads, setAllLeads] = useState([]);
@@ -257,7 +283,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <NavLink to="/leads?source=WHATSAPP&label=Hot" className="wa-cta">
+            <NavLink to="/leads?source=WHATSAPP" className="wa-cta">
               <Inbox size={14} /> <span><span className="wa-cta-long">View </span>hot leads</span> <ChevronRight size={13} />
             </NavLink>
           </div>
@@ -271,7 +297,7 @@ export default function Dashboard() {
               {!loading && <span className="wa-count">{hotCount}</span>}
             </div>
             {!loading && hotCount > 5 && (
-              <NavLink to="/leads?source=WHATSAPP&label=Hot" className="dash-link">
+              <NavLink to="/leads?source=WHATSAPP" className="dash-link">
                 View all {hotCount} <ChevronRight size={13} />
               </NavLink>
             )}
@@ -302,14 +328,16 @@ export default function Dashboard() {
               {whatsappHotLeads.slice(0, 5).map((lead, idx) => {
                 const vehicle = getLeadVehicle(lead);
                 const kind = intentKind(lead.intent);
-                const rawSummary = lead.label_reason || vehicle || lead.car_details || lead.notes || lead.message || '';
-                const cleanSummary = cleanText(rawSummary.replace(/<[^>]*>/g, ''));
-                const shortSummary = cleanSummary.length > 90 ? cleanSummary.slice(0, 90) + '…' : cleanSummary;
+                const rawReason = lead.label_reason || lead.car_details || lead.notes || lead.message || '';
+                const cleanReason = cleanText(rawReason.replace(/<[^>]*>/g, ''));
+                const shortReason = cleanReason.length > 80 ? cleanReason.slice(0, 80) + '…' : cleanReason;
+                const showVehicle = Boolean(vehicle && (!shortReason || !shortReason.toLowerCase().includes(vehicle.toLowerCase())));
+                const contactLabel = formatPhoneDisplay(lead.phone || lead.email) || 'WhatsApp';
 
                 return (
                   <NavLink
                     key={lead.id}
-                    to={`/leads?source=WHATSAPP&label=Hot&lead=${lead.id}`}
+                    to={`/leads?source=WHATSAPP&lead=${lead.id}`}
                     className="wa-lead"
                     style={{ '--i': idx }}
                   >
@@ -320,22 +348,39 @@ export default function Dashboard() {
                       <span className="wa-avatar-flag" title="Hot lead"><Flame size={9} /></span>
                     </div>
 
-                    <div style={{ minWidth: 0 }}>
-                      <div className="wa-name">{formatContactName(lead.name, lead.email, vehicle)}</div>
-                      <div className="wa-phone">
-                        <Phone size={11} /> {cleanText(lead.phone || lead.email || 'WhatsApp')}
+                    <div className="wa-lead-main">
+                      <div className="wa-lead-top">
+                        <span className="wa-name">{formatContactName(lead.name, lead.email, vehicle)}</span>
+                        <span className="wa-hot-badge"><Flame size={10} /> Hot</span>
+                        <span className={`dash-pill ${kind}`}>{INTENT_LABEL[kind]}</span>
+                      </div>
+
+                      <div className="wa-lead-sub">
+                        <span className="wa-phone">
+                          <Phone size={11} /> {contactLabel}
+                        </span>
+                        {showVehicle && (
+                          <>
+                            <span className="wa-sep" aria-hidden="true" />
+                            <span className="wa-vehicle">{vehicle}</span>
+                          </>
+                        )}
+                        {shortReason && (
+                          <>
+                            <span className="wa-sep" aria-hidden="true" />
+                            <span className="wa-reason">{shortReason}</span>
+                          </>
+                        )}
                       </div>
                     </div>
 
-                    <span className={`dash-pill ${kind}`}>{INTENT_LABEL[kind]}</span>
-
-                    <div className="wa-note">
-                      {shortSummary || <span style={{ color: 'var(--text-muted)' }}>No details yet</span>}
-                    </div>
-
                     <div className="wa-lead-end">
-                      <span className="wa-time">{timeAgo(lead.created_at)}</span>
-                      <ChevronRight size={15} className="wa-arrow" />
+                      <span className="wa-lead-time">
+                        <Clock size={11} /> {shortTimeAgo(lead.created_at)}
+                      </span>
+                      <span className="wa-arrow-pill">
+                        <ChevronRight size={14} className="wa-arrow" />
+                      </span>
                     </div>
                   </NavLink>
                 );

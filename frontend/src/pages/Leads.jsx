@@ -151,16 +151,14 @@ export default function Leads() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  // New Filters (supports deep-linking e.g. /leads?source=WHATSAPP&label=Hot&lead=<id>)
+  // New Filters (supports deep-linking e.g. /leads?source=WHATSAPP&lead=<id>)
   const urlSource = searchParams.get('source') || '';
-  const urlLabel = searchParams.get('label') || '';
   const urlLeadId = searchParams.get('lead') || '';
 
-  const [showFilters, setShowFilters] = useState(Boolean(urlSource || urlLabel));
+  const [showFilters, setShowFilters] = useState(Boolean(urlSource));
   const [statusFilter, setStatusFilter] = useState('');
   const [intentFilter, setIntentFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState(urlSource);
-  const [labelFilter, setLabelFilter] = useState(urlLabel);
   const [sortOrder, setSortOrder] = useState('label');
   const autoOpenedLeadRef = useRef(null);
 
@@ -303,13 +301,7 @@ export default function Leads() {
       }
     }
 
-    // 4. Label Filter (Hot / Warm / Cold)
-    if (labelFilter) {
-      const lLabel = (l.label || l.lead_label || '').toLowerCase();
-      if (lLabel !== labelFilter.toLowerCase()) return false;
-    }
-
-    // 5. Search Query
+    // 4. Search Query
     const query = search.toLowerCase();
     if (query) {
       const name = (l.name || '').toLowerCase();
@@ -335,7 +327,7 @@ export default function Leads() {
     return sortOrder === 'newest' ? tB - tA : tA - tB;
   });
 
-  useEffect(() => { setCurrentPage(1); setCheckedLeadIds(new Set()); }, [search, statusFilter, intentFilter, sourceFilter, labelFilter]);
+  useEffect(() => { setCurrentPage(1); setCheckedLeadIds(new Set()); }, [search, statusFilter, intentFilter, sourceFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -512,23 +504,8 @@ export default function Leads() {
                   />
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Label</label>
-                  <CustomSelect
-                    style={{ minWidth: 160 }}
-                    value={labelFilter}
-                    onChange={setLabelFilter}
-                    options={[
-                      { value: '', label: 'All Labels' },
-                      { value: 'Hot', label: '🔥 Hot' },
-                      { value: 'Warm', label: '🟡 Warm' },
-                      { value: 'Cold', label: '❄️ Cold' },
-                    ]}
-                  />
-                </div>
-
                 <div style={{ display: 'flex', alignItems: 'flex-end', marginLeft: 'auto' }}>
-                  <button className="btn btn-secondary btn-sm" onClick={() => { setStatusFilter(''); setIntentFilter(''); setSourceFilter(''); setLabelFilter(''); setSearchParams({}, { replace: true }); }}>
+                  <button className="btn btn-secondary btn-sm" onClick={() => { setStatusFilter(''); setIntentFilter(''); setSourceFilter(''); setSearchParams({}, { replace: true }); }}>
                     Clear Filters
                   </button>
                 </div>

@@ -5675,67 +5675,67 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 16px 20px 10px;
+  padding: 14px 20px 10px;
 }
 
 .wa-list-title {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text-primary);
 }
 
 .wa-flame {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   display: grid;
   place-items: center;
   border-radius: 50%;
   background: var(--status-red-bg);
+  border: 1px solid var(--status-red-border);
   color: var(--status-red-text);
 }
 
 .wa-count {
-  min-width: 20px;
-  height: 18px;
-  padding: 0 6px;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 7px;
   display: inline-grid;
   place-items: center;
   border-radius: var(--radius-full);
   background: var(--status-red-bg);
   border: 1px solid var(--status-red-border);
   color: var(--status-red-text);
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .wa-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 2px 14px 16px;
+  gap: 10px;
+  padding: 2px 20px 18px;
 }
 
 .wa-lead {
   position: relative;
   display: grid;
-  grid-template-columns: 44px minmax(0, 220px) auto minmax(0, 1fr) auto;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 16px;
-  padding: 12px 16px 12px 20px;
-  background: var(--bg-surface);
+  gap: 14px;
+  padding: 14px 16px 14px 18px;
+  background: linear-gradient(90deg, rgba(214, 69, 69, 0.03) 0%, var(--bg-surface) 38%);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   color: inherit;
   text-decoration: none;
-  transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
-  animation: waRise 0.35s cubic-bezier(0.4, 0, 0.2, 1) both;
-  animation-delay: calc(var(--i, 0) * 50ms);
+  transition: border-color var(--transition), box-shadow var(--transition), background var(--transition), transform var(--transition);
+  animation: waRise 0.3s cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
 }
 
 .wa-lead::before {
@@ -5747,17 +5747,17 @@ body {
   width: 3px;
   border-radius: 0 3px 3px 0;
   background: var(--status-red-text);
-  opacity: 0.85;
 }
 
 .wa-lead:hover {
-  border-color: var(--gray-400);
+  border-color: var(--status-red-border);
+  background: linear-gradient(90deg, rgba(214, 69, 69, 0.055) 0%, var(--bg-surface) 45%);
   box-shadow: var(--shadow-sm);
   transform: translateY(-1px);
 }
 
 .wa-lead-skel {
-  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-columns: 42px minmax(0, 1fr);
   animation: none;
 }
 
@@ -5767,14 +5767,15 @@ body {
 
 .wa-avatar-wrap {
   position: relative;
-  width: 44px;
-  height: 44px;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
 }
 
 .dash-avatar.wa-avatar {
-  width: 44px;
-  height: 44px;
-  font-size: 0.8rem;
+  width: 42px;
+  height: 42px;
+  font-size: 0.78rem;
 }
 
 .wa-avatar-flag {
@@ -5789,60 +5790,136 @@ body {
   background: var(--status-red-text);
   color: #fff;
   border: 2px solid var(--bg-surface);
+  box-shadow: var(--shadow-xs);
+}
+
+.wa-lead-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.wa-lead-top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  min-width: 0;
 }
 
 .wa-name {
-  font-size: 0.88rem;
+  font-size: 0.92rem;
   font-weight: 600;
+  line-height: 1.25;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+.wa-hot-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  background: var(--status-red-bg);
+  border: 1px solid var(--status-red-border);
+  color: var(--status-red-text);
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.wa-lead-sub {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  min-width: 0;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
 .wa-phone {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  margin-top: 3px;
-  font-size: 0.74rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-.wa-note {
-  padding-left: 12px;
-  border-left: 2px solid var(--border);
-  font-size: 0.8rem;
-  line-height: 1.4;
+.wa-phone svg {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.wa-sep {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--gray-400);
+  flex-shrink: 0;
+}
+
+.wa-vehicle {
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.wa-reason {
   color: var(--text-secondary);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 420px;
 }
 
 .wa-lead-end {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
-.wa-time {
-  font-size: 0.72rem;
+.wa-lead-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.74rem;
   color: var(--text-muted);
   white-space: nowrap;
 }
 
-.wa-arrow {
+.wa-arrow-pill {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--bg-surface-subtle);
+  border: 1px solid var(--border);
   color: var(--text-muted);
-  transition: transform var(--transition), color var(--transition);
+  transition: background-color var(--transition), border-color var(--transition), color var(--transition);
+}
+
+.wa-arrow {
+  transition: transform var(--transition);
+}
+
+.wa-lead:hover .wa-arrow-pill {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-text);
 }
 
 .wa-lead:hover .wa-arrow {
-  transform: translateX(3px);
-  color: var(--text-primary);
+  transform: translateX(1px);
 }
 
 /* Empty state */
@@ -5961,14 +6038,14 @@ body {
   }
 
   .wa-list {
-    padding: 2px 10px 12px;
-    gap: 6px;
+    padding: 2px 12px 14px;
+    gap: 8px;
   }
 
   .wa-lead {
-    grid-template-columns: 38px minmax(0, 1fr) auto;
-    gap: 6px 12px;
-    padding: 10px 12px 10px 16px;
+    grid-template-columns: 38px minmax(0, 1fr);
+    gap: 8px 12px;
+    padding: 12px 12px 12px 16px;
   }
 
   .wa-avatar-wrap,
@@ -5981,30 +6058,25 @@ body {
     font-size: 0.72rem;
   }
 
-  .wa-lead .dash-pill {
-    grid-column: 2 / -1;
-    grid-row: 2;
-    justify-self: start;
-  }
-
-  .wa-note {
-    grid-column: 1 / -1;
-    grid-row: 3;
-    margin-top: 2px;
-    font-size: 0.78rem;
+  .wa-reason {
+    max-width: 100%;
+    white-space: normal;
   }
 
   .wa-lead-end {
-    grid-column: 3;
-    grid-row: 1;
+    grid-column: 2;
+    justify-content: space-between;
+    padding-top: 6px;
+    border-top: 1px solid var(--border-light);
   }
 
-  .wa-arrow {
-    display: none;
+  .wa-arrow-pill {
+    width: 24px;
+    height: 24px;
   }
 
   .wa-empty {
-    margin: 2px 10px 12px;
+    margin: 2px 12px 14px;
     padding: 14px;
   }
 }
@@ -6013,7 +6085,8 @@ body {
 
   .wa-lead,
   .wa-cta,
-  .wa-arrow {
+  .wa-arrow,
+  .wa-arrow-pill {
     animation: none;
     transition: none;
   }
