@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     TWILIO_ACCOUNT_SID: str = ""
     TWILIO_AUTH_TOKEN: str = ""
     TWILIO_WHATSAPP_FROM: str = ""
+    TWILIO_CONTENT_ENABLED: bool = False     # Set True after upgrading off Twilio Trial to enable Content API buttons
     BRIEFING_EMAIL_RECIPIENT: str = "info@car-agents.de"
 
     # Local AI Services

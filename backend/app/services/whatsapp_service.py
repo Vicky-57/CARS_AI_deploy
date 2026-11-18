@@ -182,36 +182,56 @@ async def send_whatsapp_message(to_phone: str, text: str, media_url: str = None)
     return await _post_messages(payload)
 
 
-async def send_message(to_phone: str, text: str, buttons: Optional[List[Button]] = None) -> dict:
+async def send_message(to_phone: str, text: str, buttons: Optional[List] = None) -> dict:
     """
     Send text, or an interactive message when buttons are provided.
-    On Twilio Sandbox/Tryout, buttons are formatted as a numbered menu (1, 2, 3...)
-    which whatsapp_flow.py natively accepts.
+    Buttons can be `(id, title)` or `(id, title, description)` tuples.
+    On Twilio with Content API enabled (non-Trial), sends native quick-reply / list-picker;
+    otherwise falls back cleanly to numbered choices (`*1.*`, `*2.*`, ...).
     """
+    from app.services.whatsapp_buttons import normalize_button, try_send_twilio_buttons
+
     to = normalize_phone(to_phone)
     if not buttons:
         return await send_whatsapp_message(to, text)
 
+    norm_btns = [normalize_button(b) for b in buttons[:10]]
+
     if _twilio_collector.get() is not None or use_twilio():
-        options_txt = "\n".join(f"*{i}.* {title}" for i, (_, title) in enumerate(buttons, 1))
-        full_text = f"{text}\n\n{options_txt}\n\n_(Reply with 1-{len(buttons)})_"
+        if use_twilio() and getattr(settings, "TWILIO_CONTENT_ENABLED", False):
+            # Only send via Content API to the active caller or direct REST recipient
+            sent = await try_send_twilio_buttons(to, text, norm_btns)
+            if sent:
+                return sent
+
+        lines = []
+        for i, (_, title, desc) in enumerate(norm_btns, 1):
+            lines.append(f"*{i}.* {title}" + (f" — _{desc}_" if desc else ""))
+        options_txt = "\n".join(lines)
+        full_text = f"{text}\n\n{options_txt}\n\n_(Reply with 1-{len(norm_btns)})_"
         return await _send_via_twilio(to, full_text)
 
-    if len(buttons) <= 3:
+    if len(norm_btns) <= 3:
         interactive = {
             "type": "button",
             "body": {"text": text[:1024]},
             "action": {"buttons": [
-                {"type": "reply", "reply": {"id": bid, "title": title[:20]}} for bid, title in buttons
+                {"type": "reply", "reply": {"id": bid, "title": title[:20]}} for bid, title, _ in norm_btns
             ]},
         }
     else:
+        rows = []
+        for bid, title, desc in norm_btns:
+            row = {"id": bid, "title": title[:24]}
+            if desc:
+                row["description"] = desc[:72]
+            rows.append(row)
         interactive = {
             "type": "list",
             "body": {"text": text[:1024]},
             "action": {"button": "Auswahl / Choose", "sections": [{
                 "title": "Optionen",
-                "rows": [{"id": bid, "title": title[:24]} for bid, title in buttons[:10]],
+                "rows": rows,
             }]},
         }
     return await _post_messages({"messaging_product": "whatsapp", "to": to, "type": "interactive", "interactive": interactive})

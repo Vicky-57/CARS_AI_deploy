@@ -3,33 +3,40 @@ app/services/whatsapp_handler.py
 ────────────────────────────────────────────────────────────────────────
 Brain of the WhatsApp channel. The webhook hands every incoming message here.
 
-  Founder (number in WHATSAPP_OWNER_PHONES)  -> simple commands
-        help | leads | deals | summary | customer <name> | photo/PDF -> OCR
+  Founder (number in WHATSAPP_OWNER_PHONES)  -> Founder Cockpit (whatsapp_owner.py)
   Anyone else (customer)                    -> lead capture + fixed
-        qualification questions (see whatsapp_flow.py) + document OCR
-
-No LLM is needed for the chat flow. OCR reuses the existing pipeline.
+        qualification questions (whatsapp_flow.py) + customer doc upload
 ────────────────────────────────────────────────────────────────────────
 """
 import asyncio
 import logging
-import os
 import re
-import tempfile
 from typing import Dict, List, Optional
 
 from config import settings
+from app.services import document_service as docs
 from app.services import whatsapp_flow as flow
+from app.services import whatsapp_owner as owner
 from app.services import whatsapp_store as store
-from app.services.whatsapp_service import normalize_phone, send_message, send_whatsapp_message, download_media
+from app.services.whatsapp_owner import format_deals, format_leads, format_summary
+from app.services.whatsapp_service import (
+    download_media,
+    normalize_phone,
+    send_message,
+    send_whatsapp_message,
+)
 
 logger = logging.getLogger("whatsapp_handler")
 
 _MIME_SUFFIX = {
-    "application/pdf": ".pdf", "image/jpeg": ".jpg", "image/png": ".png",
-    "audio/ogg": ".ogg", "audio/mpeg": ".mp3", "audio/mp4": ".m4a", "audio/amr": ".amr",
+    "application/pdf": ".pdf",
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "audio/ogg": ".ogg",
+    "audio/mpeg": ".mp3",
+    "audio/mp4": ".m4a",
+    "audio/amr": ".amr",
 }
-_LABEL_ICON = {"HOT": "🔥", "WARM": "🟡", "COLD": "❄️"}
 
 
 # ─── Entry point ──────────────────────────────────────────────────────────
@@ -45,7 +52,7 @@ async def handle_webhook_payload(data: Dict) -> None:
         for change in entry.get("changes", []):
             value = change.get("value", {})
             contacts = {c.get("wa_id"): c.get("profile", {}).get("name") for c in value.get("contacts", [])}
-            for msg in value.get("messages", []):  # 'statuses' (delivery receipts) are ignored
+            for msg in value.get("messages", []):
                 try:
                     await handle_message(msg, contacts.get(msg.get("from")))
                 except Exception:
@@ -53,31 +60,33 @@ async def handle_webhook_payload(data: Dict) -> None:
 
 
 def _extract_input(msg: Dict) -> Dict:
-    """Normalise the different Meta message shapes into one dict."""
+    """Normalise Meta / Twilio message shapes into one dict."""
     mtype = msg.get("type")
-    out = {"type": mtype, "text": None, "reply_id": None, "media_id": None, "mime": None}
+    out = {"type": mtype, "text": None, "reply_id": None, "media_id": None, "mime": None, "filename": None}
     if mtype == "text":
         out["text"] = msg.get("text", {}).get("body", "")
     elif mtype == "interactive":
         inter = msg.get("interactive", {})
         rep = inter.get("button_reply") or inter.get("list_reply") or {}
         out["reply_id"], out["text"] = rep.get("id"), rep.get("title")
-    elif mtype == "button":  # quick-reply on a template
+    elif mtype == "button":
         out["reply_id"], out["text"] = msg.get("button", {}).get("payload"), msg.get("button", {}).get("text")
     elif mtype in ("image", "document", "audio"):
         media = msg.get(mtype, {})
         out["media_id"], out["mime"] = media.get("id"), media.get("mime_type")
         out["text"] = media.get("caption")
+        out["filename"] = media.get("filename")
     return out
 
 
 async def handle_twilio_payload(form: Dict) -> None:
-    """Convert Twilio's form-encoded WhatsApp webhook into our standard message dict."""
+    """Convert Twilio's form-encoded WhatsApp webhook (incl. Content button taps) into standard msg dict."""
     sid = form.get("MessageSid") or form.get("SmsMessageSid")
     from_raw = form.get("From", "")
     profile_name = form.get("ProfileName") or "WhatsApp Client"
     body = form.get("Body", "")
     num_media = int(form.get("NumMedia", "0") or 0)
+    btn_payload = (form.get("ButtonPayload") or form.get("ListId") or "").strip()
 
     if num_media > 0 and form.get("MediaUrl0"):
         mime = form.get("MediaContentType0", "image/jpeg")
@@ -87,6 +96,13 @@ async def handle_twilio_payload(form: Dict) -> None:
             "from": from_raw,
             "type": mtype,
             mtype: {"id": form["MediaUrl0"], "mime_type": mime, "caption": body},
+        }
+    elif btn_payload:
+        msg = {
+            "id": sid,
+            "from": from_raw,
+            "type": "interactive",
+            "interactive": {"type": "button_reply", "button_reply": {"id": btn_payload, "title": body or btn_payload}},
         }
     else:
         msg = {
@@ -101,23 +117,19 @@ async def handle_twilio_payload(form: Dict) -> None:
         logger.exception("Error handling Twilio WhatsApp message")
 
 
-_OWNER_CMDS = {
-    "help", "/help", "hilfe", "?",
-    "leads", "anfragen", "/leads",
-    "deals", "projekte", "projects", "/deals",
-    "summary", "zusammenfassung", "status", "/summary",
-    "reset", "/reset",
-    "customer", "kunde", "find", "/customer",
-    "convert", "/convert",
-    "stage", "/stage",
-}
-
-
-def _is_owner_command(text: Optional[str]) -> bool:
-    if not text:
-        return False
-    cmd = text.strip().lower().partition(" ")[0]
-    return cmd in _OWNER_CMDS
+async def _resolve_audio_text(inp: Dict) -> Optional[str]:
+    if inp["type"] == "audio" and inp["media_id"]:
+        media = await download_media(inp["media_id"])
+        if not media:
+            return None
+        try:
+            from app.services.whisper_service import transcribe_bytes
+            data, mime = media
+            return await asyncio.to_thread(transcribe_bytes, data, _MIME_SUFFIX.get(mime, ".ogg"))
+        except Exception:
+            logger.exception("Voice transcription failed")
+            return None
+    return inp.get("text")
 
 
 async def handle_message(msg: Dict, profile_name: Optional[str] = None) -> None:
@@ -125,65 +137,45 @@ async def handle_message(msg: Dict, profile_name: Optional[str] = None) -> None:
         return
     phone = normalize_phone(msg.get("from"))
     inp = _extract_input(msg)
-    if phone in owner_phones():
-        text = (inp.get("text") or "").strip()
-        session = store.get_session(phone)
-        in_active_flow = session is not None and not session.get("done")
 
-        # Founder testing the qualification flow:
-        # If in active flow, route all input to customer qualification UNLESS founder explicitly types an exit command
-        explicit_exit = text.lower() in ("reset", "/reset", "help", "/help", "leads", "deals", "summary")
-        if in_active_flow and not explicit_exit:
+    if phone in owner_phones():
+        text = ((await _resolve_audio_text(inp)) or inp.get("text") or "").strip()
+        btn_id = (inp.get("reply_id") or "").strip()
+        session = store.get_session(phone)
+        mode = (session or {}).get("mode", "qualify")
+
+        in_qualify_flow = session is not None and mode == "qualify" and not session.get("done")
+        in_owner_wizard = session is not None and mode.startswith("owner_") and mode != "owner_help"
+
+        # 1. Active founder multi-step wizard (schedule / upload / scan / disambig)
+        if in_owner_wizard and not owner.is_explicit_exit(text):
+            await owner.handle_owner(phone, inp, text)
+            return
+
+        # 2. Active qualification test on founder phone (keep numbers '1','2','3' inside funnel)
+        if in_qualify_flow and not owner.is_explicit_exit(text):
             await handle_customer(phone, profile_name or "WhatsApp Client", inp)
             return
 
-        # Not in active flow: if starting qualification test (e.g. "Hallo, ich möchte ein Auto kaufen"):
-        if not _is_owner_command(text) and (
+        # 3. Starting a new qualification test from founder phone
+        if not owner.is_owner_command(text) and not btn_id and (
             flow.detect_intent(text) in ("BUY", "SELL")
             or text.lower() in ("hi", "hallo", "hello", "test")
         ):
+            if mode.startswith("owner_"):
+                store.delete_session(phone)
             await handle_customer(phone, profile_name or "WhatsApp Client", inp)
             return
-        await handle_owner(phone, inp)
+
+        await owner.handle_owner(phone, inp, text)
     else:
         await handle_customer(phone, profile_name or "WhatsApp Client", inp)
 
 
-# ─── OCR (reuses the existing document pipeline) ──────────────────────────
+# ─── OCR helper (kept here so tests can monkeypatch handler.ocr_extract) ──
 
 async def ocr_extract(data: bytes, mime: str) -> Dict:
-    """Bytes -> vehicle specs dict. Uses Claude Vision for images/scans and text extraction for digital PDFs."""
-    from app.services.claude_service import extract_vehicle_specs, extract_vehicle_specs_from_image
-
-    # Image format (JPEG, PNG): use Claude Vision directly for maximum accuracy
-    if (mime or "").startswith("image/"):
-        return await extract_vehicle_specs_from_image(data, mime)
-
-    # PDF format: try digital extraction first
-    from app.services.pdf_service import extract_document_text
-    suffix = _MIME_SUFFIX.get(mime, ".pdf")
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(data)
-        path = tmp.name
-    try:
-        text = await asyncio.to_thread(extract_document_text, path)
-        if text.strip():
-            specs = await extract_vehicle_specs(text)
-            if specs:
-                return specs
-        # If digital text was empty (scanned PDF), rasterize page 0 and use Claude Vision
-        try:
-            import fitz
-            doc = fitz.open(path)
-            if len(doc) > 0:
-                pix = doc[0].get_pixmap(dpi=150)
-                return await extract_vehicle_specs_from_image(pix.tobytes("jpeg"), "image/jpeg")
-        except Exception as e:
-            logger.warning(f"PDF page rasterization failed: {e}")
-        return {}
-    finally:
-        if os.path.exists(path):
-            os.unlink(path)
+    return await docs.scan_document(data, mime, doc_kind="vehicle")
 
 
 async def _specs_from_media(inp: Dict) -> Optional[Dict]:
@@ -198,9 +190,14 @@ async def _specs_from_media(inp: Dict) -> Optional[Dict]:
 
 def _specs_to_lead_fields(specs: Dict) -> Dict:
     mapping = {
-        "manufacturer": "manufacturer", "model": "model", "vin": "vin",
-        "licence_plate": "license_plate", "initial_registration": "initial_registration",
-        "mileage": "mileage", "power_ps": "power_ps", "displacement_ccm": "displacement_ccm",
+        "manufacturer": "manufacturer",
+        "model": "model",
+        "vin": "vin",
+        "licence_plate": "license_plate",
+        "initial_registration": "initial_registration",
+        "mileage": "mileage",
+        "power_ps": "power_ps",
+        "displacement_ccm": "displacement_ccm",
         "tuv_expiry": "tuev_until",
     }
     return {col: str(specs[k]) for k, col in mapping.items() if specs.get(k) is not None}
@@ -214,189 +211,10 @@ def _specs_line(specs: Dict) -> str:
     return name + (f" ({', '.join(extras)})" if extras else "")
 
 
-def _missing_basics(specs: Dict) -> List[str]:
-    return [k for k in ("vin", "manufacturer", "model", "initial_registration") if not specs.get(k)]
-
-
-# ─── Founder side ─────────────────────────────────────────────────────────
-
-HELP_TEXT = (
-    "🚗 *CAR-AGENTS Assistant — Founder Cockpit*\n\n"
-    "📊 *CRM Quick Views:*\n"
-    "• `summary` — KPI snapshot & active deals\n"
-    "• `leads` — Latest 10 leads with quality tags\n"
-    "• `deals` — Active deals and Kanban stages\n"
-    "• `customer <name>` — Find customer, lead, or deal\n\n"
-    "⚡ *CRM Actions (POST/Update):*\n"
-    "• `convert <lead>` — Convert lead into active deal\n"
-    "• `stage <client> <stage>` — Update deal stage\n"
-    "   _(Stages: Intake, Sourcing, Negotiation, Marketing, Completed)_\n\n"
-    "📄 *Vehicle Document OCR:*\n"
-    "• Send a photo or PDF of a Fahrzeugschein to extract specs\n\n"
-    "🔄 *Testing:*\n"
-    "• `reset` — Restart customer qualification test"
-)
-
-OWNER_BUTTONS = [
-    ("summary", "📊 Summary"),
-    ("leads", "👥 Leads"),
-    ("deals", "🚗 Deals"),
-]
-
-
-def _lead_label(lead: Dict) -> str:
-    label = lead.get("lead_label")
-    if not label:
-        m = re.search(r"\b(HOT|WARM|COLD)\b", lead.get("notes") or "")
-        label = m.group(1) if m else None
-    return f"{_LABEL_ICON.get(label, '•')} {label}" if label else "• new"
-
-
-def format_leads(leads: List[Dict]) -> str:
-    if not leads:
-        return "No leads yet."
-    lines = ["Latest leads:"]
-    for i, l in enumerate(leads, 1):
-        intent = (l.get("intent") or "UNKNOWN").replace("_INTENT", "")
-        lines.append(f"{i}. {l.get('name') or 'Unknown'} - {intent} - {_lead_label(l)} ({l.get('channel') or '?'})"
-                     + (f"\n   📞 {l['phone']}" if l.get("phone") else ""))
-    return "\n".join(lines)
-
-
-def format_deals(projects: List[Dict]) -> str:
-    if not projects:
-        return "No active deals."
-    lines = ["Active deals:"]
-    for i, p in enumerate(projects, 1):
-        lines.append(f"{i}. {p.get('client_name')} - {p.get('target_vehicle') or 'n/a'}\n   Stage: {p.get('current_stage') or 'n/a'}")
-    return "\n".join(lines)
-
-
-def format_summary(leads: List[Dict], projects: List[Dict]) -> str:
-    new_leads = sum(1 for l in leads if (l.get("status") or "NEW") == "NEW")
-    hot = sum(1 for l in leads if "HOT" in _lead_label(l))
-    stages: Dict[str, int] = {}
-    for p in projects:
-        stages[p.get("current_stage") or "n/a"] = stages.get(p.get("current_stage") or "n/a", 0) + 1
-    stage_txt = "\n".join(f"   • {k}: {v}" for k, v in stages.items()) or "   none"
-    return (f"📊 *Summary:*\n• New leads: {new_leads}\n• Hot leads: {hot}\n• Active deals: {len(projects)}\n{stage_txt}")
-
-
-async def _owner_text(inp: Dict) -> Optional[str]:
-    """Text of the founder's message; voice notes are transcribed when Whisper is available."""
-    if inp["type"] == "audio" and inp["media_id"]:
-        media = await download_media(inp["media_id"])
-        if not media:
-            return None
-        try:
-            from app.services.whisper_service import transcribe_bytes
-            data, mime = media
-            return await asyncio.to_thread(transcribe_bytes, data, _MIME_SUFFIX.get(mime, ".ogg"))
-        except Exception:
-            logger.exception("Voice transcription failed")
-            return None
-    return inp["text"]
-
-
-async def handle_owner(phone: str, inp: Dict) -> None:
-    if inp["type"] in ("image", "document"):
-        specs = await _specs_from_media(inp)
-        if not specs:
-            await send_message(phone, "I could not read that document. Please send a clear photo or PDF.", buttons=OWNER_BUTTONS)
-            return
-        miss = _missing_basics(specs)
-        reply = f"📄 {_specs_line(specs)}" + (f"\nMissing: {', '.join(miss)}" if miss else "\nAll key fields found ✅")
-        await send_message(phone, reply, buttons=OWNER_BUTTONS)
-        return
-
-    btn_id = (inp.get("reply_id") or "").lower().strip()
-    text = (await _owner_text(inp) or "").strip()
-    low = text.lower()
-
-    if btn_id:
-        cmd, arg = btn_id, ""
-    elif low in ("1", "summary", "📊 summary", "/summary", "zusammenfassung", "status"):
-        cmd, arg = "summary", ""
-    elif low in ("2", "leads", "👥 leads", "/leads", "anfragen"):
-        cmd, arg = "leads", ""
-    elif low in ("3", "deals", "🚗 deals", "/deals", "projekte", "projects"):
-        cmd, arg = "deals", ""
-    elif low in ("reset", "/reset", "🔄 reset"):
-        cmd, arg = "reset", ""
-    elif low in ("help", "/help", "hilfe", "?"):
-        cmd, arg = "help", ""
-    else:
-        cmd, _, arg = low.partition(" ")
-        arg = arg.strip()
-
-    buttons = OWNER_BUTTONS
-
-    if cmd == "reset":
-        store.delete_session(phone)
-        reply = "🔄 Session reset! Send a customer message (e.g. 'Hallo, ich möchte ein Auto kaufen') to test lead qualification, or choose a founder command:"
-        buttons = OWNER_BUTTONS
-    elif cmd == "leads":
-        reply = format_leads(store.list_leads(10))
-        buttons = [("summary", "📊 Summary"), ("deals", "🚗 Deals"), ("reset", "🔄 Reset")]
-    elif cmd == "deals":
-        reply = format_deals(store.list_active_projects())
-        buttons = [("summary", "📊 Summary"), ("leads", "👥 Leads"), ("reset", "🔄 Reset")]
-    elif cmd == "summary":
-        reply = format_summary(store.list_leads(200), store.list_active_projects(100))
-        buttons = [("leads", "👥 Leads"), ("deals", "🚗 Deals"), ("reset", "🔄 Reset")]
-    elif cmd in ("customer", "kunde", "find") and arg:
-        found = store.search_leads_and_projects(arg)
-        reply = "\n\n".join(x for x in (
-            format_leads(found["leads"]) if found["leads"] else "",
-            format_deals(found["projects"]) if found["projects"] else "") if x) or f"Nothing found for '{arg}'."
-        buttons = OWNER_BUTTONS
-    elif cmd in ("convert", "/convert") and arg:
-        proj = store.convert_lead_to_project(arg)
-        if proj:
-            reply = (
-                f"✅ *Lead Converted to Active Deal!*\n\n"
-                f"👤 Client: {proj.get('client_name')}\n"
-                f"🚗 Vehicle: {proj.get('target_vehicle') or 'TBD'}\n"
-                f"📌 Type: {proj.get('project_type')}\n"
-                f"🔄 Stage: {proj.get('current_stage')}\n\n"
-                f"View in portal: https://car-agents-omega.vercel.app/deals"
-            )
-        else:
-            reply = f"❌ No matching lead found for '{arg}'. Use `leads` to view available leads."
-        buttons = [("deals", "🚗 View Deals"), ("leads", "👥 Leads"), ("summary", "📊 Summary")]
-    elif cmd in ("stage", "/stage") and arg:
-        parts = arg.split(maxsplit=1)
-        client_name = parts[0]
-        stage_name = parts[1] if len(parts) > 1 else ""
-        if not stage_name:
-            reply = (
-                "Usage: `stage <client_name> <new_stage>`\n"
-                "Example: `stage Carlos Negotiation`\n"
-                "Valid stages: Intake, Sourcing, Negotiation, Marketing, Completed"
-            )
-        else:
-            updated = store.update_project_stage(client_name, stage_name)
-            if updated:
-                proj, stg = updated
-                reply = (
-                    f"✅ *Stage Updated!*\n\n"
-                    f"👤 Client: {proj.get('client_name')}\n"
-                    f"🚗 Vehicle: {proj.get('target_vehicle') or 'TBD'}\n"
-                    f"🔄 New Stage: *{stg}*"
-                )
-            else:
-                reply = f"❌ Could not update stage. Check client name ('{client_name}') or stage ('{stage_name}')."
-        buttons = [("deals", "🚗 View Deals"), ("summary", "📊 Summary"), ("leads", "👥 Leads")]
-    else:
-        reply = HELP_TEXT
-        buttons = OWNER_BUTTONS
-
-    await send_message(phone, reply, buttons=buttons)
-
-
 async def notify_owner(text: str) -> None:
+    """Push plain-text alert to configured founder numbers (never attaches footer menus)."""
     for p in owner_phones():
-        await send_message(p, text, buttons=[("leads", "👥 Leads"), ("deals", "🚗 Deals"), ("summary", "📊 Summary")])
+        await send_whatsapp_message(p, text)
 
 
 # ─── Customer side ────────────────────────────────────────────────────────
@@ -404,27 +222,40 @@ async def notify_owner(text: str) -> None:
 async def handle_customer(phone: str, name: str, inp: Dict) -> None:
     lead = store.find_lead_by_phone(phone)
     state = store.get_session(phone)
+    # Ignore any owner_* session if starting/continuing customer flow
+    if state is not None and state.get("mode", "qualify") != "qualify":
+        state = None
+
     first_contact = state is None
     if first_contact:
         state = flow.new_state(inp["text"] or "")
+        state["mode"] = "qualify"
 
     if not lead:
         lead = store.create_lead({
-            "name": name, "phone": phone, "channel": "WHATSAPP",
+            "name": name,
+            "phone": phone,
+            "channel": "WHATSAPP",
             "intent": f"{state['intent']}_INTENT" if state["intent"] in ("BUY", "SELL") else "UNKNOWN",
-            "status": "NEW", "message": inp["text"] or f"[{inp['type']}]",
+            "status": "NEW",
+            "message": inp["text"] or f"[{inp['type']}]",
         })
     lead_id = lead.get("id")
     name = lead.get("name") or name
 
     store.save_communication({
-        "lead_id": lead_id, "channel": "WHATSAPP", "sender_name": name, "sender_contact": phone,
-        "subject": "Inbound WhatsApp Message", "body": inp["text"] or f"[{inp['type']}]", "is_inbound": True,
+        "lead_id": lead_id,
+        "channel": "WHATSAPP",
+        "sender_name": name,
+        "sender_contact": phone,
+        "subject": "Inbound WhatsApp Message",
+        "body": inp["text"] or f"[{inp['type']}]",
+        "is_inbound": True,
     })
 
-    # Customer already qualified: don't restart, just pass messages (and documents) to the founder.
+    # Customer already qualified: store uploaded documents (no OCR) & notify founder cleanly.
     if state.get("done"):
-        await _after_done(phone, name, lead_id, inp)
+        await _after_done(phone, name, lead_id, inp, lang=state.get("lang", "de"))
         return
 
     reply = None
@@ -442,7 +273,6 @@ async def handle_customer(phone: str, name: str, inp: Dict) -> None:
             reply = {"text": "Danke! Wir haben Ihre Datei erhalten." if state["lang"] == "de" else "Thanks! We received your file.", "buttons": None}
             await notify_owner(f"📎 {name} (+{phone}) sent a {inp['type']} (could not be read automatically).")
     elif first_contact:
-        # Greet first. If the first message already told us buy/sell, the first question is already the next one.
         reply = flow.prompt(state, first_contact=True)
     else:
         state, reply = flow.handle_input(state, inp["reply_id"], inp["text"])
@@ -450,6 +280,7 @@ async def handle_customer(phone: str, name: str, inp: Dict) -> None:
     if state.get("done"):
         await _on_qualified(lead_id, name, phone, state)
 
+    state.setdefault("mode", "qualify")
     store.save_session(phone, state)
     if reply:
         await send_message(phone, reply["text"], reply.get("buttons"))
@@ -470,8 +301,11 @@ async def _on_qualified(lead_id: str, name: str, phone: str, state: Dict) -> Non
     intent_col = f"{state['intent']}_INTENT" if state.get("intent") in ("BUY", "SELL") else "UNKNOWN"
     store.update_lead(
         lead_id,
-        {"intent": intent_col, "status": "QUALIFIED" if state["label"] in ("HOT", "WARM") else "NEW",
-         "notes": f"WhatsApp qualification: {summ}"},
+        {
+            "intent": intent_col,
+            "status": "QUALIFIED" if state["label"] in ("HOT", "WARM") else "NEW",
+            "notes": f"WhatsApp qualification: {summ}",
+        },
         optional={
             "qualification_stage": "qualified",
             "is_qualified": state["label"] in ("HOT", "WARM"),
@@ -485,22 +319,33 @@ async def _on_qualified(lead_id: str, name: str, phone: str, state: Dict) -> Non
     await notify_owner(f"{summ}\n👤 {name}\n📞 +{phone}")
 
 
-async def _after_done(phone: str, name: str, lead_id: str, inp: Dict) -> None:
-    if inp["type"] in ("image", "document"):
-        specs = await _specs_from_media(inp)
-        if specs:
-            store.update_lead(lead_id, _specs_to_lead_fields(specs))
-            await send_message(phone, _ack_document("de", specs))
-            await notify_owner(f"📄 {name} (+{phone}) sent a document: {_specs_line(specs)}")
+async def _after_done(phone: str, name: str, lead_id: Optional[str], inp: Dict, lang: str = "de") -> None:
+    if inp["type"] in ("image", "document") and inp.get("media_id"):
+        media = await download_media(inp["media_id"])
+        if media:
+            data, mime = media
+            row = await docs.store_uploaded_document(
+                file_bytes=data,
+                filename=inp.get("filename"),
+                mime_type=inp.get("mime") or mime,
+                customer={"name": name, "phone": phone, "lead_id": lead_id},
+                category="other",
+                source="WHATSAPP_CUSTOMER",
+            )
+            ack = "Vielen Dank! Wir haben Ihr Dokument sicher gespeichert." if lang == "de" else "Thank you! We safely stored your document."
+            await send_message(phone, ack)
+            link_line = f"\n🔗 {row['file_url']}" if row.get("file_url") else ""
+            await notify_owner(f"📎 Document uploaded by {name} (+{phone}): {row.get('filename')}{link_line}")
             return
-        else:
-            await send_message(phone, "Danke! Wir haben Ihre Datei erhalten.")
-            await notify_owner(f"📎 {name} (+{phone}) sent a {inp['type']} (could not be read automatically).")
-            return
+        ack = "Danke! Wir haben Ihre Datei erhalten." if lang == "de" else "Thanks! We received your file."
+        await send_message(phone, ack)
+        await notify_owner(f"📎 {name} (+{phone}) sent a {inp['type']}.")
+        return
 
-    # Acknowledge customer so they know their message reached the team
-    await send_message(
-        phone,
+    ack = (
         "Vielen Dank für Ihre Nachricht! Unser Team hat Ihre Nachricht erhalten und meldet sich schnellstmöglich persönlich bei Ihnen."
+        if lang == "de"
+        else "Thank you for your message! Our team received it and will get back to you personally shortly."
     )
+    await send_message(phone, ack)
     await notify_owner(f"💬 {name} (+{phone}): {inp['text'] or '[' + inp['type'] + ']'}")

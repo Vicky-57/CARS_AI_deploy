@@ -22,12 +22,15 @@ _mem_sessions: Dict[str, Dict] = {}
 _mem_leads: Dict[str, Dict] = {}
 _mem_comms: List[Dict] = []
 _mem_projects: List[Dict] = []
+_mem_meetings: List[Dict] = []
+_mem_docs: List[Dict] = []
 _seen_ids: List[str] = []
 _SEEN_MAX = 2000
 
 
 def reset_memory() -> None:
-    _mem_sessions.clear(); _mem_leads.clear(); _mem_comms.clear(); _mem_projects.clear(); _seen_ids.clear()
+    _mem_sessions.clear(); _mem_leads.clear(); _mem_comms.clear(); _mem_projects.clear()
+    _mem_meetings.clear(); _mem_docs.clear(); _seen_ids.clear()
 
 
 def _sb():
@@ -132,36 +135,21 @@ def list_leads(limit: int = 10) -> List[Dict]:
     return _sb().table("leads").select("*").order("created_at", desc=True).limit(limit).execute().data or []
 
 
-def search_leads_and_projects(term: str, limit: int = 5) -> Dict[str, List[Dict]]:
-    term_l = term.lower()
+def search_customers(query: str, limit: int = 10) -> List[Dict]:
+    from app.services import crm_service
     if MEMORY:
-        leads = [l for l in _mem_leads.values() if term_l in (l.get("name") or "").lower()][:limit]
-        projects = [p for p in _mem_projects if term_l in (p.get("client_name") or "").lower()][:limit]
-        return {"leads": leads, "projects": projects}
-    sb = _sb()
-    leads = []
-    projects = []
-    try:
-        leads = sb.table("leads").select("*").ilike("name", f"*{term}*").limit(limit).execute().data or []
-    except Exception as e:
-        logger.warning(f"Search leads failed: {e}")
-    try:
-        projects = sb.table("projects").select("*").ilike("client_name", f"*{term}*").limit(limit).execute().data or []
-    except Exception as e:
-        logger.warning(f"Search projects failed: {e}")
-    return {"leads": leads, "projects": projects}
+        return crm_service.search_customers(query, limit=limit, mem_leads=_mem_leads, mem_projects=_mem_projects)
+    return crm_service.search_customers(query, limit=limit)
+
+
+def recent_customers(limit: int = 8) -> List[Dict]:
+    from app.services import crm_service
+    if MEMORY:
+        return crm_service.recent_customers(limit=limit, mem_leads=_mem_leads, mem_projects=_mem_projects)
+    return crm_service.recent_customers(limit=limit)
 
 
 # ─── Projects (Founder CRM Actions) ───────────────────────────────────────
-
-VALID_STAGES = [
-    "Intake & Onboarding",
-    "Sourcing & Inspection",
-    "Negotiation & Contract",
-    "Marketing & Listing",
-    "Completed & Delivered",
-]
-
 
 def list_active_projects(limit: int = 15) -> List[Dict]:
     if MEMORY:
@@ -172,75 +160,65 @@ def list_active_projects(limit: int = 15) -> List[Dict]:
     )
 
 
-def convert_lead_to_project(lead_query: str) -> Optional[Dict]:
-    """Convert an existing lead into an active CRM project/deal (POST mutation)."""
+def update_project_fields(project_id: str, updates: Dict) -> None:
+    """Update vehicle/client metadata on an existing project."""
+    if not project_id or not updates:
+        return
+    clean = {k: v for k, v in updates.items() if v is not None}
+    if not clean:
+        return
+    clean["updated_at"] = _now()
     if MEMORY:
-        for lid, l in list(_mem_leads.items()):
-            if lead_query.lower() in (l.get("name") or "").lower():
-                proj = {
-                    "id": str(uuid.uuid4()),
-                    "client_name": l.get("name"),
-                    "client_phone": l.get("phone"),
-                    "project_type": "SELL" if "sell" in (l.get("intent") or "").lower() else "BUY",
-                    "target_vehicle": l.get("model") or "Vehicle TBD",
-                    "status": "ACTIVE",
-                    "current_stage": "Intake & Onboarding",
-                    "created_at": _now(),
-                }
-                _mem_projects.append(proj)
-                return proj
-        return None
+        for p in _mem_projects:
+            if p.get("id") == project_id:
+                p.update(clean)
+        return
+    try:
+        _sb().table("projects").update(clean).eq("id", project_id).execute()
+    except Exception as e:
+        logger.warning(f"update_project_fields failed: {e}")
 
-    sb = _sb()
-    leads_res = sb.table("leads").select("*").ilike("name", f"*{lead_query}*").limit(1).execute()
-    if not leads_res.data:
-        leads_res = sb.table("leads").select("*").ilike("phone", f"*{lead_query}*").limit(1).execute()
-    if not leads_res.data:
-        return None
 
-    lead = leads_res.data[0]
-    p_type = "SELL" if "sell" in (lead.get("intent") or "").lower() else "BUY"
-    veh = lead.get("vehicle_interest") or f"{lead.get('manufacturer') or ''} {lead.get('model') or ''}".strip() or "Vehicle TBD"
-    project_data = {
-        "client_name": lead.get("name") or "New Customer",
-        "client_phone": lead.get("phone"),
-        "client_email": lead.get("email"),
-        "project_type": p_type,
-        "target_vehicle": veh,
-        "status": "ACTIVE",
-        "current_stage": "Intake & Onboarding",
-        "notes": lead.get("notes") or f"Converted from WhatsApp lead {lead.get('id')}",
-    }
-    proj_res = sb.table("projects").insert(project_data).execute()
-    return proj_res.data[0] if proj_res.data else project_data
+def convert_lead_to_project(lead_query: str) -> Optional[Dict]:
+    from app.services import crm_service
+    if MEMORY:
+        return crm_service.convert_lead_to_project(lead_query, mem_leads=_mem_leads, mem_projects=_mem_projects)
+    return crm_service.convert_lead_to_project(lead_query)
 
 
 def update_project_stage(client_query: str, target_stage_str: str) -> Optional[Tuple[Dict, str]]:
-    """Update active deal stage (PUT/PATCH mutation)."""
-    matched_stage = None
-    t_low = target_stage_str.lower()
-    for s in VALID_STAGES:
-        if t_low in s.lower():
-            matched_stage = s
-            break
-    if not matched_stage:
-        return None
-
+    from app.services import crm_service
     if MEMORY:
-        for p in _mem_projects:
-            if client_query.lower() in (p.get("client_name") or "").lower():
-                p["current_stage"] = matched_stage
-                return p, matched_stage
-        return None
+        return crm_service.update_project_stage(client_query, target_stage_str, mem_projects=_mem_projects)
+    return crm_service.update_project_stage(client_query, target_stage_str)
 
-    sb = _sb()
-    proj_res = sb.table("projects").select("*").ilike("client_name", f"*{client_query}*").eq("status", "ACTIVE").limit(1).execute()
-    if not proj_res.data:
-        return None
-    proj = proj_res.data[0]
-    sb.table("projects").update({"current_stage": matched_stage}).eq("id", proj["id"]).execute()
-    proj["current_stage"] = matched_stage
-    return proj, matched_stage
+
+# ─── Customer Uploaded Documents ──────────────────────────────────────────
+
+def save_customer_document(payload: Dict) -> Dict:
+    doc = {**payload, "created_at": _now()}
+    if MEMORY:
+        doc.setdefault("id", str(uuid.uuid4()))
+        _mem_docs.append(doc)
+        return doc
+    res = _sb().table("customer_documents").insert(payload).execute()
+    return res.data[0] if res.data else doc
+
+
+def list_customer_documents(lead_id: Optional[str] = None, project_id: Optional[str] = None, limit: int = 20) -> List[Dict]:
+    if MEMORY:
+        out = _mem_docs
+        if lead_id:
+            out = [d for d in out if d.get("lead_id") == lead_id]
+        if project_id:
+            out = [d for d in out if d.get("project_id") == project_id]
+        return out[:limit]
+    q = _sb().table("customer_documents").select("*").order("created_at", desc=True).limit(limit)
+    if lead_id:
+        q = q.eq("lead_id", lead_id)
+    if project_id:
+        q = q.eq("project_id", project_id)
+    return q.execute().data or []
 
 
 # ─── Communications log ───────────────────────────────────────────────────

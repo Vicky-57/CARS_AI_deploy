@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from app.api.v1.endpoints import (
     auth, ocr, voice, classify, contracts, projects,
     webhooks, briefings, google_auth, forms,
-    telegram_bot, outlook, leads
+    telegram_bot, outlook, leads, meetings
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -16,6 +16,7 @@ api_router.include_router(telegram_bot.router)
 
 # ─── Outlook 365 Email & Calendar ────────────────────────────────────────────
 api_router.include_router(outlook.router)
+api_router.include_router(meetings.router)
 
 # ─── CRM: Leads & Projects ───────────────────────────────────────────────────
 api_router.include_router(leads.router)

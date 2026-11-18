@@ -221,17 +221,43 @@ Respond ONLY with this JSON (no markdown):
     }
 
 
-async def extract_vehicle_specs_from_image(image_bytes: bytes, media_type: str = "image/jpeg") -> dict:
-    """Extract vehicle specs directly from document image using Claude multimodal vision."""
+async def _call_claude_vision(image_bytes: bytes, media_type: str, prompt: str, max_tokens: int = 600) -> dict:
+    """Shared Claude Multimodal Vision helper returning parsed non-null JSON fields."""
     import base64
+    import logging
+
     b64 = base64.b64encode(image_bytes).decode("utf-8")
     valid_mime = media_type if media_type in ("image/jpeg", "image/png", "image/gif", "image/webp") else "image/jpeg"
-
     headers = {
         "x-api-key": settings.ANTHROPIC_API_KEY,
         "anthropic-version": "2023-06-01",
         "content-type": "application/json",
     }
+    body = {
+        "model": MODEL,
+        "max_tokens": max_tokens,
+        "messages": [{
+            "role": "user",
+            "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": valid_mime, "data": b64}},
+                {"type": "text", "text": prompt},
+            ],
+        }],
+    }
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            res = await client.post("https://api.anthropic.com/v1/messages", headers=headers, json=body)
+            res.raise_for_status()
+            raw = res.json()["content"][0]["text"]
+            result = _parse_json(raw)
+            return {k: v for k, v in result.items() if v is not None}
+    except Exception as e:
+        logging.getLogger("claude_service").error(f"Claude Vision extraction failed: {e}")
+        return {}
+
+
+async def extract_vehicle_specs_from_image(image_bytes: bytes, media_type: str = "image/jpeg") -> dict:
+    """Extract vehicle specs directly from document image using Claude multimodal vision."""
     prompt = """You are an expert German automotive document scanner for CAR-AGENTS Germany.
 Analyze this image of a vehicle document (Fahrzeugschein / Zulassungsbescheinigung Teil I / Fahrzeugdatenträger).
 Extract the following vehicle specifications:
@@ -257,25 +283,48 @@ Respond ONLY with this exact JSON format (no markdown):
   "displacement_ccm": null,
   "mileage": null
 }"""
-    body = {
-        "model": MODEL,
-        "max_tokens": 600,
-        "messages": [{
-            "role": "user",
-            "content": [
-                {"type": "image", "source": {"type": "base64", "media_type": valid_mime, "data": b64}},
-                {"type": "text", "text": prompt}
-            ]
-        }]
-    }
-    try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            res = await client.post("https://api.anthropic.com/v1/messages", headers=headers, json=body)
-            res.raise_for_status()
-            raw = res.json()["content"][0]["text"]
-            result = _parse_json(raw)
-            return {k: v for k, v in result.items() if v is not None}
-    except Exception as e:
-        import logging
-        logging.getLogger("claude_service").error(f"Claude Vision vehicle extraction failed: {e}")
-        return {}
+    return await _call_claude_vision(image_bytes, media_type, prompt)
+
+
+async def extract_client_details_from_image(image_bytes: bytes, media_type: str = "image/jpeg") -> dict:
+    """Extract client identity & address fields from an ID card / passport / driver's license image."""
+    prompt = """You are an assistant for a German automotive brokerage.
+Analyze this image of an identity card / passport / driver's license (Personalausweis / Reisepass / Führerschein).
+Extract personal details accurately (use null if absent):
+{
+  "first_name": null,
+  "last_name": null,
+  "id_number": null,
+  "date_of_birth": null,
+  "nationality": null,
+  "address": null,
+  "postcode": null,
+  "city": null
+}
+Respond ONLY with valid JSON (no markdown)."""
+    return await _call_claude_vision(image_bytes, media_type, prompt, max_tokens=500)
+
+
+async def extract_any_document_from_image(image_bytes: bytes, media_type: str = "image/jpeg") -> dict:
+    """Extract either vehicle or client details from a general automotive document image."""
+    prompt = """You are an automotive document scanner for CAR-AGENTS Germany.
+Extract any visible client or vehicle details from this document into JSON (use null if missing):
+{
+  "vin": null,
+  "manufacturer": null,
+  "model": null,
+  "licence_plate": null,
+  "initial_registration": null,
+  "tuv_expiry": null,
+  "power_ps": null,
+  "displacement_ccm": null,
+  "mileage": null,
+  "first_name": null,
+  "last_name": null,
+  "id_number": null,
+  "address": null,
+  "postcode": null,
+  "city": null
+}
+Respond ONLY with valid JSON (no markdown)."""
+    return await _call_claude_vision(image_bytes, media_type, prompt)
