@@ -117,41 +117,55 @@ Following the Independent Validation Audit (resolving findings **CA-001 through 
 
 ```
 d:\CARS AI\
-├── AUDIT_REMEDIATION_REPORT.md           # Formal audit findings (CA-001..CA-030) remediation report
-├── MEMORY.md                             # Architectural memory & developer log
 ├── README.md                             # System documentation (this file)
 ├── render.yaml                           # Render cloud deployment blueprint
-├── supabase_schema_v3.sql                # PostgreSQL database schema v3.0
-├── supabase_fields_cheatsheet.md         # Field mapping cheatsheet
+├── docs/
+│   ├── WHATSAPP.md                       # WhatsApp v2 architecture, commands, meetings & OCR/Upload guide
+│   ├── db/
+│   │   ├── supabase_schema_v3.sql        # PostgreSQL database schema v3.0
+│   │   ├── supabase_whatsapp_migration.sql
+│   │   ├── supabase_v3_2_whatsapp_v2.sql # Schema v3.2 (meetings slots + customer_documents)
+│   │   └── supabase_fields_cheatsheet.md # Field mapping cheatsheet
+│   └── archive/                          # Historical scope docs, audit reports & specs
 │
 ├── backend/                              # FastAPI Python Backend Service
 │   ├── main.py                           # App entry point & lifespan scheduler
 │   ├── config.py                         # Pydantic environment configuration
 │   ├── database.py                       # Supabase client singleton & Universal REST fallback
-│   ├── clean_db.py                       # Database sanitization script (mojibake, spam, UUIDs)
 │   ├── requirements.txt                  # Python dependencies
+│   ├── scripts/
+│   │   └── clean_db.py                   # One-off DB utilities & sanitizers
+│   ├── tests/
+│   │   └── test_whatsapp.py              # Offline WhatsApp unit & flow suite
 │   │
 │   └── app/
 │       ├── api/v1/
 │       │   ├── router.py                 # Combined v1 API Router
 │       │   └── endpoints/
 │       │       ├── telegram_bot.py       # Telegram webhook & command endpoints
+│       │       ├── meetings.py           # Free-slot calendar & clash-guarded booking APIs
 │       │       ├── ocr.py                # Vehicle specs & document OCR
 │       │       ├── contracts.py          # Contract pre-filling & PDF generation
 │       │       ├── forms.py              # Customer form sessions & PDF approval engine
 │       │       ├── projects.py           # Deals, expenses & net profit calculations
 │       │       ├── classify.py           # AI intent classification
-│       │       ├── webhooks.py           # External webhook handlers
+│       │       ├── webhooks.py           # WhatsApp webhooks (Meta + Twilio)
 │       │       └── briefings.py          # Executive briefing generator
 │       │
 │       └── services/
+│           ├── crm_service.py            # Unified customer search, disambiguation & conversions
+│           ├── meeting_service.py        # Free slots, clash prevention & .ics email invites
+│           ├── document_service.py       # Separate Upload storage vs OCR template extraction
+│           ├── whatsapp_handler.py       # WhatsApp inbound router & qualification intake
+│           ├── whatsapp_owner.py         # Founder cockpit, Help menu & interactive wizards
+│           ├── whatsapp_buttons.py       # Twilio Content API buttons registry + fallback
 │           ├── telegram_service.py       # Telegram Bot polling, keyboards & message engine
 │           ├── outlook_service.py        # Strato IMAP email poller & spam filter
 │           ├── email_service.py          # Strato SMTP briefing & alert sender
 │           ├── gdrive_service.py         # Google Drive folder creation & cached sync
 │           ├── pdf_service.py            # PDF document generator & template pre-filling
 │           ├── calculator_service.py     # Net profit & financial margin calculator
-│           ├── claude_service.py         # Anthropic Claude 3.5 Sonnet client
+│           ├── claude_service.py         # Anthropic Claude AI & Vision client
 │           └── scheduler_service.py      # APScheduler automated cron jobs
 │
 ├── frontend/                             # React Operations Portal (Vite + React 18)
@@ -212,7 +226,7 @@ python main.py
 ### 2. Database Sanitizer (Optional Utility)
 ```powershell
 cd "d:\CARS AI\backend"
-python clean_db.py
+python scripts/clean_db.py
 ```
 * Scans live Supabase records, cleans corrupted umlauts, removes raw UUID strings, and quarantines spam.
 
