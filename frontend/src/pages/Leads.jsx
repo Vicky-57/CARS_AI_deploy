@@ -10,6 +10,7 @@ import { api } from '../api/api';
 import LeadModal from '../components/LeadModal';
 import LeadDetailPanel from '../components/LeadDetailPanel';
 import Customers from './Customers';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { formatDistanceToNow } from 'date-fns';
 import { cleanText, getCleanInitials, formatContactName, isAutomatedSpam } from '../utils/textUtils';
 
@@ -170,6 +171,11 @@ export default function Leads() {
   const [selectedLead, setSelectedLead] = useState(null);
   const [checkedLeadIds, setCheckedLeadIds] = useState(new Set());
 
+  // Confirm dialog state
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', detail: '', onConfirm: null, variant: 'danger' });
+  const openConfirm = (cfg) => setConfirmDialog({ open: true, variant: 'danger', ...cfg });
+  const closeConfirm = () => setConfirmDialog(d => ({ ...d, open: false }));
+
   const loadLeads = async () => {
     setLoading(true);
     try {
@@ -192,13 +198,21 @@ export default function Leads() {
   };
 
   const handleDeleteSpamLead = async (lead) => {
-    if (!window.confirm(`Permanently remove "${lead.name || lead.email}" from DB?`)) return;
-    setActioningId(lead.id);
-    try {
-      await api.deleteLead(lead.id);
-      if (selectedLead?.id === lead.id) setSelectedLead(null);
-      await loadLeads();
-    } finally { setActioningId(null); }
+    openConfirm({
+      title: 'Delete Lead Permanently',
+      message: `Remove "${lead.name || lead.email}" from the database?`,
+      detail: 'This action cannot be undone. All data for this lead will be erased.',
+      confirmLabel: 'Delete Permanently',
+      onConfirm: async () => {
+        closeConfirm();
+        setActioningId(lead.id);
+        try {
+          await api.deleteLead(lead.id);
+          if (selectedLead?.id === lead.id) setSelectedLead(null);
+          await loadLeads();
+        } finally { setActioningId(null); }
+      },
+    });
   };
 
   const handleConvertLeadToProject = async (lead, skipNavigate = false) => {
@@ -230,37 +244,54 @@ export default function Leads() {
   };
 
   const handleBulkDelete = async () => {
-    if (!window.confirm(`Delete ${checkedLeadIds.size} selected leads?`)) return;
-    setActioningId('bulk');
-    try {
-      for (const id of checkedLeadIds) {
-        await api.deleteLead(id);
-      }
-      setCheckedLeadIds(new Set());
-      await loadLeads();
-    } catch (err) {
-      alert('Error deleting leads: ' + err.message);
-    } finally {
-      setActioningId(null);
-    }
+    openConfirm({
+      title: `Delete ${checkedLeadIds.size} Lead${checkedLeadIds.size > 1 ? 's' : ''}`,
+      message: `Are you sure you want to delete ${checkedLeadIds.size} selected lead${checkedLeadIds.size > 1 ? 's' : ''}?`,
+      detail: 'This action is permanent and cannot be undone.',
+      confirmLabel: `Delete ${checkedLeadIds.size} Lead${checkedLeadIds.size > 1 ? 's' : ''}`,
+      onConfirm: async () => {
+        closeConfirm();
+        setActioningId('bulk');
+        try {
+          for (const id of checkedLeadIds) {
+            await api.deleteLead(id);
+          }
+          setCheckedLeadIds(new Set());
+          await loadLeads();
+        } catch (err) {
+          alert('Error deleting leads: ' + err.message);
+        } finally {
+          setActioningId(null);
+        }
+      },
+    });
   };
 
   const handleBulkConvert = async () => {
-    if (!window.confirm(`Convert ${checkedLeadIds.size} selected leads to active deals?`)) return;
-    setConvertingId('bulk');
-    try {
-      for (const id of checkedLeadIds) {
-        const lead = leads.find(l => l.id === id);
-        if (lead) await handleConvertLeadToProject(lead, true);
-      }
-      setCheckedLeadIds(new Set());
-      await loadLeads();
-      navigate('/projects');
-    } catch (err) {
-      alert('Bulk Conversion Error: ' + err.message);
-    } finally {
-      setConvertingId(null);
-    }
+    openConfirm({
+      title: `Convert ${checkedLeadIds.size} Lead${checkedLeadIds.size > 1 ? 's' : ''} to Deals`,
+      message: `Convert ${checkedLeadIds.size} selected lead${checkedLeadIds.size > 1 ? 's' : ''} to active deals?`,
+      detail: 'Each lead will be converted into a Deal/Project and removed from the leads list.',
+      confirmLabel: 'Convert to Deals',
+      variant: 'info',
+      onConfirm: async () => {
+        closeConfirm();
+        setConvertingId('bulk');
+        try {
+          for (const id of checkedLeadIds) {
+            const lead = leads.find(l => l.id === id);
+            if (lead) await handleConvertLeadToProject(lead, true);
+          }
+          setCheckedLeadIds(new Set());
+          await loadLeads();
+          navigate('/projects');
+        } catch (err) {
+          alert('Bulk Conversion Error: ' + err.message);
+        } finally {
+          setConvertingId(null);
+        }
+      },
+    });
   };
 
   useEffect(() => {
@@ -345,6 +376,16 @@ export default function Leads() {
 
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto', paddingBottom: 48 }}>
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        detail={confirmDialog.detail}
+        confirmLabel={confirmDialog.confirmLabel}
+        variant={confirmDialog.variant}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={closeConfirm}
+      />
       {/* ── Page Header ── */}
       <div className="page-header">
         <div>

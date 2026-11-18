@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Calendar, Plus, X, AlertTriangle, Trash2, Pencil, Clock, ChevronLeft, ChevronRight, RefreshCw, MapPin, Video, User, CheckCircle } from 'lucide-react';
 import { api } from '../api/api';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { format, startOfWeek, addDays, isSameDay, startOfMonth, endOfMonth, addWeeks, subWeeks, addMonths, subMonths } from 'date-fns';
 
 // ─── Meeting Modal ────────────────────────────────────────────────────────────
@@ -430,6 +431,11 @@ export default function CalendarPage() {
   const [selectedDay, setSelectedDay] = useState(null);
   const [outlookConnected, setOutlookConnected] = useState(false);
 
+  // Confirm dialog state
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null });
+  const openConfirm = (cfg) => setConfirmDialog({ open: true, variant: 'danger', ...cfg });
+  const closeConfirm = () => setConfirmDialog(d => ({ ...d, open: false }));
+
   // Merge Supabase Portal meetings + Outlook events
   const allMeetings = [...supabaseMeetings, ...outlookEvents];
 
@@ -475,13 +481,21 @@ export default function CalendarPage() {
   };
 
   const cancel = async (id) => {
-    if (!confirm('Cancel this meeting?')) return;
-    try {
-      if (api.unsyncMeeting) await api.unsyncMeeting(id).catch(() => { });
-      await api.deleteMeeting(id);
-      setSelectedDay(null);
-      loadData(true);
-    } catch (e) { alert(e.message); }
+    openConfirm({
+      title: 'Cancel Meeting',
+      message: 'Are you sure you want to cancel this meeting?',
+      detail: 'The meeting will be permanently removed from your calendar.',
+      confirmLabel: 'Cancel Meeting',
+      onConfirm: async () => {
+        closeConfirm();
+        try {
+          if (api.unsyncMeeting) await api.unsyncMeeting(id).catch(() => { });
+          await api.deleteMeeting(id);
+          setSelectedDay(null);
+          loadData(true);
+        } catch (e) { alert(e.message); }
+      },
+    });
   };
 
   // Today's meetings for the summary strip
@@ -496,6 +510,16 @@ export default function CalendarPage() {
 
   return (
     <div style={{ paddingBottom: 40 }}>
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        detail={confirmDialog.detail}
+        confirmLabel={confirmDialog.confirmLabel}
+        variant={confirmDialog.variant}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={closeConfirm}
+      />
       {/* Frappe Workspace Header */}
       <div className="page-header" style={{ marginBottom: 20 }}>
         <div className="page-header-left">

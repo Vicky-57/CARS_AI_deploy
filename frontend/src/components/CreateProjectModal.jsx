@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Car, Tag, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { api } from '../api/api';
+import ConfirmDialog from './ConfirmDialog';
 import { isValidVIN, isValidEmail, isValidPhone, cleanText } from '../utils/textUtils';
 
 export default function CreateProjectModal({ isOpen, onClose, onCreated, defaultStatus = 'ACTIVE', defaultType = 'SELL' }) {
@@ -23,6 +24,9 @@ export default function CreateProjectModal({ isOpen, onClose, onCreated, default
   });
 
   const [submitting, setSubmitting] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', detail: '', onConfirm: null });
+  const openConfirm = (cfg) => setConfirmDialog({ open: true, variant: 'warning', ...cfg });
+  const closeConfirm = () => setConfirmDialog(d => ({ ...d, open: false }));
 
   useEffect(() => {
     if (!isOpen) return;
@@ -134,13 +138,22 @@ export default function CreateProjectModal({ isOpen, onClose, onCreated, default
         (clientPhone && c.phone && c.phone.replace(/\D/g, '') === clientPhone.replace(/\D/g, ''))
       );
       if (duplicateContact) {
-        const proceed = window.confirm(
-          `A contact with this email/phone already exists: "${duplicateContact.name || duplicateContact.email}".\n\nClick OK to link this project to that customer profile, or Cancel to review.`
-        );
-        if (!proceed) return;
+        openConfirm({
+          title: 'Duplicate Contact Found',
+          message: `A contact already exists: "${duplicateContact.name || duplicateContact.email}"`,
+          detail: 'Proceeding will link this project to that existing customer profile.',
+          confirmLabel: 'Link & Continue',
+          variant: 'warning',
+          onConfirm: () => { closeConfirm(); doSubmit(clientEmail, clientPhone, vinVal); },
+        });
+        return;
       }
     }
 
+    doSubmit(clientEmail, clientPhone, vinVal);
+  };
+
+  const doSubmit = async (clientEmail, clientPhone, vinVal) => {
     setSubmitting(true);
     try {
       const initialStage = 'Intake & Onboarding';
@@ -174,6 +187,16 @@ export default function CreateProjectModal({ isOpen, onClose, onCreated, default
 
   return (
     <div className="modal-overlay" onClick={onClose}>
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        detail={confirmDialog.detail}
+        confirmLabel={confirmDialog.confirmLabel}
+        variant={confirmDialog.variant}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={closeConfirm}
+      />
       <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 540 }}>
         
         {/* Header */}

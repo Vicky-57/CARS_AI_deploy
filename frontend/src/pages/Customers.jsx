@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { api, supabase } from '../api/api';
 import CreateProjectModal from '../components/CreateProjectModal';
 import ContactDetailPanel from '../components/ContactDetailPanel';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { isValidEmail, isValidPhone, cleanText, formatContactName, getCleanInitials, isAutomatedSpam } from '../utils/textUtils';
 
 function getCustomerCar(customer) {
@@ -101,6 +102,11 @@ const Customers = forwardRef(function Customers({ isEmbedded = false, onCustomer
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
   const [checkedCustomerIds, setCheckedCustomerIds] = useState(new Set());
   const [actioningId, setActioningId] = useState(null);
+
+  // Confirm dialog state
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', detail: '', onConfirm: null, variant: 'danger' });
+  const openConfirm = (cfg) => setConfirmDialog({ open: true, variant: 'danger', ...cfg });
+  const closeConfirm = () => setConfirmDialog(d => ({ ...d, open: false }));
 
   const navigate = useNavigate();
   const [newCustomerForm, setNewCustomerForm] = useState({
@@ -378,71 +384,95 @@ const Customers = forwardRef(function Customers({ isEmbedded = false, onCustomer
   const handleDeleteCustomer = async (customer, e) => {
     if (e) e.stopPropagation();
     const name = customer.name || customer.email || 'this customer';
-    if (!window.confirm(`Are you sure you want to delete customer "${name}"?`)) return;
-
-    try {
-      if (customer.email) {
-        await supabase.from('leads').delete().eq('email', customer.email);
-        await supabase.from('projects').delete().eq('client_email', customer.email);
-      }
-      toast.success(`Customer ${name} successfully deleted.`);
-      if (selectedCustomerDetail?.id === customer.id) setSelectedCustomerDetail(null);
-      loadCustomers();
-    } catch (err) {
-      toast.error('Error deleting customer: ' + err.message);
-    }
+    openConfirm({
+      title: 'Delete Customer',
+      message: `Delete "${name}" from your customer directory?`,
+      detail: 'All associated leads and projects for this customer will also be removed.',
+      confirmLabel: 'Delete Customer',
+      onConfirm: async () => {
+        closeConfirm();
+        try {
+          if (customer.email) {
+            await supabase.from('leads').delete().eq('email', customer.email);
+            await supabase.from('projects').delete().eq('client_email', customer.email);
+          }
+          toast.success(`Customer ${name} successfully deleted.`);
+          if (selectedCustomerDetail?.id === customer.id) setSelectedCustomerDetail(null);
+          loadCustomers();
+        } catch (err) {
+          toast.error('Error deleting customer: ' + err.message);
+        }
+      },
+    });
   };
 
   const handleBulkDelete = async () => {
-    if (!window.confirm(`Delete ${checkedCustomerIds.size} selected customers (including all their leads and projects)?`)) return;
-    setActioningId('bulk');
-    try {
-      for (const id of checkedCustomerIds) {
-        const customer = customers.find(c => c.id === id);
-        if (customer && customer.email) {
-          await supabase.from('leads').delete().eq('email', customer.email);
-          await supabase.from('projects').delete().eq('client_email', customer.email);
+    openConfirm({
+      title: `Delete ${checkedCustomerIds.size} Customer${checkedCustomerIds.size > 1 ? 's' : ''}`,
+      message: `Delete ${checkedCustomerIds.size} selected customer${checkedCustomerIds.size > 1 ? 's' : ''}?`,
+      detail: 'All associated leads and projects for these customers will also be permanently removed.',
+      confirmLabel: `Delete ${checkedCustomerIds.size} Customer${checkedCustomerIds.size > 1 ? 's' : ''}`,
+      onConfirm: async () => {
+        closeConfirm();
+        setActioningId('bulk');
+        try {
+          for (const id of checkedCustomerIds) {
+            const customer = customers.find(c => c.id === id);
+            if (customer && customer.email) {
+              await supabase.from('leads').delete().eq('email', customer.email);
+              await supabase.from('projects').delete().eq('client_email', customer.email);
+            }
+          }
+          setCheckedCustomerIds(new Set());
+          toast.success(`Successfully deleted ${checkedCustomerIds.size} customers.`);
+          await loadCustomers();
+        } catch (err) {
+          toast.error('Error deleting customers: ' + err.message);
+        } finally {
+          setActioningId(null);
         }
-      }
-      setCheckedCustomerIds(new Set());
-      toast.success(`Successfully deleted ${checkedCustomerIds.size} customers.`);
-      await loadCustomers();
-    } catch (err) {
-      toast.error('Error deleting customers: ' + err.message);
-    } finally {
-      setActioningId(null);
-    }
+      },
+    });
   };
 
   const handleBulkLaunch = async () => {
-    if (!window.confirm(`Launch Deals/Projects for ${checkedCustomerIds.size} selected customers?`)) return;
-    setActioningId('bulk-launch');
-    try {
-      for (const id of checkedCustomerIds) {
-        const c = customers.find(x => x.id === id);
-        if (c) {
-          const payload = {
-            client_name: c.name || 'Unknown Client',
-            client_email: c.email || null,
-            client_phone: c.phone || null,
-            project_type: 'SELL',
-            target_vehicle: getCustomerCar(c) || '',
-            current_stage: 'Intake & Onboarding',
-            status: 'ACTIVE',
-            notes: 'Bulk launched from Customers page'
-          };
-          await api.createProject(payload).catch(console.error);
+    openConfirm({
+      title: `Launch Deals for ${checkedCustomerIds.size} Customer${checkedCustomerIds.size > 1 ? 's' : ''}`,
+      message: `Create active Deals/Projects for ${checkedCustomerIds.size} selected customer${checkedCustomerIds.size > 1 ? 's' : ''}?`,
+      detail: 'New projects will be created and you\'ll be redirected to the Projects page.',
+      confirmLabel: 'Launch Deals',
+      variant: 'warning',
+      onConfirm: async () => {
+        closeConfirm();
+        setActioningId('bulk-launch');
+        try {
+          for (const id of checkedCustomerIds) {
+            const c = customers.find(x => x.id === id);
+            if (c) {
+              const payload = {
+                client_name: c.name || 'Unknown Client',
+                client_email: c.email || null,
+                client_phone: c.phone || null,
+                project_type: 'SELL',
+                target_vehicle: getCustomerCar(c) || '',
+                current_stage: 'Intake & Onboarding',
+                status: 'ACTIVE',
+                notes: 'Bulk launched from Customers page'
+              };
+              await api.createProject(payload).catch(console.error);
+            }
+          }
+          setCheckedCustomerIds(new Set());
+          toast.success(`Successfully launched projects for ${checkedCustomerIds.size} customers.`);
+          await loadCustomers();
+          navigate('/projects');
+        } catch (err) {
+          toast.error('Bulk Launch Error: ' + err.message);
+        } finally {
+          setActioningId(null);
         }
-      }
-      setCheckedCustomerIds(new Set());
-      toast.success(`Successfully launched projects for ${checkedCustomerIds.size} customers.`);
-      await loadCustomers();
-      navigate('/projects');
-    } catch (err) {
-      toast.error('Bulk Launch Error: ' + err.message);
-    } finally {
-      setActioningId(null);
-    }
+      },
+    });
   };
 
   // Bulk Selection Handlers
@@ -460,6 +490,16 @@ const Customers = forwardRef(function Customers({ isEmbedded = false, onCustomer
 
   return (
     <div style={{ maxWidth: 1280, margin: '0 auto' }}>
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        detail={confirmDialog.detail}
+        confirmLabel={confirmDialog.confirmLabel}
+        variant={confirmDialog.variant}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={closeConfirm}
+      />
       {/* Contact Detail Panel */}
       {selectedCustomerDetail && (
         <ContactDetailPanel
