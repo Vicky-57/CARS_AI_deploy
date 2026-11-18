@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, NavLink, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Users, FolderKanban, MessageSquare,
@@ -9,7 +9,6 @@ import {
 
 import Dashboard from './pages/Dashboard';
 import Leads from './pages/Leads';
-import Customers from './pages/Customers';
 import Projects from './pages/Projects';
 import Deals from './pages/Deals';
 import Communications from './pages/Communications';
@@ -32,7 +31,7 @@ const NAV = [
   {
     section: 'CRM & Brokerage',
     items: [
-      { path: '/leads', icon: Users, label: 'Leads' },
+      { path: '/leads', icon: Users, label: 'Leads / Customers' },
       { path: '/projects', icon: FolderKanban, label: 'Deals & Projects' },
     ],
   },
@@ -47,8 +46,8 @@ const NAV = [
 
 const BREADCRUMB_MAP = {
   '/': ['Workspace', 'Dashboard'],
-  '/leads': ['CRM', 'Leads'],
-  '/customers': ['CRM', 'Customers'],
+  '/leads': ['CRM', 'Leads / Customers'],
+  '/customers': ['CRM', 'Leads / Customers'],
   '/projects': ['Brokerage', 'Deals & Projects'],
   '/deals': ['Brokerage', 'Deals & Projects'],
   '/communications': ['Brokerage', 'Communications'],
@@ -70,7 +69,7 @@ function DeskTopbar({ online, userProfile }) {
     const term = searchTerm.toLowerCase();
     if (term.includes('lead')) navigate('/leads');
     else if (term.includes('deal') || term.includes('project') || term.includes('car')) navigate('/projects');
-    else if (term.includes('customer') || term.includes('client')) navigate('/customers');
+    else if (term.includes('customer') || term.includes('client')) navigate('/leads?tab=customers');
     else if (term.includes('contract') || term.includes('doc') || term.includes('pdf')) navigate('/contracts');
     else if (term.includes('cal') || term.includes('sched')) navigate('/calendar');
     else if (term.includes('set') || term.includes('prof')) navigate('/profile');
@@ -408,7 +407,7 @@ function AppRoutes({ isAuthenticated, online, userProfile, onLogin, onLogout }) 
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/leads" element={<Leads />} />
-              <Route path="/customers" element={<Customers />} />
+              <Route path="/customers" element={<Navigate to="/leads?tab=customers" replace />} />
               <Route path="/communications" element={<Communications />} />
               <Route path="/projects" element={<Projects />} />
               <Route path="/deals" element={<Projects />} />

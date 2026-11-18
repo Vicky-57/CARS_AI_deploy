@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Users, UserPlus, Search, RefreshCw, Mail, Phone, Plus, X, Briefcase, Car, Trash2, Eye, Check, ChevronDown, Filter, Calendar, Loader2, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -50,7 +50,7 @@ function CustomSelect({ value, onChange, options, style }) {
     <div style={{ position: 'relative', ...style }}>
       <button
         className="input input-sm"
-        style={{ 
+        style={{
           width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           background: 'var(--bg-surface)', cursor: 'pointer', textAlign: 'left'
         }}
@@ -82,11 +82,11 @@ function CustomSelect({ value, onChange, options, style }) {
   );
 }
 
-export default function Customers() {
+const Customers = forwardRef(function Customers({ isEmbedded = false, onCustomerCountChange }, ref) {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  
+
   // Filters
   const [showFilters, setShowFilters] = useState(false);
   const [intentFilter, setIntentFilter] = useState('');
@@ -101,7 +101,7 @@ export default function Customers() {
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
   const [checkedCustomerIds, setCheckedCustomerIds] = useState(new Set());
   const [actioningId, setActioningId] = useState(null);
-  
+
   const navigate = useNavigate();
   const [newCustomerForm, setNewCustomerForm] = useState({
     name: '',
@@ -113,6 +113,23 @@ export default function Customers() {
     notes: ''
   });
   const [savingCustomer, setSavingCustomer] = useState(false);
+
+  useImperativeHandle(ref, () => ({
+    refresh: loadCustomers,
+    openAddModal: () => {
+      setEditingCustomer(null);
+      setNewCustomerForm({
+        name: '',
+        email: '',
+        phone: '',
+        intent: 'BUY',
+        vehicle: '',
+        year: '',
+        notes: ''
+      });
+      setIsAddCustomerOpen(true);
+    }
+  }));
 
   const loadCustomers = async () => {
     setLoading(true);
@@ -173,6 +190,7 @@ export default function Customers() {
       allCustomers.sort((a, b) => new Date(b.last_interaction || 0) - new Date(a.last_interaction || 0));
 
       setCustomers(allCustomers);
+      if (onCustomerCountChange) onCustomerCountChange(allCustomers.length);
     } catch (err) {
       console.error('Failed to load customers:', err);
     } finally {
@@ -221,12 +239,12 @@ export default function Customers() {
       const now = new Date();
       // Calculate start of today for accurate "today" filtering
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      
+
       if (dateFilter === 'TODAY' && lastInt < today) return false;
-      
+
       const diffTime = Math.abs(now - lastInt);
       const diffDays = diffTime / (1000 * 60 * 60 * 24);
-      
+
       if (dateFilter === 'WEEK' && diffDays > 7) return false;
       if (dateFilter === 'MONTH' && diffDays > 30) return false;
     }
@@ -281,7 +299,7 @@ export default function Customers() {
             await api.updateProject(inter.details.id, { client_name: nameVal, client_email: emailVal || null, client_phone: phoneVal || null });
           }
         }
-        
+
         // Artificial delay for better UX feeling
         await new Promise(resolve => setTimeout(resolve, 800));
 
@@ -289,12 +307,12 @@ export default function Customers() {
         setIsAddCustomerOpen(false);
         setEditingCustomer(null);
         loadCustomers();
-        
+
         // If the side panel is open, update it
         if (selectedCustomerDetail?.id === editingCustomer.id) {
-           setSelectedCustomerDetail(prev => ({
-             ...prev, name: nameVal, email: emailVal || null, phone: phoneVal || null
-           }));
+          setSelectedCustomerDetail(prev => ({
+            ...prev, name: nameVal, email: emailVal || null, phone: phoneVal || null
+          }));
         }
         return;
       }
@@ -476,21 +494,23 @@ export default function Customers() {
         />
       )}
 
-      {/* Frappe Header */}
-      <div className="page-header">
-        <div className="page-header-left">
-          <h1 className="page-title">Customers</h1>
-          <p className="page-subtitle">Manage client relationships, contact records, and active deal histories.</p>
+      {/* Frappe Header (hidden when embedded in Leads tabs) */}
+      {!isEmbedded && (
+        <div className="page-header">
+          <div className="page-header-left">
+            <h1 className="page-title">Customers</h1>
+            <p className="page-subtitle">Manage client relationships, contact records, and active deal histories.</p>
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button className="btn btn-secondary btn-sm" onClick={loadCustomers} title="Refresh Directory">
+              <RefreshCw size={13} /> Refresh
+            </button>
+            <button className="btn btn-primary" onClick={() => setIsAddCustomerOpen(true)}>
+              <Plus size={14} /> Add Customer
+            </button>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button className="btn btn-secondary btn-sm" onClick={loadCustomers} title="Refresh Directory">
-            <RefreshCw size={13} /> Refresh
-          </button>
-          <button className="btn btn-primary" onClick={() => setIsAddCustomerOpen(true)}>
-            <Plus size={14} /> Add Customer
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* Tabs & Search Outside Container */}
       <div style={{ marginBottom: 16, padding: '0 4px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
@@ -512,8 +532,8 @@ export default function Customers() {
         </div>
 
         <div style={{ display: 'flex', gap: 8 }}>
-          <button 
-            className="btn btn-secondary btn-sm" 
+          <button
+            className="btn btn-secondary btn-sm"
             style={{ padding: '6px 12px', background: showFilters ? 'var(--bg-surface-subtle)' : 'transparent', border: '1px solid var(--border)' }}
             onClick={() => setShowFilters(!showFilters)}
           >
@@ -532,7 +552,7 @@ export default function Customers() {
           </div>
         </div>
       </div>
-      
+
       {/* Horizontal Filters Bar */}
       {showFilters && (
         <div style={{ marginBottom: 16, padding: '12px 16px', background: 'var(--bg-surface-subtle)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
@@ -593,7 +613,7 @@ export default function Customers() {
               ]}
             />
           </div>
-          
+
           <div style={{ display: 'flex', alignItems: 'flex-end', marginLeft: 'auto' }}>
             <button className="btn btn-secondary btn-sm" onClick={() => { setIntentFilter(''); setTypeFilter(''); setVehicleFilter(''); setDateFilter(''); }}>
               Clear Filters
@@ -603,7 +623,7 @@ export default function Customers() {
       )}
 
       <div className="frappe-list-container">
-        
+
         {/* Bulk Action Bar overlay */}
         {checkedCustomerIds.size > 0 && (
           <div className="bulk-action-bar" style={{
@@ -615,17 +635,17 @@ export default function Customers() {
               <span className="badge badge-blue" style={{ fontSize: '0.8rem', padding: '2px 8px' }}>
                 {checkedCustomerIds.size} selected
               </span>
-              <button 
-                className="btn btn-primary btn-sm" 
-                onClick={handleBulkLaunch} 
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handleBulkLaunch}
                 disabled={actioningId === 'bulk-launch'}
                 style={{ padding: '6px 12px' }}
               >
                 {actioningId === 'bulk-launch' ? <Loader2 size={13} className="spin" /> : <Briefcase size={13} />}
                 Launch Deal / Project
               </button>
-              <button 
-                className="btn btn-danger btn-sm btn-icon" 
+              <button
+                className="btn btn-danger btn-sm btn-icon"
                 onClick={handleBulkDelete}
                 disabled={actioningId === 'bulk'}
                 title="Delete Selected"
@@ -656,8 +676,8 @@ export default function Customers() {
             <thead>
               <tr>
                 <th style={{ width: 40, textAlign: 'center' }}>
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     onChange={handleSelectAll}
                     checked={paginated.length > 0 && checkedCustomerIds.size === paginated.length}
                   />
@@ -675,99 +695,99 @@ export default function Customers() {
               {paginated.map(customer => {
                 const isChecked = checkedCustomerIds.has(customer.id);
                 return (
-                <tr key={customer.id} className={`crm-row ${isChecked ? 'selected' : ''}`} style={{ cursor: 'pointer' }} onClick={() => setSelectedCustomerDetail(customer)}>
-                  <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-                    <input 
-                      type="checkbox" 
-                      checked={isChecked}
-                      onChange={(e) => handleSelectOne(e, customer.id)}
-                    />
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div className="notranslate" style={{
-                        width: 30, height: 30, borderRadius: 'var(--radius-xs)',
-                        background: 'var(--bg-surface-subtle)',
-                        border: '1px solid var(--border)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '0.75rem', fontWeight: 700,
-                        color: 'var(--text-primary)', flexShrink: 0
-                      }}>
-                        {getInitials(customer.name, customer.email)}
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.85rem' }}>
-                          {formatContactName(customer.name, customer.email, getCustomerCar(customer))}
-                        </span>
-                        {/-mo-mo@kontakt\.mobile\.de/i.test(customer.email || '') && (
-                          <span className="badge badge-gray" style={{ fontSize: '0.65rem', padding: '1px 5px', fontWeight: 600 }} title="Anonymized proxy relay from mobile.de">
-                            mobile.de
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="hide-on-mobile">
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                      <div>{cleanText(customer.email || '—')}</div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>{cleanText(customer.phone || '')}</div>
-                    </div>
-                  </td>
-                  <td>
-                    {(() => {
-                      const car = getCustomerCar(customer);
-                      return car ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-                          <Car size={13} color="var(--text-secondary)" style={{ flexShrink: 0 }} />
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{car}</span>
+                  <tr key={customer.id} className={`crm-row ${isChecked ? 'selected' : ''}`} style={{ cursor: 'pointer' }} onClick={() => setSelectedCustomerDetail(customer)}>
+                    <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => handleSelectOne(e, customer.id)}
+                      />
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div className="notranslate" style={{
+                          width: 30, height: 30, borderRadius: 'var(--radius-xs)',
+                          background: 'var(--bg-surface-subtle)',
+                          border: '1px solid var(--border)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: '0.75rem', fontWeight: 700,
+                          color: 'var(--text-primary)', flexShrink: 0
+                        }}>
+                          {getInitials(customer.name, customer.email)}
                         </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.85rem' }}>
+                            {formatContactName(customer.name, customer.email, getCustomerCar(customer))}
+                          </span>
+                          {/-mo-mo@kontakt\.mobile\.de/i.test(customer.email || '') && (
+                            <span className="badge badge-gray" style={{ fontSize: '0.65rem', padding: '1px 5px', fontWeight: 600 }} title="Anonymized proxy relay from mobile.de">
+                              mobile.de
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="hide-on-mobile">
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                        <div>{cleanText(customer.email || '—')}</div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>{cleanText(customer.phone || '')}</div>
+                      </div>
+                    </td>
+                    <td>
+                      {(() => {
+                        const car = getCustomerCar(customer);
+                        return car ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                            <Car size={13} color="var(--text-secondary)" style={{ flexShrink: 0 }} />
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{car}</span>
+                          </div>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>—</span>
+                        );
+                      })()}
+                    </td>
+                    <td className="hide-on-mobile">
+                      <span className="badge badge-gray">
+                        {customer.interactions.length} {customer.interactions.length === 1 ? 'record' : 'records'}
+                      </span>
+                    </td>
+                    <td className="hide-on-mobile">
+                      {customer.interactions.length > 1 ? (
+                        <span className="badge badge-amber">Repeat</span>
                       ) : (
-                        <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>—</span>
-                      );
-                    })()}
-                  </td>
-                  <td className="hide-on-mobile">
-                    <span className="badge badge-gray">
-                      {customer.interactions.length} {customer.interactions.length === 1 ? 'record' : 'records'}
-                    </span>
-                  </td>
-                  <td className="hide-on-mobile">
-                    {customer.interactions.length > 1 ? (
-                      <span className="badge badge-amber">Repeat</span>
-                    ) : (
-                      <span className="badge badge-blue">New</span>
-                    )}
-                  </td>
-                  <td className="hide-on-mobile" style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-                    {customer.last_interaction ? new Date(customer.last_interaction).toLocaleDateString('de-DE') : '—'}
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
-                      <button
-                        className="btn btn-secondary btn-sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingCustomer(customer);
-                          setNewCustomerForm({
-                            name: customer.name || '',
-                            email: customer.email || '',
-                            phone: customer.phone || '',
-                            intent: 'BUY', vehicle: '', year: '', notes: ''
-                          });
-                          setIsAddCustomerOpen(true);
-                        }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="btn btn-secondary btn-sm"
-                        onClick={(e) => { e.stopPropagation(); setSelectedCustomerDetail(customer); }}
-                      >
-                        View <ArrowRight size={11} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                        <span className="badge badge-blue">New</span>
+                      )}
+                    </td>
+                    <td className="hide-on-mobile" style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                      {customer.last_interaction ? new Date(customer.last_interaction).toLocaleDateString('de-DE') : '—'}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingCustomer(customer);
+                            setNewCustomerForm({
+                              name: customer.name || '',
+                              email: customer.email || '',
+                              phone: customer.phone || '',
+                              intent: 'BUY', vehicle: '', year: '', notes: ''
+                            });
+                            setIsAddCustomerOpen(true);
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={(e) => { e.stopPropagation(); setSelectedCustomerDetail(customer); }}
+                        >
+                          View <ArrowRight size={11} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
                 );
               })}
             </tbody>
@@ -943,4 +963,6 @@ export default function Customers() {
 
     </div>
   );
-}
+});
+
+export default Customers;
