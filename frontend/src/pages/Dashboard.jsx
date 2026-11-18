@@ -4,10 +4,12 @@ import {
   Users, FolderKanban, Calendar,
   ArrowUpRight, TrendingUp, FileText,
   CheckCircle, ChevronRight, Plus, ExternalLink,
-  Tag, WifiOff, Clock, AlertCircle, MessageCircle, Inbox
+  Tag, WifiOff, Clock, AlertCircle, MessageCircle, Inbox,
+  Flame, Phone, Sunrise
 } from 'lucide-react';
 import { api } from '../api/api';
 import { format, formatDistanceToNow } from 'date-fns';
+import { cleanText, isAutomatedSpam, formatContactName, getCleanInitials } from '../utils/textUtils';
 
 const greeting = () => {
   const h = new Date().getHours();
@@ -17,16 +19,36 @@ const greeting = () => {
 };
 
 const intentKind = (intent) => {
-  if (intent === 'BUY_INTENT' || intent === 'BUY') return 'buy';
-  if (intent === 'SELL_INTENT' || intent === 'SELL') return 'sell';
+  const upper = (intent || '').toUpperCase();
+  if (upper.includes('BUY')) return 'buy';
+  if (upper.includes('SELL')) return 'sell';
   return 'new';
 };
 
 const INTENT_LABEL = { buy: 'Buy intent', sell: 'Sell intent', new: 'New lead' };
 
+const getLeadVehicle = (lead) => {
+  if (lead.vehicle_interest) return cleanText(lead.vehicle_interest);
+  if (lead.vehicle) return cleanText(lead.vehicle);
+  if (lead.manufacturer || lead.model) return cleanText(`${lead.manufacturer || ''} ${lead.model || ''}`.trim());
+  const text = `${lead.subject || ''} ${lead.message || ''} ${lead.notes || ''}`;
+  const carMatch = text.match(/(Porsche\s+[\w\d.\s()-]+|BMW\s+[\w\d.\s-]+|Audi\s+[\w\d.\s-]+|Mercedes-?Benz?\s+[\w\d.\s-]+|VW\s+[\w\d.\s-]+|Volkswagen\s+[\w\d.\s-]+)/i);
+  if (carMatch) return cleanText(carMatch[0].split('\n')[0].split('-')[0].trim().slice(0, 35));
+  return null;
+};
+
+const isWhatsAppHotLead = (lead) => {
+  if (!lead) return false;
+  const isSpam = lead.status === 'SPAM' || isAutomatedSpam(lead);
+  if (isSpam) return false;
+  const srcRaw = (lead.source || lead.channel || '').toUpperCase();
+  const labelKey = (lead.label || lead.lead_label || '').toLowerCase();
+  return srcRaw.includes('WHATSAPP') && labelKey === 'hot';
+};
+
 export default function Dashboard() {
   const [summary, setSummary] = useState(null);
-  const [leads, setLeads] = useState([]);
+  const [allLeads, setAllLeads] = useState([]);
   const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [waStatus, setWaStatus] = useState(null); // WhatsApp status
@@ -36,13 +58,13 @@ export default function Dashboard() {
       try {
         const [summaryRes, leadsRes, meetingsRes, waRes] = await Promise.allSettled([
           api.getPipelineSummary(),
-          api.getLeads({}, 6),
+          api.getLeads({}),
           api.getMeetings({}, 4),
           api.getWhatsAppStatus ? api.getWhatsAppStatus() : Promise.resolve(null),
         ]);
 
         if (summaryRes.status === 'fulfilled') setSummary(summaryRes.value);
-        if (leadsRes.status === 'fulfilled') setLeads(leadsRes.value.slice(0, 6));
+        if (leadsRes.status === 'fulfilled') setAllLeads(Array.isArray(leadsRes.value) ? leadsRes.value : []);
         if (meetingsRes.status === 'fulfilled') setMeetings(meetingsRes.value.slice(0, 4));
         if (waRes.status === 'fulfilled' && waRes.value) setWaStatus(waRes.value);
       } finally {
@@ -50,7 +72,20 @@ export default function Dashboard() {
       }
     };
     fetchAll();
+
+    const sub = api.subscribeToLeads
+      ? api.subscribeToLeads(async () => {
+        try {
+          const latestLeads = await api.getLeads({});
+          if (Array.isArray(latestLeads)) setAllLeads(latestLeads);
+        } catch { /* ignore background refresh errors */ }
+      })
+      : null;
+    return () => { if (sub) sub.unsubscribe(); };
   }, []);
+
+  const leads = allLeads.slice(0, 6);
+  const whatsappHotLeads = allLeads.filter(isWhatsAppHotLead);
 
   const sellDeals = summary?.active_sell_deals || 0;
   const buyDeals = summary?.active_buy_deals || 0;
@@ -102,7 +137,7 @@ export default function Dashboard() {
 
   const waConnected = waStatus?.connected === true;
   const waDown = waStatus?.connected === false;
-  const hotNoReply = waStatus?.hot_no_reply || 0;
+  const hotCount = whatsappHotLeads.length;
 
   return (
     <div className="dash">
@@ -192,48 +227,123 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* ── WhatsApp channel strip ─────────────────────────────────────────── */}
-      <div className="dash-card dash-channel">
-        <div className="dash-channel-brand">
-          <div className="dash-channel-logo">
-            <img src="/assets/whatsapp.png" alt="WhatsApp" />
+      {/* ── WhatsApp channel panel ─────────────────────────────────────────── */}
+      <section className="wa-panel">
+        <header className="wa-head">
+          <div className="wa-brand">
+            <div className="wa-logo">
+              <img src="/assets/whatsapp.png" alt="WhatsApp" />
+            </div>
+            <div>
+              <div className="wa-title">WhatsApp channel</div>
+              {waDown ? (
+                <span className="wa-chip bad"><WifiOff size={11} /> Not connected</span>
+              ) : waConnected ? (
+                <span className="wa-chip ok"><span className="dash-live" /> Connected</span>
+              ) : (
+                <span className="wa-chip"><Clock size={11} /> Pending Meta approval</span>
+              )}
+            </div>
           </div>
-          <div>
-            <div className="dash-channel-name">WhatsApp channel</div>
-            {waDown ? (
-              <div className="dash-status bad"><WifiOff size={11} /> Not connected</div>
-            ) : waConnected ? (
-              <div className="dash-status ok"><span className="dash-live" /> Connected</div>
-            ) : (
-              <div className="dash-status"><Clock size={11} /> Pending Meta approval</div>
+
+          <div className="wa-head-right">
+            <div className={`wa-briefing ${waStatus?.briefing_sent ? 'done' : ''}`}>
+              <div className="wa-briefing-icon">
+                {waStatus?.briefing_sent ? <CheckCircle size={15} /> : <Sunrise size={15} />}
+              </div>
+              <div>
+                <small>Morning briefing</small>
+                <strong>{waStatus?.briefing_sent ? 'Sent today' : 'Pending'}</strong>
+              </div>
+            </div>
+
+            <NavLink to="/leads?source=WHATSAPP&label=Hot" className="wa-cta">
+              <Inbox size={14} /> <span><span className="wa-cta-long">View </span>hot leads</span> <ChevronRight size={13} />
+            </NavLink>
+          </div>
+        </header>
+
+        <div className="wa-body">
+          <div className="wa-list-head">
+            <div className="wa-list-title">
+              <span className="wa-flame"><Flame size={12} /></span>
+              Hot leads
+              {!loading && <span className="wa-count">{hotCount}</span>}
+            </div>
+            {!loading && hotCount > 5 && (
+              <NavLink to="/leads?source=WHATSAPP&label=Hot" className="dash-link">
+                View all {hotCount} <ChevronRight size={13} />
+              </NavLink>
             )}
           </div>
-        </div>
 
-        <div className="dash-channel-item">
-          <small>Morning briefing</small>
-          <span className={waStatus?.briefing_sent ? 'good' : ''}>
-            {waStatus?.briefing_sent
-              ? <CheckCircle size={14} />
-              : <Clock size={14} color="var(--text-muted)" />}
-            {waStatus?.briefing_sent ? 'Sent today' : 'Pending'}
-          </span>
-        </div>
+          {loading ? (
+            <div className="wa-list">
+              {[0, 1].map(i => (
+                <div key={i} className="wa-lead wa-lead-skel">
+                  <span className="dash-skel" style={{ width: 44, height: 44, borderRadius: '50%' }} />
+                  <div>
+                    <span className="dash-skel block" style={{ width: '60%', marginBottom: 6 }} />
+                    <span className="dash-skel block" style={{ width: '40%', height: '0.8em' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : hotCount === 0 ? (
+            <div className="wa-empty">
+              <CheckCircle size={18} />
+              <div>
+                <div className="wa-empty-title">No hot leads right now</div>
+                <div className="wa-empty-sub">New hot WhatsApp enquiries will appear here as they arrive.</div>
+              </div>
+            </div>
+          ) : (
+            <div className="wa-list">
+              {whatsappHotLeads.slice(0, 5).map((lead, idx) => {
+                const vehicle = getLeadVehicle(lead);
+                const kind = intentKind(lead.intent);
+                const rawSummary = lead.label_reason || vehicle || lead.car_details || lead.notes || lead.message || '';
+                const cleanSummary = cleanText(rawSummary.replace(/<[^>]*>/g, ''));
+                const shortSummary = cleanSummary.length > 90 ? cleanSummary.slice(0, 90) + '…' : cleanSummary;
 
-        <div className="dash-channel-item">
-          <small>Hot leads without reply</small>
-          <span className={hotNoReply > 0 ? 'warn' : ''}>
-            {hotNoReply > 0
-              ? <AlertCircle size={14} />
-              : <CheckCircle size={14} color="var(--text-muted)" />}
-            {waStatus?.hot_no_reply != null ? `${waStatus.hot_no_reply} ${waStatus.hot_no_reply === 1 ? 'lead' : 'leads'}` : '—'}
-          </span>
-        </div>
+                return (
+                  <NavLink
+                    key={lead.id}
+                    to={`/leads?source=WHATSAPP&label=Hot&lead=${lead.id}`}
+                    className="wa-lead"
+                    style={{ '--i': idx }}
+                  >
+                    <div className="wa-avatar-wrap">
+                      <div className={`dash-avatar ${kind} wa-avatar`}>
+                        {getCleanInitials(lead.name, lead.email)}
+                      </div>
+                      <span className="wa-avatar-flag" title="Hot lead"><Flame size={9} /></span>
+                    </div>
 
-        <NavLink to="/leads" className="dash-link dash-channel-cta">
-          <Inbox size={14} style={{ marginRight: 4 }} /> View leads <ChevronRight size={13} />
-        </NavLink>
-      </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div className="wa-name">{formatContactName(lead.name, lead.email, vehicle)}</div>
+                      <div className="wa-phone">
+                        <Phone size={11} /> {cleanText(lead.phone || lead.email || 'WhatsApp')}
+                      </div>
+                    </div>
+
+                    <span className={`dash-pill ${kind}`}>{INTENT_LABEL[kind]}</span>
+
+                    <div className="wa-note">
+                      {shortSummary || <span style={{ color: 'var(--text-muted)' }}>No details yet</span>}
+                    </div>
+
+                    <div className="wa-lead-end">
+                      <span className="wa-time">{timeAgo(lead.created_at)}</span>
+                      <ChevronRight size={15} className="wa-arrow" />
+                    </div>
+                  </NavLink>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* ── Main grid ──────────────────────────────────────────────────────── */}
       <div className="dash-grid">

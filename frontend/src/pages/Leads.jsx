@@ -151,13 +151,18 @@ export default function Leads() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  // New Filters
-  const [showFilters, setShowFilters] = useState(false);
+  // New Filters (supports deep-linking e.g. /leads?source=WHATSAPP&label=Hot&lead=<id>)
+  const urlSource = searchParams.get('source') || '';
+  const urlLabel = searchParams.get('label') || '';
+  const urlLeadId = searchParams.get('lead') || '';
+
+  const [showFilters, setShowFilters] = useState(Boolean(urlSource || urlLabel));
   const [statusFilter, setStatusFilter] = useState('');
   const [intentFilter, setIntentFilter] = useState('');
-  const [sourceFilter, setSourceFilter] = useState('');
-  const [labelFilter, setLabelFilter] = useState('');
+  const [sourceFilter, setSourceFilter] = useState(urlSource);
+  const [labelFilter, setLabelFilter] = useState(urlLabel);
   const [sortOrder, setSortOrder] = useState('label');
+  const autoOpenedLeadRef = useRef(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLead, setEditingLead] = useState(null);
@@ -266,6 +271,15 @@ export default function Leads() {
     return () => { if (sub) sub.unsubscribe(); };
   }, []);
 
+  useEffect(() => {
+    if (!urlLeadId || !leads.length || autoOpenedLeadRef.current === urlLeadId) return;
+    const match = leads.find(l => String(l.id) === String(urlLeadId));
+    if (match) {
+      setSelectedLead(match);
+      autoOpenedLeadRef.current = urlLeadId;
+    }
+  }, [leads, urlLeadId]);
+
   // Filtering
   const filtered = leads.filter(l => {
     // 1. Status Filter
@@ -280,12 +294,18 @@ export default function Leads() {
     else if (intentFilter === 'BUY') { if (!lIntent.includes('BUY')) return false; }
 
     // 3. Source Filter
-    const lSource = (l.channel || 'MANUAL').toUpperCase();
-    if (sourceFilter && lSource !== sourceFilter) return false;
+    const lSource = (l.source || l.channel || 'MANUAL').toUpperCase();
+    if (sourceFilter) {
+      if (sourceFilter === 'WHATSAPP') {
+        if (!lSource.includes('WHATSAPP')) return false;
+      } else if (lSource !== sourceFilter) {
+        return false;
+      }
+    }
 
     // 4. Label Filter (Hot / Warm / Cold)
     if (labelFilter) {
-      const lLabel = (l.label || '').toLowerCase();
+      const lLabel = (l.label || l.lead_label || '').toLowerCase();
       if (lLabel !== labelFilter.toLowerCase()) return false;
     }
 
@@ -305,8 +325,8 @@ export default function Leads() {
   const LABEL_ORDER = { hot: 0, warm: 1, cold: 2, '': 3 };
   filtered.sort((a, b) => {
     if (sortOrder === 'label') {
-      const lA = LABEL_ORDER[(a.label || '').toLowerCase()] ?? 3;
-      const lB = LABEL_ORDER[(b.label || '').toLowerCase()] ?? 3;
+      const lA = LABEL_ORDER[(a.label || a.lead_label || '').toLowerCase()] ?? 3;
+      const lB = LABEL_ORDER[(b.label || b.lead_label || '').toLowerCase()] ?? 3;
       if (lA !== lB) return lA - lB;
       return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
     }
@@ -508,7 +528,7 @@ export default function Leads() {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'flex-end', marginLeft: 'auto' }}>
-                  <button className="btn btn-secondary btn-sm" onClick={() => { setStatusFilter(''); setIntentFilter(''); setSourceFilter(''); setLabelFilter(''); }}>
+                  <button className="btn btn-secondary btn-sm" onClick={() => { setStatusFilter(''); setIntentFilter(''); setSourceFilter(''); setLabelFilter(''); setSearchParams({}, { replace: true }); }}>
                     Clear Filters
                   </button>
                 </div>
@@ -556,7 +576,7 @@ export default function Leads() {
                       const isChecked = checkedLeadIds.has(lead.id);
 
                       // Label badge helper — lucide icons, no emojis
-                      const labelKey = (lead.label || '').toLowerCase();
+                      const labelKey = (lead.label || lead.lead_label || '').toLowerCase();
                       const labelBadge = labelKey === 'hot'
                         ? (
                           <span className="badge badge-red" title={lead.label_reason || 'Hot lead'}
