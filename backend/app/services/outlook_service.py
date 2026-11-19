@@ -856,30 +856,22 @@ async def poll_outlook_inbound_emails() -> List[Dict]:
                             if new_lead.data:
                                 lead_id = new_lead.data[0]["id"]
                                 logger.info(f"New lead created: {sender_name} <{sender_email}>")
-                                # Send Telegram alert for new email lead with inline action buttons
+                                # Send WhatsApp alert for new email lead
                                 try:
-                                    from app.services.telegram_service import send_telegram_message
+                                    from app.services.whatsapp_service import send_whatsapp_message
+                                    from config import settings as _s
                                     lead_disp_name = sender_name or sender_email
-                                    inline_btns = {
-                                        "inline_keyboard": [
-                                            [
-                                                {"text": "⚡ Convert to Project", "callback_data": f"/convert {lead_disp_name}"},
-                                                {"text": "📋 View Leads", "callback_data": "/leads"}
-                                            ]
-                                        ]
-                                    }
-                                    await send_telegram_message(
-                                        f"📩 <b>Neue E-Mail-Anfrage eingetroffen!</b>\n\n"
-                                        f"👤 <b>Name:</b> {_h(lead_disp_name)}\n"
-                                        f"📧 <b>E-Mail:</b> {_h(sender_email)}\n"
-                                        f"📌 <b>Intent:</b> {_h(intent)}\n"
-                                        f"📝 <b>Betreff:</b> {_h(subject)}\n\n"
-                                        f"💡 <i>Tippe ⚡ Convert to Project um direkt ein Projekt zu erstellen.</i>",
-                                        parse_mode="HTML",
-                                        reply_markup=inline_btns
+                                    alert = (
+                                        f"📩 *Neue E-Mail-Anfrage!*\n\n"
+                                        f"👤 Name: {lead_disp_name}\n"
+                                        f"📧 E-Mail: {sender_email}\n"
+                                        f"📌 Intent: {intent}\n"
+                                        f"📝 Betreff: {subject}"
                                     )
-                                except Exception as te:
-                                    logger.warning(f"Telegram new lead alert failed: {te}")
+                                    for num in [n.strip() for n in _s.WHATSAPP_OWNER_PHONES.split(",") if n.strip()]:
+                                        await send_whatsapp_message(num, alert)
+                                except Exception as wa_err:
+                                    logger.warning(f"WhatsApp new lead alert failed: {wa_err}")
 
                     # Save inbound email record in email_conversations & communications
                     try:
@@ -981,30 +973,23 @@ async def poll_outlook_inbound_emails() -> List[Dict]:
                                 "notes": f"Q3 reply (timeline): {body[:300]}",
                             }).eq("id", lead_id).execute()
                             logger.info(f"Lead QUALIFIED: {sender_name} <{sender_email}> ({intent})")
-                            # Telegram alert with 1-click Convert button
+                            # WhatsApp alert for qualified lead
                             try:
-                                from app.services.telegram_service import send_telegram_message
+                                from app.services.whatsapp_service import send_whatsapp_message
+                                from config import settings as _s
                                 qual_disp_name = sender_name or sender_email
-                                inline_btns = {
-                                    "inline_keyboard": [
-                                        [
-                                            {"text": "⚡ Convert to Project", "callback_data": f"/convert {qual_disp_name}"},
-                                            {"text": "🌟 All Qualified Leads", "callback_data": "/qualified"}
-                                        ]
-                                    ]
-                                }
-                                await send_telegram_message(
-                                    f"🌟 <b>Neuer qualifizierter Lead!</b>\n\n"
-                                    f"👤 <b>Name:</b> {_h(qual_disp_name)}\n"
-                                    f"📧 <b>E-Mail:</b> {_h(sender_email)}\n"
-                                    f"📌 <b>Intent:</b> {_h(intent)}\n"
-                                    f"📅 <b>Zeitplan / Details:</b> {_h(body[:200])}\n\n"
-                                    f"✅ Lead ist vollständig qualifiziert & bereit für Konvertierung.",
-                                    parse_mode="HTML",
-                                    reply_markup=inline_btns
+                                alert = (
+                                    f"🌟 *Neuer qualifizierter Lead!*\n\n"
+                                    f"👤 Name: {qual_disp_name}\n"
+                                    f"📧 E-Mail: {sender_email}\n"
+                                    f"📌 Intent: {intent}\n"
+                                    f"📅 Details: {body[:200]}\n\n"
+                                    f"✅ Lead ist vollständig qualifiziert & bereit für Konvertierung."
                                 )
-                            except Exception as te:
-                                logger.warning(f"Telegram alert failed: {te}")
+                                for num in [n.strip() for n in _s.WHATSAPP_OWNER_PHONES.split(",") if n.strip()]:
+                                    await send_whatsapp_message(num, alert)
+                            except Exception as wa_err:
+                                logger.warning(f"WhatsApp qualified lead alert failed: {wa_err}")
 
                         processed.append({"email": sender_email, "stage": "qualified"})
 

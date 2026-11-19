@@ -169,6 +169,31 @@ async def store_uploaded_document(
 
 # ─── Separate Workflow 2: OCR Scan & Template Mapping ────────────────────
 
+_VIN_VALID_CHARS = re.compile(r"[^A-HJ-NPR-Z0-9]", re.IGNORECASE)
+_VIN_AMBIGUOUS = str.maketrans("IOQ", "100")  # chars that must never appear; map common OCR confusions
+
+
+def _clean_vin(raw: Optional[str]) -> Optional[str]:
+    """
+    Post-process a VIN string extracted by OCR/LLM:
+      - Strip spaces and dashes
+      - Replace common OCR misreads: I→1, O→0, Q→0
+      - Return None if the result is not exactly 17 characters
+    """
+    if not raw:
+        return None
+    cleaned = raw.strip().replace(" ", "").replace("-", "").upper()
+    # Translate common ambiguous characters
+    cleaned = cleaned.translate(_VIN_AMBIGUOUS)
+    # Drop any remaining invalid chars (shouldn't happen, but be safe)
+    cleaned = _VIN_VALID_CHARS.sub("", cleaned)
+    if len(cleaned) == 17:
+        return cleaned
+    # If length is wrong, log it but still return raw so the user can verify
+    logger.warning(f"VIN length after cleaning is {len(cleaned)} (not 17): '{cleaned}' (original: '{raw}')")
+    return cleaned or None
+
+
 async def scan_document(data: bytes, mime: str, doc_kind: str = "vehicle") -> Dict:
     """
     Extract structured fields from an image or PDF based on `doc_kind`:
@@ -190,7 +215,12 @@ async def scan_document(data: bytes, mime: str, doc_kind: str = "vehicle") -> Di
             return await extract_client_details_from_image(data, clean_mime)
         if doc_kind == "other":
             return await extract_any_document_from_image(data, clean_mime)
-        return await extract_vehicle_specs_from_image(data, clean_mime)
+        result = await extract_vehicle_specs_from_image(data, clean_mime)
+        if "vin" in result:
+            result["vin"] = _clean_vin(result["vin"])
+            if result["vin"] is None:
+                result.pop("vin", None)
+        return result
 
     from app.services.pdf_service import extract_document_text
     suffix = _MIME_EXT.get(clean_mime, ".pdf")
@@ -209,6 +239,10 @@ async def scan_document(data: bytes, mime: str, doc_kind: str = "vehicle") -> Di
             else:
                 res = await extract_vehicle_specs(text)
             if res:
+                if "vin" in res:
+                    res["vin"] = _clean_vin(res["vin"])
+                    if res["vin"] is None:
+                        res.pop("vin", None)
                 return res
 
         # Scanned PDF fallback: rasterize page 0 and run Claude Vision
@@ -222,7 +256,12 @@ async def scan_document(data: bytes, mime: str, doc_kind: str = "vehicle") -> Di
                     return await extract_client_details_from_image(img_bytes, "image/jpeg")
                 if doc_kind == "other":
                     return await extract_any_document_from_image(img_bytes, "image/jpeg")
-                return await extract_vehicle_specs_from_image(img_bytes, "image/jpeg")
+                result = await extract_vehicle_specs_from_image(img_bytes, "image/jpeg")
+                if "vin" in result:
+                    result["vin"] = _clean_vin(result["vin"])
+                    if result["vin"] is None:
+                        result.pop("vin", None)
+                return result
         except Exception as e:
             logger.warning(f"PDF page rasterization failed: {e}")
         return {}
@@ -287,7 +326,14 @@ def format_ocr_preview(extracted: Dict) -> str:
     lines = ["🔎 *Extracted Fields:*"]
     for k, v in extracted.items():
         if v is not None and str(v).strip():
-            lines.append(f"• {labels.get(k, k)}: `{v}`")
+            val_str = str(v)
+            # Flag VIN with length warning so user can verify
+            suffix = ""
+            if k == "vin":
+                vin_len = len(val_str.replace(" ", ""))
+                if vin_len != 17:
+                    suffix = f" ⚠️ ({vin_len} chars — VIN must be 17, please verify)"
+            lines.append(f"• {labels.get(k, k)}: `{val_str}`{suffix}")
     return "\n".join(lines)
 
 

@@ -2,7 +2,7 @@ import sys
 import os
 
 # Add backend to sys.path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database import get_supabase
 from app.services.google_service import _get_valid_access_token

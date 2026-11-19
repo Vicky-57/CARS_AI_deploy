@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from app.api.v1.endpoints import (
     auth, ocr, voice, classify, contracts, projects,
     webhooks, briefings, google_auth, forms,
-    telegram_bot, outlook, leads, meetings
+    outlook, leads, meetings
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -10,9 +10,6 @@ api_router = APIRouter(prefix="/api/v1")
 # ─── Core Auth & Settings ─────────────────────────────────────────────────────
 api_router.include_router(auth.router)
 api_router.include_router(google_auth.router)    # Google Drive OAuth only
-
-# ─── Telegram Master Agent ────────────────────────────────────────────────────
-api_router.include_router(telegram_bot.router)
 
 # ─── Outlook 365 Email & Calendar ────────────────────────────────────────────
 api_router.include_router(outlook.router)

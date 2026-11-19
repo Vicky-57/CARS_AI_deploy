@@ -1,16 +1,11 @@
 from pydantic_settings import BaseSettings
 import os
 
-
 class Settings(BaseSettings):
     # Supabase (PostgreSQL Schema v3.0)
     SUPABASE_URL: str = "https://wvzulyxzuntjnzdykstt.supabase.co"
     SUPABASE_SECRET_KEY: str = ""
     SUPABASE_PUBLISHABLE_KEY: str = "sb_publishable_s5EKZcMXdOb6LBSF-I758A_-cS8v1Zm"
-
-    # Telegram Master Agent
-    TELEGRAM_BOT_TOKEN: str = ""
-    TELEGRAM_CHAT_ID: str = ""
 
     # Microsoft Outlook 365 & Strato Email Integration
     OUTLOOK_ICS_URL: str = ""
@@ -33,7 +28,7 @@ class Settings(BaseSettings):
     WHATSAPP_BUSINESS_ACCOUNT_ID: str = ""
     WHATSAPP_VERIFY_TOKEN: str = ""
     WHATSAPP_APP_SECRET: str = ""            # Meta App Secret -> verifies X-Hub-Signature-256
-    WHATSAPP_OWNER_PHONES: str = ""          # Comma-separated founder numbers allowed to run commands
+    WHATSAPP_OWNER_PHONES: str = ""          # Comma-separated founder numbers (all get owner commands)
     WHATSAPP_DRY_RUN: bool = False           # True = never call Meta/Twilio, log/collect outbound messages
     WHATSAPP_API_VERSION: str = "v21.0"
     BRIEFING_WHATSAPP_RECIPIENT: str = ""

@@ -83,17 +83,19 @@ async def generate_daily_briefing() -> str:
 
 
 async def run_daily_briefing():
-    """W5: Generates daily executive briefing digest and delivers via Telegram & Email."""
+    """W5: Generates daily executive briefing digest and delivers via WhatsApp & Email."""
     logger.info("Executing W5 Daily Executive Briefing job...")
     try:
         text_msg = await generate_daily_briefing()
 
-        # Send via Telegram bot
+        # Send via WhatsApp to owner(s)
         try:
-            from app.services.telegram_service import send_telegram_message
-            await send_telegram_message(text_msg)
-        except Exception as tg_err:
-            logger.warning(f"Telegram briefing send failed: {tg_err}")
+            from app.services.whatsapp_service import send_whatsapp_message
+            from config import settings as _s
+            for num in [n.strip() for n in _s.WHATSAPP_OWNER_PHONES.split(",") if n.strip()]:
+                await send_whatsapp_message(num, text_msg)
+        except Exception as wa_err:
+            logger.warning(f"WhatsApp briefing send failed: {wa_err}")
 
         # Fallback: Email briefing via SMTP
         try:
@@ -116,7 +118,7 @@ async def run_daily_briefing():
 
 
 async def run_inactivity_check():
-    """W6: Checks for projects with no activity in 24h and sends Telegram alerts."""
+    """W6: Checks for projects with no activity in 24h and sends WhatsApp alerts to owner."""
     logger.info("Executing W6 Deal Inactivity Check job...")
     try:
         projects = get_all_projects()
@@ -128,7 +130,9 @@ async def run_inactivity_check():
 
         if inactive:
             try:
-                from app.services.telegram_service import send_telegram_message
+                from app.services.whatsapp_service import send_whatsapp_message
+                from config import settings as _s
+                owners = [n.strip() for n in _s.WHATSAPP_OWNER_PHONES.split(",") if n.strip()]
                 for p in inactive[:5]:
                     alert_msg = (
                         f"⚠️ *Inactivity Alert*\n\n"
@@ -138,9 +142,10 @@ async def run_inactivity_check():
                         f"Last Updated: {p.get('updated_at', '')[:10]}\n\n"
                         f"Please follow up with the client."
                     )
-                    await send_telegram_message(alert_msg)
-            except Exception as tg_err:
-                logger.warning(f"Telegram inactivity alert failed: {tg_err}")
+                    for num in owners:
+                        await send_whatsapp_message(num, alert_msg)
+            except Exception as wa_err:
+                logger.warning(f"WhatsApp inactivity alert failed: {wa_err}")
     except Exception as e:
         logger.error(f"Error in run_inactivity_check: {str(e)}")
 

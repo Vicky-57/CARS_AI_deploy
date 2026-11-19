@@ -6,7 +6,7 @@ import psycopg2
 from urllib.parse import quote_plus
 from dotenv import load_dotenv
 
-_load = load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+_load = load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
 
 DB_PASSWORD = os.getenv("SUPABASE_DB_PASSWORD", "CARS_AI2026")
 ENCODED_PW = quote_plus(DB_PASSWORD)
@@ -21,7 +21,7 @@ CONN_STRINGS = [
 ]
 
 def apply_schema():
-    sql_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "supabase_schema_v3.sql"))
+    sql_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "docs", "db", "supabase_schema_v3.sql"))
     with open(sql_path, "r", encoding="utf-8") as f:
         sql_script = f.read()
 

@@ -15,7 +15,7 @@ import asyncio
 from datetime import datetime, timezone
 import httpx
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import settings
 
 SUPABASE_URL = "https://wvzulyxzuntjnzdykstt.supabase.co"

@@ -13,7 +13,7 @@ os.environ["IMAP_PASSWORD"] = "https://car-agents.de/"
 os.environ["SMTP_PASSWORD"] = "https://car-agents.de/"
 os.environ["IMAP_HOST"] = "imap.strato.de"
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Patch the activation date for testing (Aug 24 to pick up last week's emails)
 import app.services.outlook_service as svc

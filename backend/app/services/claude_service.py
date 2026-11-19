@@ -171,6 +171,10 @@ async def extract_vehicle_specs(raw_text: str) -> dict:
     prompt = f"""You are a vehicle data extraction expert for a German car broker.
 Extract vehicle specifications from this German vehicle document text.
 
+CRITICAL: The VIN (FIN) is ALWAYS exactly 17 characters. Count each character individually.
+Valid VIN chars: A-H, J-N, P-R, S-Z, 0-9 (I, O, Q are NEVER in a VIN).
+After extracting the VIN, verify len == 17. If not, re-read the source text.
+
 Document Text:
 {raw_text[:3000]}
 
@@ -260,18 +264,28 @@ async def extract_vehicle_specs_from_image(image_bytes: bytes, media_type: str =
     """Extract vehicle specs directly from document image using Claude multimodal vision."""
     prompt = """You are an expert German automotive document scanner for CAR-AGENTS Germany.
 Analyze this image of a vehicle document (Fahrzeugschein / Zulassungsbescheinigung Teil I / Fahrzeugdatenträger).
-Extract the following vehicle specifications:
-- vin (17-character vehicle identification number / FIN)
+
+CRITICAL RULES — read before extracting:
+1. VIN (FIN, Feld E): The VIN is ALWAYS exactly 17 characters. It may contain letters A-H, J-N, P-R, S-Z and digits 0-9.
+   NEVER skip or guess characters — read every character individually and carefully.
+   The letters I, O, Q are NOT valid VIN characters; if you see something that looks like I/O/Q in a VIN,
+   re-read the character from the image — it is likely a digit (1, 0) or another letter.
+   After extraction, verify: len(vin) == 17. If you count fewer or more, re-read the VIN field.
+2. For all numeric fields (power_ps, displacement_ccm, mileage) return only the numeric value as a string, no units.
+3. Use null for any field you cannot read clearly — do NOT guess.
+
+Fields to extract:
+- vin (17-char FIN, Feld E — recount characters before returning)
 - manufacturer (Marke, Feld D.1)
 - model (Handelsbezeichnung / Typ, Feld D.3)
 - licence_plate (Amtliches Kennzeichen, Feld A)
-- initial_registration (Erstzulassung, Feld B, e.g. DD.MM.YYYY)
-- tuv_expiry (HU / TÜV expiry, e.g. MM.YYYY)
-- power_ps (Leistung in PS, Feld P.2/P.4)
-- displacement_ccm (Hubraum in ccm, Feld P.1)
-- mileage (Kilometerstand if visible)
+- initial_registration (Erstzulassung, Feld B, format DD.MM.YYYY)
+- tuv_expiry (HU / TÜV next due date, format MM.YYYY)
+- power_ps (Leistung PS, Feld P.2 or P.4 — number only)
+- displacement_ccm (Hubraum ccm, Feld P.1 — number only)
+- mileage (Kilometerstand if visible — number only)
 
-Respond ONLY with this exact JSON format (no markdown):
+Respond ONLY with this exact JSON format (no markdown, no extra text):
 {
   "vin": null,
   "manufacturer": null,
@@ -283,7 +297,7 @@ Respond ONLY with this exact JSON format (no markdown):
   "displacement_ccm": null,
   "mileage": null
 }"""
-    return await _call_claude_vision(image_bytes, media_type, prompt)
+    return await _call_claude_vision(image_bytes, media_type, prompt, max_tokens=800)
 
 
 async def extract_client_details_from_image(image_bytes: bytes, media_type: str = "image/jpeg") -> dict:
