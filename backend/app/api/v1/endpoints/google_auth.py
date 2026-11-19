@@ -38,7 +38,8 @@ async def google_auth_callback(code: str = Query(None), error: str = Query(None)
         raise HTTPException(status_code=500, detail=f"Token exchange failed: {str(e)}")
 
     # Redirect back to the frontend profile page with success marker
-    return RedirectResponse(url="http://localhost:5173/profile?google=connected")
+    frontend_url = getattr(settings, "FRONTEND_URL", "https://car-agents-omega.vercel.app")
+    return RedirectResponse(url=f"{frontend_url}/profile?google=connected")
 
 
 @router.get("/status")

@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     IMAP_HOST: str = "imap.strato.de"
     IMAP_PORT: int = 993
     IMAP_USER: str = "info@car-agents.de"
+    
     IMAP_PASSWORD: str = ""
     SMTP_HOST: str = "smtp.strato.de"
     SMTP_PORT: int = 465
@@ -43,13 +44,20 @@ class Settings(BaseSettings):
     # Local AI Services
     WHISPER_MODEL_SIZE: str = "base"
 
-    # Google OAuth2 (Strictly for Google Drive Cloud Storage)
+    # Frontend URL (used for OAuth redirects)
+    FRONTEND_URL: str = "https://car-agents-omega.vercel.app"
+
+    # Google OAuth2 (Drive + Calendar)
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
-    GOOGLE_REDIRECT_URI: str = "http://localhost:9000/api/v1/auth/google/callback"
+    GOOGLE_REDIRECT_URI: str = "https://car-agents-backend.onrender.com/api/v1/auth/google/callback"
     GOOGLE_AUTH_URI: str = "https://accounts.google.com/o/oauth2/auth"
     GOOGLE_TOKEN_URI: str = "https://oauth2.googleapis.com/token"
-    GOOGLE_SCOPES: str = "openid email profile https://www.googleapis.com/auth/drive.file"
+    GOOGLE_SCOPES: str = (
+        "openid email profile "
+        "https://www.googleapis.com/auth/drive.file "
+        "https://www.googleapis.com/auth/calendar"
+    )
 
     class Config:
         env_file = [
