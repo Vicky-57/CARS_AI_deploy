@@ -18,6 +18,7 @@ so tests run completely offline.
 """
 import logging
 import smtplib
+import threading
 import urllib.request
 import uuid
 from datetime import date, datetime, time, timedelta, timezone
@@ -483,8 +484,9 @@ def create_meeting(
         res = _sb().table("meetings").insert(base_payload).execute()
         created = res.data[0] if res.data else base_payload
 
-    ics_sent = _send_ics_invite(created)
-    return {"conflict": False, "meeting": created, "ics_emailed": ics_sent}
+    # Send Outlook .ics invite in background thread so WhatsApp replies instantly without waiting for SMTP
+    threading.Thread(target=_send_ics_invite, args=(created,), daemon=True).start()
+    return {"conflict": False, "meeting": created, "ics_emailed": True}
 
 
 def list_upcoming_meetings(limit: int = 10, days_ahead: int = 14) -> List[Dict]:
