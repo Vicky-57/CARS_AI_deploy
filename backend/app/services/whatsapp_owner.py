@@ -322,6 +322,36 @@ async def _dispatch_command(phone: str, cmd: str, arg: str, raw_text: str) -> No
 
 # ─── Customer Search & Disambiguation ─────────────────────────────────────
 
+def _drive_folder_for(cust: Dict) -> Optional[str]:
+    """Customer's Drive folder URL (created on demand, so it is shown even when empty)."""
+    if store.MEMORY:
+        return None
+    try:
+        from app.services.google_service import is_connected
+        if not is_connected():
+            return None
+        from app.services.gdrive_service import create_customer_folder_structure
+        ref_id = str(cust.get("project_id") or cust.get("lead_id") or "")[:8]
+        if not ref_id:
+            return None
+        struct = create_customer_folder_structure(cust.get("name") or "Customer", ref_id)
+        return struct.get("customer_folder_url")
+    except Exception as e:
+        logger.warning(f"Drive folder lookup failed for {cust.get('name')}: {e}")
+        return None
+
+
+async def _card_with_drive(cust: Dict) -> str:
+    import asyncio
+    card = crm.format_customer_card(cust)
+    url = await asyncio.to_thread(_drive_folder_for, cust)
+    if url:
+        card += f"\n📁 Documents: {url}"
+    else:
+        card += "\n📁 Documents: (Drive not connected or no record ID)"
+    return card
+
+
 async def _cmd_customer(phone: str, query: str) -> None:
     if not query:
         store.save_session(phone, {"mode": "owner_find_prompt", "done": True})
@@ -340,7 +370,7 @@ async def _cmd_customer(phone: str, query: str) -> None:
         return
 
     if len(matches) == 1:
-        await send_message(phone, crm.format_customer_card(matches[0]))
+        await send_message(phone, await _card_with_drive(matches[0]))
         return
 
     # Multiple customers matched -> show disambiguation picklist
@@ -366,7 +396,7 @@ async def _handle_customer_pick(phone: str, session: Dict, low: str, btn_id: str
         await _cmd_customer(phone, low)
         return
     store.delete_session(phone)
-    await send_message(phone, crm.format_customer_card(matches[idx]))
+    await send_message(phone, await _card_with_drive(matches[idx]))
 
 
 # ─── Convert & Stage ──────────────────────────────────────────────────────
