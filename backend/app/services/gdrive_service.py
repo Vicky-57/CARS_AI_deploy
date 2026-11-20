@@ -151,6 +151,22 @@ def create_customer_folder_structure(customer_name: str, project_id: str, create
     return res
 
 
+def list_folder_files(folder_id: str, limit: int = 30) -> list:
+    """List non-folder files in a Drive folder: [{name, url, created}]."""
+    token = _get_valid_access_token()
+    if not token:
+        raise PermissionError("Google Drive not connected.")
+    q = f"'{folder_id}' in parents and trashed=false and mimeType!='application/vnd.google-apps.folder'"
+    url = (
+        f"{DRIVE_API}/files?q={urllib.parse.quote(q)}"
+        f"&fields=files(id,name,webViewLink,createdTime)&orderBy=createdTime%20desc&pageSize={limit}"
+    )
+    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        files = json.loads(r.read().decode("utf-8")).get("files", [])
+    return [{"name": f.get("name"), "url": f.get("webViewLink"), "created": (f.get("createdTime") or "")[:10]} for f in files]
+
+
 def upload_file_to_drive_folder(
     parent_folder_id: str,
     filename: str,

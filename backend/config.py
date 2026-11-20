@@ -9,6 +9,7 @@ class Settings(BaseSettings):
 
     # Microsoft Outlook 365 & Strato Email Integration
     OUTLOOK_ICS_URL: str = ""
+    USE_OUTLOOK_CALENDAR: bool = False       # Meetings use Google Calendar; set True to also read Outlook ICS busy time
     IMAP_HOST: str = "imap.strato.de"
     IMAP_PORT: int = 993
     IMAP_USER: str = "info@car-agents.de"

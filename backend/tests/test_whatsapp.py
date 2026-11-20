@@ -400,6 +400,20 @@ def test_customer_document_ocr_during_sell_qualification():
         handler.ocr_extract, handler.download_media = orig_ocr, orig_dl
 
 
+def test_docs_command_lists_customer_documents():
+    reset()
+    store._mem_leads["l1"] = {"id": "l1", "name": "Docs Kunde", "phone": "+49170555666", "status": "NEW"}
+    store.save_customer_document({
+        "lead_id": "l1", "customer_name": "Docs Kunde", "category": "id",
+        "filename": "ausweis.jpg", "file_url": "https://example.test/ausweis.jpg",
+    })
+    run(handler.handle_message(text_msg(OWNER, "docs Docs Kunde", "d1")))
+    body = body_of(sent_to(OWNER)[-1])
+    assert "ausweis.jpg" in body and "https://example.test/ausweis.jpg" in body
+    run(handler.handle_message(text_msg(OWNER, "docs Niemand Unbekannt", "d2")))
+    assert "Nothing found" in body_of(sent_to(OWNER)[-1])
+
+
 # ─── Transport security ───────────────────────────────────────────────────
 
 def test_signature_verification():

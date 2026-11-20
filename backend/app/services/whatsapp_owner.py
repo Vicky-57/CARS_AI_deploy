@@ -42,6 +42,7 @@ HELP_TEXT = (
     "Tap an option or type a command:\n"
     "• `customer <name | phone | email>`\n"
     "  _(e.g. `customer +49170...` or `customer max@mail.de`)_\n"
+    "• `docs <name | phone | email>` — list customer documents\n"
     "• `convert <lead>` • `stage <client> <stage>`\n"
     "• `cancel meeting` • `reschedule`"
 )
@@ -53,6 +54,7 @@ OWNER_CMDS = {
     "summary", "zusammenfassung", "status", "/summary",
     "reset", "/reset",
     "customer", "kunde", "find", "/customer",
+    "docs", "/docs", "documents", "dokumente",
     "convert", "/convert",
     "stage", "/stage",
     "schedule", "/schedule", "meeting", "termin",
@@ -241,7 +243,10 @@ async def handle_owner(phone: str, inp: Dict, text: str) -> None:
             return
         if mode == "owner_find_prompt":
             store.delete_session(phone)
-            await _cmd_customer(phone, (text or "").strip())
+            if session.get("action") == "docs":
+                await _cmd_docs(phone, (text or "").strip())
+            else:
+                await _cmd_customer(phone, (text or "").strip())
             return
         if mode == "owner_customer_pick":
             await _handle_customer_pick(phone, session, low, btn_id)
@@ -288,6 +293,9 @@ async def _dispatch_command(phone: str, cmd: str, arg: str, raw_text: str) -> No
         return
     if cmd in ("summary", "zusammenfassung", "status"):
         await send_message(phone, format_summary(store.list_leads(200), store.list_active_projects(100)))
+        return
+    if cmd in ("docs", "documents", "dokumente"):
+        await _cmd_docs(phone, arg)
         return
     if cmd in ("customer", "kunde", "find"):
         await _cmd_customer(phone, arg)
@@ -393,10 +401,98 @@ async def _handle_customer_pick(phone: str, session: Dict, low: str, btn_id: str
     if idx is None:
         # Allow typing a new phone/email right away to refine search
         store.delete_session(phone)
-        await _cmd_customer(phone, low)
+        if session.get("action") == "docs":
+            await _cmd_docs(phone, low)
+        else:
+            await _cmd_customer(phone, low)
         return
     store.delete_session(phone)
+    if session.get("action") == "docs":
+        await _send_docs_list(phone, matches[idx])
+        return
     await send_message(phone, await _card_with_drive(matches[idx]))
+
+
+# ─── Customer Documents Listing ───────────────────────────────────────────
+
+_DOCS_SUBFOLDERS = [
+    ("1. OCR", "ocr_folder_id"),
+    ("2. Legal Docs", "legal_docs_folder_id"),
+    ("3. Signed Docs", "signed_docs_folder_id"),
+]
+
+
+def _collect_docs(cust: Dict) -> Dict:
+    """Live Drive listing per subfolder; falls back to customer_documents DB records."""
+    out: Dict = {"folder_url": None, "groups": [], "source": "db"}
+    if not store.MEMORY:
+        try:
+            from app.services.google_service import is_connected
+            if is_connected():
+                from app.services.gdrive_service import create_customer_folder_structure, list_folder_files
+                ref_id = str(cust.get("project_id") or cust.get("lead_id") or "")[:8]
+                if ref_id:
+                    struct = create_customer_folder_structure(cust.get("name") or "Customer", ref_id)
+                    out["folder_url"] = struct.get("customer_folder_url")
+                    out["source"] = "drive"
+                    for label, key in _DOCS_SUBFOLDERS:
+                        out["groups"].append((label, list_folder_files(struct[key])))
+                    return out
+        except Exception as e:
+            logger.warning(f"Drive listing failed for {cust.get('name')}: {e}")
+
+    rows: List[Dict] = []
+    seen = set()
+    for kw in ({"lead_id": cust.get("lead_id")}, {"project_id": cust.get("project_id")}):
+        if not list(kw.values())[0]:
+            continue
+        for d in store.list_customer_documents(limit=20, **kw):
+            if d.get("id") not in seen:
+                seen.add(d.get("id"))
+                rows.append(d)
+    out["groups"].append((
+        "Saved documents",
+        [{"name": d.get("filename"), "url": d.get("file_url") or d.get("drive_url"),
+          "created": str(d.get("created_at") or "")[:10]} for d in rows],
+    ))
+    return out
+
+
+async def _send_docs_list(phone: str, cust: Dict) -> None:
+    import asyncio
+    data = await asyncio.to_thread(_collect_docs, cust)
+    lines = [f"📂 *Documents — {cust.get('name') or 'Customer'}*"]
+    total = 0
+    for label, files in data["groups"]:
+        if not files:
+            continue
+        lines.append(f"\n*{label}*")
+        for f in files[:8]:
+            total += 1
+            lines.append(f"• {f['name']} ({f['created']})\n  {f['url'] or '(no link)'}")
+    if total == 0:
+        lines.append("\nNo documents stored yet. Use `upload` to add one.")
+    if data["folder_url"]:
+        lines.append(f"\n📁 Folder: {data['folder_url']}")
+    await send_message(phone, "\n".join(lines))
+
+
+async def _cmd_docs(phone: str, query: str) -> None:
+    if not query:
+        store.save_session(phone, {"mode": "owner_find_prompt", "done": True, "action": "docs"})
+        await send_message(phone, "📂 *Documents*\nSend a customer name, phone, or email:")
+        return
+    matches = store.search_customers(query, limit=8)
+    if not matches:
+        await send_message(phone, f"Nothing found for '{query}'. Try `docs <name | phone | email>`.")
+        return
+    if len(matches) == 1:
+        await _send_docs_list(phone, matches[0])
+        return
+    refs = [crm.to_session_ref(m) for m in matches]
+    store.save_session(phone, {"mode": "owner_customer_pick", "done": True, "matches": refs, "action": "docs"})
+    btns = [(f"cust_{i}", crm.disambiguate_row_title(m), crm.disambiguate_row_desc(m)) for i, m in enumerate(matches)]
+    await send_message(phone, f"📂 Found {len(matches)} customers matching '{query}'. Pick one:", buttons=btns)
 
 
 # ─── Convert & Stage ──────────────────────────────────────────────────────
@@ -723,7 +819,7 @@ async def _finalize_schedule(phone: str, state: Dict) -> None:
         return
 
     store.delete_session(phone)
-    invite_note = "\n📧 Calendar invite (.ics) emailed to Outlook." if res.get("ics_emailed") else ""
+    invite_note = "\n📅 Added to Google Calendar." if res.get("calendar_synced") else ""
     await send_message(
         phone,
         f"✅ *Meeting Booked!*\n\n"

@@ -221,7 +221,14 @@ def _fetch_db_meetings(range_start: datetime, range_end: datetime, include_outlo
         active.append({**m, "start_time": dt_s.isoformat(), "end_time": dt_e.isoformat(), "source": "database"})
 
     if include_outlook and not store.MEMORY:
-        active.extend(_fetch_outlook_ics_sync(range_start, range_end))
+        # External calendar busy time: Google Calendar (primary); Outlook ICS only if explicitly enabled
+        try:
+            from app.services.google_calendar_service import list_busy_events
+            active.extend(list_busy_events(range_start, range_end))
+        except Exception as e:
+            logger.warning(f"Google Calendar busy fetch failed: {e}")
+        if getattr(settings, "USE_OUTLOOK_CALENDAR", False):
+            active.extend(_fetch_outlook_ics_sync(range_start, range_end))
 
     active.sort(key=lambda e: e["start_time"])
     return active
@@ -420,6 +427,36 @@ def _send_ics_invite(meeting: Dict) -> bool:
         return False
 
 
+def _gcal_sync_create(meeting: Dict) -> None:
+    """Create the Google Calendar event and remember its id on the meetings row."""
+    try:
+        from app.services.google_calendar_service import create_event
+        event_id = create_event(meeting)
+        if event_id and meeting.get("id"):
+            try:
+                _sb().table("meetings").update({"gcal_event_id": event_id}).eq("id", meeting["id"]).execute()
+            except Exception as e:
+                logger.warning(f"Could not store gcal_event_id (run docs/db/supabase_v3_3_gcal.sql): {e}")
+    except Exception as e:
+        logger.warning(f"Google Calendar create sync failed: {e}")
+
+
+def _gcal_sync_delete(event_id: str) -> None:
+    try:
+        from app.services.google_calendar_service import delete_event
+        delete_event(event_id)
+    except Exception as e:
+        logger.warning(f"Google Calendar delete sync failed: {e}")
+
+
+def _gcal_sync_update(event_id: str, start: datetime, end: datetime) -> None:
+    try:
+        from app.services.google_calendar_service import update_event
+        update_event(event_id, start, end)
+    except Exception as e:
+        logger.warning(f"Google Calendar update sync failed: {e}")
+
+
 def create_meeting(
     client_name: str,
     start_utc: datetime,
@@ -471,7 +508,7 @@ def create_meeting(
     if store.MEMORY:
         created = {**payload, "id": str(uuid.uuid4()), "created_at": datetime.now(timezone.utc).isoformat()}
         store._mem_meetings.append(created)
-        return {"conflict": False, "meeting": created, "ics_emailed": False}
+        return {"conflict": False, "meeting": created, "calendar_synced": False}
 
     try:
         res = _sb().table("meetings").insert(payload).execute()
@@ -484,9 +521,9 @@ def create_meeting(
         res = _sb().table("meetings").insert(base_payload).execute()
         created = res.data[0] if res.data else base_payload
 
-    # Send Outlook .ics invite in background thread so WhatsApp replies instantly without waiting for SMTP
-    threading.Thread(target=_send_ics_invite, args=(created,), daemon=True).start()
-    return {"conflict": False, "meeting": created, "ics_emailed": True}
+    # Push to Google Calendar in a background thread so WhatsApp replies instantly
+    threading.Thread(target=_gcal_sync_create, args=(created,), daemon=True).start()
+    return {"conflict": False, "meeting": created, "calendar_synced": True}
 
 
 def list_upcoming_meetings(limit: int = 10, days_ahead: int = 14) -> List[Dict]:
@@ -507,7 +544,10 @@ def cancel_meeting(meeting_id: str) -> Optional[Dict]:
         return None
 
     res = _sb().table("meetings").update({"status": "CANCELLED"}).eq("id", meeting_id).execute()
-    return res.data[0] if res.data else None
+    row = res.data[0] if res.data else None
+    if row and row.get("gcal_event_id"):
+        threading.Thread(target=_gcal_sync_delete, args=(row["gcal_event_id"],), daemon=True).start()
+    return row
 
 
 def reschedule_meeting(
@@ -542,6 +582,10 @@ def reschedule_meeting(
         "start_time": new_start_utc.astimezone(timezone.utc).isoformat(),
         "end_time": new_end_utc.astimezone(timezone.utc).isoformat(),
     }).eq("id", meeting_id).execute()
+    if target.get("gcal_event_id"):
+        threading.Thread(
+            target=_gcal_sync_update, args=(target["gcal_event_id"], new_start_utc, new_end_utc), daemon=True
+        ).start()
     return {"conflict": False, "meeting": res.data[0] if res.data else target}
 
 
