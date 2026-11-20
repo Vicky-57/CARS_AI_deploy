@@ -38,6 +38,7 @@ const NAV = [
   {
     section: 'Tools & Documentation',
     items: [
+      { path: '/communications', icon: MessageSquare, label: 'Communications' },
       { path: '/contracts', icon: FileText, label: 'Documentation' },
       { path: '/calendar', icon: Calendar, label: 'Calendar' },
     ],
