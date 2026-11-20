@@ -414,6 +414,44 @@ def test_docs_command_lists_customer_documents():
     assert "Nothing found" in body_of(sent_to(OWNER)[-1])
 
 
+def test_slow_handler_answers_twilio_within_budget_then_sends_rest():
+    reset()
+    wa.OUTBOX.clear()
+
+    async def slow_turn():
+        await wa.send_message(OWNER, "first")
+        await asyncio.sleep(0.5)
+        await wa.send_message(OWNER, "late")
+
+    async def scenario():
+        replies = await wa.run_within_twiml_budget(OWNER, slow_turn, budget=0.1)
+        assert replies and "first" in replies[0] and all("late" not in r for r in replies)
+        await asyncio.sleep(0.8)  # let the detached handler finish
+
+    rest_calls = []
+
+    class _FakeResp:
+        def raise_for_status(self): pass
+        def json(self): return {"sid": "SMfake"}
+
+    class _FakeClient:
+        def __init__(self, *a, **k): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+        async def post(self, url, data=None, auth=None, **k):
+            rest_calls.append(data)
+            return _FakeResp()
+
+    orig_client = wa.httpx.AsyncClient
+    wa.httpx.AsyncClient = _FakeClient
+    try:
+        run(scenario())
+    finally:
+        wa.httpx.AsyncClient = orig_client
+    # the late reply must not be lost: it goes out through the REST API
+    assert any("late" in (c or {}).get("Body", "") for c in rest_calls)
+
+
 # ─── Transport security ───────────────────────────────────────────────────
 
 def test_signature_verification():

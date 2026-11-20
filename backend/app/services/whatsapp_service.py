@@ -42,6 +42,11 @@ _twilio_collector: contextvars.ContextVar[Optional[Tuple[Optional[str], List[str
 Button = Tuple[str, str]  # (id, title) - title max 20 chars on WhatsApp
 
 
+class _ReplyBucket(list):
+    """List of queued TwiML replies; `detached` flips once the webhook has already answered Twilio."""
+    detached: bool = False
+
+
 @contextmanager
 def collect_twilio_replies(target_phone: Optional[str] = None):
     """
@@ -49,13 +54,35 @@ def collect_twilio_replies(target_phone: Optional[str] = None):
     Any message to other numbers (e.g. notify_owner alert to founder) will NOT leak into
     the customer's TwiML response.
     """
-    bucket: List[str] = []
+    bucket = _ReplyBucket()
     norm_target = normalize_phone(target_phone) if target_phone else None
     token = _twilio_collector.set((norm_target, bucket))
     try:
         yield bucket
     finally:
         _twilio_collector.reset(token)
+
+
+async def run_within_twiml_budget(target_phone: Optional[str], coro_factory, budget: float = 9.0) -> List[str]:
+    """
+    Run a handler but never let Twilio's 15s webhook timeout swallow the reply.
+    Fast turns return their replies as TwiML. If the handler is still running after `budget`
+    seconds (Drive/OCR work), answer Twilio now with whatever is queued and let the handler
+    finish in the background; its remaining replies are then sent through the REST API.
+    """
+    import asyncio
+
+    with collect_twilio_replies(target_phone=target_phone) as replies:
+        task = asyncio.ensure_future(coro_factory())
+        done, _ = await asyncio.wait({task}, timeout=budget)
+        if task in done:
+            exc = task.exception()
+            if exc:
+                logger.error(f"Webhook handler failed: {exc}")
+            return list(replies)
+        replies.detached = True
+        logger.info("Handler exceeded TwiML budget; continuing in background (REST replies).")
+        return list(replies)
 
 
 def build_twiml(messages: List[str]) -> str:
@@ -113,7 +140,7 @@ def _headers() -> Dict[str, str]:
 
 async def _send_via_twilio(to_digits: str, body: str, media_url: Optional[str] = None) -> Dict:
     collector_info = _twilio_collector.get()
-    if collector_info is not None:
+    if collector_info is not None and not getattr(collector_info[1], "detached", False):
         target_sender, bucket = collector_info
         if target_sender is None or to_digits == target_sender:
             text_out = f"{body}\n{media_url}" if media_url else body

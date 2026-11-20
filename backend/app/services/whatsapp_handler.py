@@ -115,6 +115,10 @@ async def handle_twilio_payload(form: Dict) -> None:
         await handle_message(msg, profile_name)
     except Exception:
         logger.exception("Error handling Twilio WhatsApp message")
+        try:
+            await send_message(from_raw, "⚠️ Something went wrong with that request. Please try again or send `reset`.")
+        except Exception:
+            pass
 
 
 async def _resolve_audio_text(inp: Dict) -> Optional[str]:
