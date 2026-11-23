@@ -728,74 +728,34 @@ async def poll_outlook_inbound_emails() -> List[Dict]:
                     # ── 1. Date cutoff check ──────────────────────────────────
                     email_date = _parse_email_date(msg)
                     if email_date and email_date < ACTIVATION_DATE:
-                        mail.store(msg_id, "+FLAGS", "\\Seen")
-                        continue  # Skip old emails silently
+                        continue  # Skip old emails silently without altering \Seen flags
 
                     # ── 2. Extract metadata ───────────────────────────────────
-                    message_id = _decode_header(msg.get("Message-ID", "")).strip()
+                    message_id = _decode_header(msg.get("Message-ID", "")).strip() or f"<no-id-{msg_id.decode()}>"
                     in_reply_to = _decode_header(msg.get("In-Reply-To", "")).strip()
                     references = _decode_header(msg.get("References", "")).strip()
                     sender_raw = _decode_header(msg.get("From", ""))
+                    reply_to_raw = _decode_header(msg.get("Reply-To", ""))
                     subject = _decode_header(msg.get("Subject", ""))
                     body = _extract_body(msg)
 
                     sender_email = sender_raw.split("<")[-1].replace(">", "").strip() if "<" in sender_raw else sender_raw.strip()
                     sender_name = sender_raw.split("<")[0].strip().strip('"') if "<" in sender_raw else sender_email
+                    reply_to_email = (reply_to_raw.split("<")[-1].replace(">", "").strip() if "<" in reply_to_raw else reply_to_raw.strip()) or sender_email
 
                     # Skip our own outbound emails if they land in inbox
                     if sender_email.lower() == imap_user.lower():
-                        mail.store(msg_id, "+FLAGS", "\\Seen")
                         continue
 
-                    # ── 2b. Header-based spam detection ──────────────────────
-                    # Check industry-standard newsletter/bulk headers
-                    list_unsub = msg.get("List-Unsubscribe", "")
-                    precedence = msg.get("Precedence", "").lower()
-                    auto_submitted = msg.get("Auto-Submitted", "").lower()
-                    x_mailer = msg.get("X-Mailer", "").lower()
-                    x_bulk = msg.get("X-Bulk-Unsubscribe", "")
+                    # ── 3. Deduplication check (email_conversations + email_triage) ─
+                    from app.services import email_triage_store as tstore
+                    from app.services.email_triage_service import triage
 
-                    is_bulk = (
-                        bool(list_unsub) or  # newsletters always have this
-                        precedence in ("bulk", "list", "junk") or
-                        (auto_submitted and auto_submitted != "no") or
-                        bool(x_bulk) or
-                        any(m in x_mailer for m in ("mailchimp", "sendinblue", "hubspot",
-                                                     "klaviyo", "constantcontact", "brevo"))
-                    )
-                    if is_bulk:
-                        mail.store(msg_id, "+FLAGS", "\\Seen")
-                        logger.debug(f"Skipped bulk/newsletter email from {sender_email} (header check)")
+                    if tstore.seen_message(message_id):
                         continue
-
-                    # Check blocked sender domains & prefix patterns (CA-003)
-                    sender_lower = sender_email.lower().strip()
-                    sender_domain = sender_lower.split("@")[-1] if "@" in sender_lower else ""
-
-                    if sender_domain in _BLOCKED_SENDER_DOMAINS or any(sender_lower.startswith(pfx) for pfx in _BLOCKED_SENDER_PREFIXES):
-                        mail.store(msg_id, "+FLAGS", "\\Seen")
-                        logger.debug(f"Skipped blocked automated sender: {sender_email}")
+                    existing = sb.table("email_conversations").select("id").eq("message_id", message_id).execute()
+                    if existing.data:
                         continue
-
-                    # Check automated transaction subjects (invoices, receipts, booking confirmations)
-                    subject_lower = (subject or "").lower()
-                    if any(kw in subject_lower for kw in _AUTOMATED_SUBJECT_KEYWORDS):
-                        mail.store(msg_id, "+FLAGS", "\\Seen")
-                        logger.debug(f"Skipped automated transaction subject: {subject}")
-                        continue
-
-                    # Skip very short bodies (automated pings / delivery receipts)
-                    if body and len(body.strip()) < 30:
-                        mail.store(msg_id, "+FLAGS", "\\Seen")
-                        logger.debug(f"Skipped too-short body email from {sender_email}")
-                        continue
-
-                    # ── 3. Deduplication check ────────────────────────────────
-                    if message_id:
-                        existing = sb.table("email_conversations").select("id").eq("message_id", message_id).execute()
-                        if existing.data:
-                            mail.store(msg_id, "+FLAGS", "\\Seen")
-                            continue
 
                     # ── 4. Thread detection — is this a reply to a Q we sent? ─
                     thread_lead = None
@@ -809,17 +769,77 @@ async def poll_outlook_inbound_emails() -> List[Dict]:
                         if prior.data:
                             thread_lead = prior.data[0].get("lead_id")
                             current_stage = prior.data[0].get("qualification_stage")
+                    if not thread_lead:
+                        # Fallback if client stripped In-Reply-To: match open lead by sender/reply-to email
+                        open_lead = sb.table("leads").select("id, qualification_stage") \
+                            .in_("email", list({sender_email, reply_to_email})) \
+                            .in_("qualification_stage", ["q1_sent", "q2_sent", "q3_sent"]).limit(1).execute()
+                        if open_lead.data:
+                            thread_lead = open_lead.data[0]["id"]
+                            current_stage = open_lead.data[0].get("qualification_stage")
 
-                    # ── 5. Intent detection (Layer 1: keywords) ───────────────
-                    intent = _detect_intent_keywords(subject, body)
-                    if intent is None and current_stage is None:
-                        # Not a car inquiry and not part of our thread → ignore
-                        mail.store(msg_id, "+FLAGS", "\\Seen")
-                        logger.debug(f"Ignored non-car email from {sender_email}")
+                    # ── 5. Layered triage (Layer 0 -> Layer 1 -> Layer 2 Haiku) ─
+                    hdr_dict = {k: _decode_header(v) for k, v in msg.items()}
+                    rule = tstore.get_rule(sender_email) or tstore.get_rule(reply_to_email)
+                    t_res = await triage({
+                        "sender_email": sender_email,
+                        "sender_name": sender_name,
+                        "subject": subject,
+                        "body": body,
+                        "headers": hdr_dict,
+                        "in_thread": bool(thread_lead and current_stage),
+                        "own_address": imap_user,
+                    }, use_ai=True, sender_rule=rule)
+
+                    cat = t_res.get("category") or "unknown"
+                    intent = "SELL" if cat == "lead_sell" else ("BUY" if cat in ("lead_buy", "marketplace", "lead_other") else (_detect_intent_keywords(subject, body) or "BUY"))
+                    lead_contact_email = reply_to_email if cat == "marketplace" and reply_to_email else sender_email
+
+                    triage_row = tstore.log_decision({
+                        "message_id": message_id,
+                        "sender_email": sender_email,
+                        "sender_name": sender_name,
+                        "reply_to": lead_contact_email,
+                        "subject": subject,
+                        "body_preview": body[:600],
+                        "intent": intent,
+                        "decision": t_res["decision"],
+                        "category": cat,
+                        "layer": str(t_res.get("layer")),
+                        "score": t_res.get("score"),
+                        "confidence": t_res.get("confidence"),
+                        "reason": t_res.get("reason"),
+                    })
+
+                    if t_res["decision"] == "drop":
+                        logger.info(f"[TRIAGE DROP L{t_res['layer']}] {sender_email} | {subject[:50]} | {t_res['reason']}")
+                        continue
+
+                    if t_res["decision"] == "review":
+                        sid = tstore.short_id(triage_row)
+                        logger.info(f"[TRIAGE REVIEW #{sid}] {sender_email} | {subject[:50]}")
+                        try:
+                            from app.services.whatsapp_service import send_whatsapp_message
+                            from config import settings as _s
+                            conf_txt = f"{t_res['confidence']:.2f}" if t_res.get("confidence") is not None else f"score {t_res.get('score')}"
+                            alert = (
+                                f"🤔 *E-Mail prüfen (#{sid})*\n"
+                                f"👤 {sender_name} <{lead_contact_email}>\n"
+                                f"📝 {subject}\n"
+                                f"📊 {cat} ({conf_txt}) — {t_res.get('reason')}\n\n"
+                                f"Antworten:\n"
+                                f"• `mail ok {sid}` → Lead anlegen & Q1 senden\n"
+                                f"• `mail no {sid}` → Ignorieren & Absender sperren"
+                            )
+                            for num in [n.strip() for n in _s.WHATSAPP_OWNER_PHONES.split(",") if n.strip()]:
+                                await send_whatsapp_message(num, alert)
+                        except Exception as wa_err:
+                            logger.warning(f"WhatsApp review alert failed: {wa_err}")
+                        processed.append({"email": sender_email, "stage": "review", "triage_id": sid})
                         continue
 
                     # If it's a thread reply (already talking to us), keep intent from lead
-                    if intent is None and thread_lead:
+                    if thread_lead:
                         lead_rec = sb.table("leads").select("intent").eq("id", thread_lead).execute()
                         if lead_rec.data:
                             raw_intent = lead_rec.data[0].get("intent", "INQUIRY")
@@ -829,6 +849,7 @@ async def poll_outlook_inbound_emails() -> List[Dict]:
                         intent = "BUY"
 
                     strict_intent_str = "SELL_INTENT" if intent == "SELL" else "BUY_INTENT"
+                    sender_email = lead_contact_email
 
                     # ── 6. Record inbound email ───────────────────────────────
                     pipeline = "SELL" if intent == "SELL" else "BUY"
@@ -993,8 +1014,7 @@ async def poll_outlook_inbound_emails() -> List[Dict]:
 
                         processed.append({"email": sender_email, "stage": "qualified"})
 
-                    # ── 8. Mark as read (ONLY safe operation) ─────────────────
-                    mail.store(msg_id, "+FLAGS", "\\Seen")
+                    # ── 8. Do NOT mark as \Seen so the human inbox stays untouched ─
                     processed.append({"email": sender_email, "stage": current_stage or "q1_sent"})
 
                 except Exception as inner_e:

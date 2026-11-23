@@ -43,6 +43,7 @@ HELP_TEXT = (
     "• `customer <name | phone | email>`\n"
     "  _(e.g. `customer +49170...` or `customer max@mail.de`)_\n"
     "• `docs <name | phone | email>` — list customer documents\n"
+    "• `mail` / `mail ok <id>` / `mail no <id>` — email review queue\n"
     "• `convert <lead>` • `stage <client> <stage>`\n"
     "• `cancel meeting` • `reschedule`"
 )
@@ -55,6 +56,7 @@ OWNER_CMDS = {
     "reset", "/reset",
     "customer", "kunde", "find", "/customer",
     "docs", "/docs", "documents", "dokumente",
+    "mail", "/mail", "emails", "triage",
     "convert", "/convert",
     "stage", "/stage",
     "schedule", "/schedule", "meeting", "termin",
@@ -126,7 +128,20 @@ def format_summary(leads: List[Dict], projects: List[Dict]) -> str:
     for p in projects:
         stages[p.get("current_stage") or "n/a"] = stages.get(p.get("current_stage") or "n/a", 0) + 1
     stage_txt = "\n".join(f"   • {k}: {v}" for k, v in stages.items()) or "   none"
-    return f"📊 *Summary:*\n• New leads: {new_leads}\n• Hot leads: {hot}\n• Active deals: {len(projects)}\n{stage_txt}"
+    base = f"📊 *Summary:*\n• New leads: {new_leads}\n• Hot leads: {hot}\n• Active deals: {len(projects)}\n{stage_txt}"
+    try:
+        from app.services import email_triage_store as tstore
+        st = tstore.stats(30)
+        if st.get("total"):
+            d = st["decisions"]
+            base += (
+                f"\n\n📩 *Email triage (30d):* {st['total']} scanned — "
+                f"leads: {d.get('lead', 0)}, replies: {d.get('reply', 0)}, "
+                f"review: {d.get('review', 0)}, dropped: {d.get('drop', 0)}"
+            )
+    except Exception:
+        pass
+    return base
 
 
 def _pick_index(text: str, reply_id: str, count: int, prefix: str = "") -> Optional[int]:
@@ -293,6 +308,9 @@ async def _dispatch_command(phone: str, cmd: str, arg: str, raw_text: str) -> No
         return
     if cmd in ("summary", "zusammenfassung", "status"):
         await send_message(phone, format_summary(store.list_leads(200), store.list_active_projects(100)))
+        return
+    if cmd in ("mail", "emails", "triage"):
+        await _cmd_mail(phone, arg)
         return
     if cmd in ("docs", "documents", "dokumente"):
         await _cmd_docs(phone, arg)
@@ -493,6 +511,94 @@ async def _cmd_docs(phone: str, query: str) -> None:
     store.save_session(phone, {"mode": "owner_customer_pick", "done": True, "matches": refs, "action": "docs"})
     btns = [(f"cust_{i}", crm.disambiguate_row_title(m), crm.disambiguate_row_desc(m)) for i, m in enumerate(matches)]
     await send_message(phone, f"📂 Found {len(matches)} customers matching '{query}'. Pick one:", buttons=btns)
+
+
+async def _cmd_mail(phone: str, arg: str) -> None:
+    from app.services import email_triage_store as tstore
+
+    parts = (arg or "").strip().split()
+    sub = parts[0].lower() if parts else ""
+    target = parts[1] if len(parts) >= 2 else ""
+
+    if sub in ("ok", "approve", "yes", "ja") and target:
+        row = tstore.find_pending(target)
+        if not row:
+            await send_message(phone, f"No pending email with id `{target}`. Type `mail` to list open items.")
+            return
+        contact_email = row.get("reply_to") or row.get("sender_email")
+        tstore.set_rule(contact_email, "allow")
+        lead_id = row.get("lead_id")
+        if not store.MEMORY:
+            try:
+                from database import get_supabase
+                from app.services.outlook_service import _send_or_log_reply, _Q1_TEMPLATE
+                sb = get_supabase()
+                intent = row.get("intent") or "BUY"
+                strict_intent = "SELL_INTENT" if intent == "SELL" else "BUY_INTENT"
+                res = sb.table("leads").insert({
+                    "name": row.get("sender_name") or contact_email,
+                    "email": contact_email,
+                    "intent": strict_intent,
+                    "channel": "STRATO_EMAIL",
+                    "status": "NEW",
+                    "qualification_stage": "q1_sent",
+                    "is_qualified": False,
+                    "notes": f"Approved via WhatsApp (#{tstore.short_id(row)})\nSubject: {row.get('subject')}\n\n{row.get('body_preview') or ''}",
+                }).execute()
+                if res.data:
+                    lead_id = res.data[0]["id"]
+                _send_or_log_reply(
+                    to_email=contact_email,
+                    sender_name=row.get("sender_name") or contact_email,
+                    subject=row.get("subject") or "Ihre Anfrage",
+                    body_template=_Q1_TEMPLATE,
+                    in_reply_to=row.get("message_id") or "",
+                    references=row.get("message_id") or "",
+                    stage="q1_sent",
+                    lead_id=lead_id,
+                    intent=intent,
+                )
+            except Exception as e:
+                logger.warning(f"mail ok lead/reply failed: {e}")
+        tstore.update_decision(row["id"], {
+            "resolution": "ok",
+            "lead_id": lead_id,
+            "resolved_at": datetime.now(timezone.utc).isoformat(),
+        })
+        await send_message(phone, f"✅ Approved `#{tstore.short_id(row)}` ({contact_email}) — sender allowed, lead created & Q1 sent.")
+        return
+
+    if sub in ("no", "deny", "block", "spam", "nein") and target:
+        row = tstore.find_pending(target)
+        if not row:
+            await send_message(phone, f"No pending email with id `{target}`. Type `mail` to list open items.")
+            return
+        tstore.set_rule(row.get("sender_email") or "", "deny")
+        tstore.update_decision(row["id"], {
+            "resolution": "no",
+            "resolved_at": datetime.now(timezone.utc).isoformat(),
+        })
+        await send_message(phone, f"🚫 Ignored `#{tstore.short_id(row)}` and blocked `{row.get('sender_email')}`.")
+        return
+
+    pending = tstore.list_pending(10)
+    st = tstore.stats(30)
+    d = st.get("decisions", {})
+    lines = [
+        f"📩 *Email Triage (last 30d)*",
+        f"Scanned: {st.get('total', 0)} • Leads: {d.get('lead', 0)} • Replies: {d.get('reply', 0)} • Review: {d.get('review', 0)} • Dropped: {d.get('drop', 0)}",
+    ]
+    if not pending:
+        lines.append("\nNo emails waiting for review.")
+    else:
+        lines.append(f"\n*Waiting for review ({len(pending)}):*")
+        for r in pending:
+            sid = tstore.short_id(r)
+            lines.append(
+                f"• `#{sid}` {r.get('sender_email')} — _{(r.get('subject') or '')[:45]}_\n"
+                f"  Reply `mail ok {sid}` or `mail no {sid}`"
+            )
+    await send_message(phone, "\n".join(lines))
 
 
 # ─── Convert & Stage ──────────────────────────────────────────────────────

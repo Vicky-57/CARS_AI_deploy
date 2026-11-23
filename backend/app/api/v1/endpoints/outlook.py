@@ -111,3 +111,13 @@ async def outlook_integration_status():
             "imap": "Set IMAP_HOST, IMAP_PORT, IMAP_USER, and IMAP_PASSWORD in .env"
         }
     }
+
+
+@router.get("/triage-stats")
+async def email_triage_stats(days: int = 30):
+    """Return 30-day email triage statistics and pending review items."""
+    from app.services import email_triage_store as tstore
+    return {
+        "stats": tstore.stats(days),
+        "pending_review": tstore.list_pending(20),
+    }

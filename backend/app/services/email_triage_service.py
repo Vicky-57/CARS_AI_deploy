@@ -102,6 +102,8 @@ def layer0(mail: Dict) -> Optional[Tuple[str, str, str]]:
         return "drop", "automated", "own outbound address"
 
     if _domain_in(dom, MARKETPLACE_DOMAINS):
+        if any(sender.startswith(p) for p in BLOCKED_PREFIXES):
+            return "drop", "automated", f"marketplace system notification ({sender})"
         return "lead", "marketplace", f"marketplace relay ({dom}) - reply to Reply-To buyer"
 
     auto_sub = _h(headers, "Auto-Submitted").lower()

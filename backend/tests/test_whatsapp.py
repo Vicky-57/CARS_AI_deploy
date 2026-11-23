@@ -452,6 +452,36 @@ def test_slow_handler_answers_twilio_within_budget_then_sends_rest():
     assert any("late" in (c or {}).get("Body", "") for c in rest_calls)
 
 
+def test_mail_review_queue_approve_and_deny():
+    from app.services import email_triage_store as tstore
+
+    reset()
+    tstore.reset_memory()
+    row = tstore.log_decision({
+        "message_id": "<m1@test>",
+        "sender_email": "unsure.buyer@gmail.com",
+        "sender_name": "Unsure Buyer",
+        "reply_to": "unsure.buyer@gmail.com",
+        "subject": "BMW Anfrage",
+        "body_preview": "Hallo, hätten Sie eine Limousine?",
+        "intent": "BUY",
+        "decision": "review",
+        "category": "lead_buy",
+        "layer": "2",
+        "score": 4,
+        "confidence": 0.65,
+        "reason": "AI: borderline inquiry",
+    })
+    sid = tstore.short_id(row)
+
+    run(handler.handle_message(text_msg(OWNER, "mail", "m_list")))
+    assert sid in body_of(sent_to(OWNER)[-1])
+
+    run(handler.handle_message(text_msg(OWNER, f"mail no {sid}", "m_no")))
+    assert "Ignored" in body_of(sent_to(OWNER)[-1])
+    assert tstore.get_rule("unsure.buyer@gmail.com") == "deny"
+
+
 # ─── Transport security ───────────────────────────────────────────────────
 
 def test_signature_verification():
