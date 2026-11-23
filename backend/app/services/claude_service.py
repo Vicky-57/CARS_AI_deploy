@@ -15,7 +15,7 @@ from config import settings
 MODEL = "claude-sonnet-4-5"
 
 
-async def call_claude(prompt: str, max_tokens: int = 1024) -> str:
+async def call_claude(prompt: str, max_tokens: int = 1024, model: str = None) -> str:
     """Call Anthropic Claude API and return text response."""
     headers = {
         "x-api-key": settings.ANTHROPIC_API_KEY,
@@ -23,7 +23,7 @@ async def call_claude(prompt: str, max_tokens: int = 1024) -> str:
         "content-type": "application/json",
     }
     body = {
-        "model": MODEL,
+        "model": model or MODEL,
         "max_tokens": max_tokens,
         "messages": [{"role": "user", "content": prompt}],
     }
