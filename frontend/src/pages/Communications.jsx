@@ -13,7 +13,7 @@ function getAvatar(contact) {
 }
 
 function formatTs(iso) {
-  try { return format(new Date(iso), 'HH:mm'); } catch { return ''; }
+  try { return format(new Date(iso), 'dd.MM · HH:mm'); } catch { return ''; }
 }
 
 const SPAM_PATTERNS = [
@@ -74,6 +74,7 @@ export default function Communications() {
   const [converting, setConverting] = useState(false);
   const [convertedMap, setConvertedMap] = useState({});
   const [filter, setFilter] = useState('EMAIL');
+  const [directionFilter, setDirectionFilter] = useState('INBOUND'); // 'INBOUND' | 'OUTBOUND' | 'ALL'
   const [showSpam, setShowSpam] = useState(false);
   const [search, setSearch] = useState('');
   const [pollingEmail, setPollingEmail] = useState(false);
@@ -93,7 +94,8 @@ export default function Communications() {
       const uniqueContacts = [];
 
       for (const c of supabaseComms) {
-        const key = `${(c.sender_contact || '').toLowerCase()}::${(c.subject || '').toLowerCase().trim()}`;
+        const dir = c.is_inbound === false ? 'out' : 'in';
+        const key = `${dir}::${(c.sender_contact || '').toLowerCase()}::${(c.subject || '').toLowerCase().trim()}::${(c.body || '').slice(0, 25)}`;
         if (!seenKeys.has(key)) {
           seenKeys.add(key);
           uniqueContacts.push(c);
@@ -119,12 +121,14 @@ export default function Communications() {
 
   const selectContact = async (c) => {
     setSelected(c);
-    if (!c.lead_id) { setThread([c]); return; }
-
     setThreadLoading(true);
     try {
-      const messages = await api.getCommunications({ lead_id: c.lead_id });
-      setThread(messages.reverse());
+      const peerEmail = (c.sender_contact || '').toLowerCase().trim();
+      const messages = c.lead_id
+        ? await api.getCommunications({ lead_id: c.lead_id })
+        : (peerEmail ? await api.getCommunications({ client_email: peerEmail }) : [c]);
+      const sorted = [...(messages.length ? messages : [c])].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      setThread(sorted);
     } catch {
       setThread([c]);
     } finally {
@@ -170,6 +174,9 @@ export default function Communications() {
   };
 
   const spamCount = contacts.filter(c => isSpamMessage(c)).length;
+  const nonSpamContacts = contacts.filter(c => !isSpamMessage(c));
+  const inboundCount = nonSpamContacts.filter(c => c.is_inbound !== false).length;
+  const outboundCount = nonSpamContacts.filter(c => c.is_inbound === false).length;
 
   const filtered = contacts
     .filter(c => {
@@ -178,6 +185,8 @@ export default function Communications() {
         if (!isSpam) return false;
       } else {
         if (isSpam) return false;
+        if (directionFilter === 'INBOUND' && c.is_inbound === false) return false;
+        if (directionFilter === 'OUTBOUND' && c.is_inbound !== false) return false;
       }
       if (filter === 'ALL') return true;
       if (filter === 'EMAIL') return c.channel === 'EMAIL' || c.channel === 'OUTLOOK_EMAIL' || c.channel === 'STRATO_EMAIL';
@@ -197,6 +206,24 @@ export default function Communications() {
     if (ch === 'TELEGRAM') return <span className="badge badge-info" style={{ fontSize: '0.65rem' }}>TG</span>;
     if (ch === 'EMAIL' || ch === 'OUTLOOK_EMAIL' || ch === 'STRATO_EMAIL') return <span className="badge badge-info" style={{ fontSize: '0.65rem' }}>Email</span>;
     return null;
+  };
+
+  const directionBadge = (c) => {
+    const isInbound = c.is_inbound !== false;
+    return (
+      <span
+        className="badge"
+        style={{
+          fontSize: '0.62rem',
+          padding: '1px 6px',
+          background: isInbound ? 'rgba(16, 185, 129, 0.14)' : 'rgba(59, 130, 246, 0.14)',
+          color: isInbound ? '#059669' : '#2563eb',
+          fontWeight: 600,
+        }}
+      >
+        {isInbound ? '↓ Received' : '↑ Sent'}
+      </span>
+    );
   };
 
   return (
@@ -223,6 +250,31 @@ export default function Communications() {
               }}>{f === 'EMAIL' ? 'EMAIL' : f}</button>
             ))}
           </div>
+
+          {/* Direction Filter Tabs: Received vs Sent vs All */}
+          {!showSpam && (
+            <div style={{ display: 'inline-flex', background: 'var(--border)', padding: 2, borderRadius: 'var(--radius-sm)' }}>
+              {[
+                { id: 'INBOUND', label: `↓ Received (${inboundCount})` },
+                { id: 'OUTBOUND', label: `↑ Sent (${outboundCount})` },
+                { id: 'ALL', label: `All (${inboundCount + outboundCount})` },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setDirectionFilter(tab.id)}
+                  style={{
+                    padding: '5px 10px', borderRadius: 4, fontWeight: 600, fontSize: '0.73rem',
+                    border: 'none', cursor: 'pointer',
+                    background: directionFilter === tab.id ? 'var(--surface)' : 'transparent',
+                    color: directionFilter === tab.id ? 'var(--text-primary)' : 'var(--text-muted)',
+                    boxShadow: directionFilter === tab.id ? 'var(--shadow-xs)' : 'none',
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           <button
             className={`btn btn-sm ${showSpam ? 'btn-primary' : 'btn-secondary'}`}
@@ -270,7 +322,10 @@ export default function Communications() {
             filtered.map(c => {
               const av = getAvatar(c);
               const isActive = selected?.id === c.id;
-              const displayName = cleanText(c.sender_name) || c.sender_contact || 'Unknown';
+              const isInbound = c.is_inbound !== false;
+              const displayName = isInbound
+                ? (cleanText(c.sender_name) || c.sender_contact || 'Unknown')
+                : `To: ${(c.sender_contact || 'Client').split('@')[0]}`;
               const preview = cleanText(c.body).slice(0, 65) || cleanText(c.subject) || '—';
               return (
                 <div key={c.id} className={`contact-item${isActive ? ' active' : ''}`} onClick={() => {
@@ -279,8 +334,9 @@ export default function Communications() {
                 }}>
                   <div className={`contact-avatar ${av.cls}`}>{av.icon}</div>
                   <div className="contact-info">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2, flexWrap: 'wrap' }}>
                       <span className="contact-name">{displayName}</span>
+                      {directionBadge(c)}
                       {channelBadge(c.channel)}
                     </div>
                     <div className="contact-preview">{preview}</div>

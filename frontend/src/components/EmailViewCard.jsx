@@ -63,7 +63,21 @@ export default function EmailViewCard({ msg, toAddress = 'info@car-agents.de' })
       <div className="email-view-header">
         <div className="email-view-meta">
           {/* Subject first — most prominent */}
-          <div className="email-subject-line">{subject}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <div className="email-subject-line">{subject}</div>
+            <span
+              className="badge"
+              style={{
+                fontSize: '0.65rem',
+                padding: '2px 7px',
+                background: isInbound ? 'rgba(16, 185, 129, 0.14)' : 'rgba(59, 130, 246, 0.14)',
+                color: isInbound ? '#059669' : '#2563eb',
+                fontWeight: 600,
+              }}
+            >
+              {isInbound ? '↓ Received (Inbound)' : '↑ Sent by CAR-AGENTS (Outbound)'}
+            </span>
+          </div>
 
           <div className="email-meta-row" style={{ marginTop: 6 }}>
             <span className="email-meta-label">From</span>
