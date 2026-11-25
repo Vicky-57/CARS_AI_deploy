@@ -63,6 +63,19 @@ def test_clean_for_ai_strips_quotes_and_links():
     assert "zitat" not in txt and "foo" not in txt and "Golf" in txt
 
 
+def test_phase1_parameters_missing_fields_and_drafts():
+    # Seller inquiry with model + year + price -> extracts params, lists remaining missing fields, builds draft
+    r_sell = run(mail("seller@gmail.com", "Mein BMW X5 verkaufen", "Hallo, ich möchte meinen BMW X5 Baujahr 2021 mit 45.000 km in München für 48.000 € verkaufen."))
+    assert r_sell["extracted_params"].get("first_registration") == "2021"
+    assert r_sell["extracted_params"].get("mileage")
+    assert r_sell["draft_reply"] and "CAR-AGENTS" in r_sell["draft_reply"]
+
+    # Invoice subject -> flagged as invoice with payment deadline extracted, no customer auto-draft
+    r_inv = run(mail("billing@vendor-gmbh.de", "Rechnung Nr. 2026-991", "Anbei Ihre Rechnung über 250 €. Zahlbar bis: 15.12.2026."))
+    assert r_inv["category"] == "invoice" and r_inv["payment_deadline"] == "15.12.2026"
+    assert r_inv["draft_reply"] is None
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     for name, fn in tests:

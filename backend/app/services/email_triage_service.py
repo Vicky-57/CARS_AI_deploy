@@ -1,28 +1,31 @@
 """
 app/services/email_triage_service.py
 ────────────────────────────────────────────────────────────────────────
-Layered inbound-email triage (cheap first, AI last).
+CAR-AGENTS Phase 1 — AI-Assisted Lead Qualification & Triage Engine.
 
-  Layer 0  hard rules   (headers, sender, subject)           free
-  Thread   reply to a conversation we started                free, skips filtering
-  Layer 1  scoring      (signals, not a keyword gate)        free
-  Layer 2  Claude Haiku classifier (only for what is left)   ~300 tokens/mail
+Core Phase 1 Principles (24 Nov 2026 spec):
+  1. The AI NEVER rejects/deletes inquiries or sends customer messages on its own
+     (unless EMAIL_AUTO_REPLY=True is explicitly enabled).
+  2. Every incoming message is classified into the Phase 1 taxonomy, evaluated
+     for extracted parameters + missing fields, assigned a suggested priority,
+     and prepared with a tailored draft reply (German or English).
+  3. Suspected spam/phishing is flagged (decision='flagged') — never deleted.
 
-`triage(mail)` returns a decision dict:
-  {
-    "decision":   "drop" | "lead" | "review" | "reply",
-    "category":   lead_buy | lead_sell | lead_other | marketplace | reply |
-                  marketing | automated | b2b_solicitation | spam | unknown,
-    "layer":      0 | 1 | 2 | "thread",
-    "score":      int,
-    "confidence": float | None,
-    "reason":     str,
-    "extracted":  {"vehicle": ..., "budget": ...},
-  }
+Taxonomy (`category`):
+  - seller              (§3: Customer wishing to sell vehicle via CAR-AGENTS)
+  - sourcing            (§5: Customer engaging CAR-AGENTS to source a vehicle)
+  - sell_and_source     (§6: Customer selling current vehicle & sourcing another)
+  - advertised_buyer    (§4: Prospective buyer of an already advertised vehicle, incl. mobile.de/AutoScout24/Kleinanzeigen)
+  - b2b_cooperation     (§7: Specific B2B cooperation inquiry)
+  - b2b_offer           (§7: General B2B service offer)
+  - b2b_advertising     (§7: Recognizable B2B advertising/marketing)
+  - invoice             (§7: Invoice, receipt, or financial document — highlights payment deadline)
+  - spam                (§7: Suspected spam, phishing, or automated platform noise — flagged, not deleted)
+  - other               (§2: Unclear or general inquiry)
 
-This module makes NO side effects (no DB writes, no replies); callers decide.
-Input `mail` keys: sender_email, sender_name, subject, body, headers (dict, any
-case), in_thread (bool), own_address (str).
+ backward-compatible aliases accepted in tests/legacy:
+  lead_buy -> sourcing, lead_sell -> seller, marketplace -> advertised_buyer,
+  b2b_solicitation -> b2b_offer, lead_other -> other
 ────────────────────────────────────────────────────────────────────────
 """
 import json
@@ -34,9 +37,37 @@ logger = logging.getLogger("email_triage")
 
 AUTO_LEAD_CONFIDENCE = 0.8
 REVIEW_CONFIDENCE = 0.5
-DROP_SCORE = -3          # Layer 1: at or below this (and no strong positive) -> drop without AI
-AI_BODY_CHARS = 600
+DROP_SCORE = -3
+AI_BODY_CHARS = 900
 HAIKU_MODEL = "claude-haiku-4-5"
+
+# ─── Phase 1 Required Field Checklists (§3, §4, §5, §6) ────────────────────
+
+SELLER_REQUIRED_FIELDS = [
+    ("manufacturer_model", "Hersteller & Modell", "Manufacturer & model"),
+    ("first_registration", "Erstzulassung / Baujahr", "First registration / year"),
+    ("timeframe", "Gewünschter Verkaufszeitraum", "Desired sale timeframe"),
+    ("location", "Standort des Fahrzeugs", "Vehicle location"),
+    ("phone", "Telefonnummer für Rückruf", "Telephone number / callback"),
+    ("preferred_channel", "Bevorzugter Kontaktweg & Erreichbarkeit", "Preferred channel & contact times"),
+]
+
+SOURCING_REQUIRED_FIELDS = [
+    ("manufacturer_model", "Gewünschte Marke / Modell oder Fahrzeugtyp", "Preferred make/model or vehicle type"),
+    ("intended_use", "Einsatzzweck & wichtige Anforderungen", "Intended use & key requirements"),
+    ("timeframe", "Gewünschter Kaufzeitraum", "Desired purchase timeframe"),
+    ("location", "Standort / Suchregion", "Customer location / search region"),
+    ("preferred_channel", "Telefonnummer, bevorzugter Kontaktweg & Erreichbarkeit", "Phone, preferred channel & availability"),
+    # Note (§5): Budget is discussed in personal conversation and is NOT mandatory in initial written message.
+]
+
+ADVERTISED_BUYER_FIELDS = [
+    ("target_vehicle", "Angefragtes Inserat / Fahrzeug", "Advertised vehicle reference"),
+    ("buyer_question", "Anliegen (Verfügbarkeit / Besichtigung / Preisangebot)", "Inquiry focus (availability / viewing / offer)"),
+]
+
+LEAD_CATEGORIES = {"seller", "sourcing", "sell_and_source", "advertised_buyer", "lead_buy", "lead_sell", "marketplace", "lead_other"}
+B2B_CATEGORIES = {"b2b_cooperation", "b2b_offer", "b2b_advertising", "b2b_solicitation"}
 
 # ─── Layer 0 data ─────────────────────────────────────────────────────────
 
@@ -52,17 +83,26 @@ BLOCKED_DOMAINS = {
     "trustpilotmail.com", "metafin.com.my",
 }
 
-# Marketplaces whose relay mails are REAL buyer leads (reply to Reply-To, not the relay address)
 MARKETPLACE_DOMAINS = ("mobile.de", "autoscout24.de", "autoscout24.com", "kleinanzeigen.de")
 
 BLOCKED_PREFIXES = (
     "no-reply", "noreply", "donotreply", "do-not-reply", "newsletter", "mailer-daemon",
-    "postmaster", "bounce", "notifications", "notification", "alerts", "billing", "invoice", "receipt",
+    "postmaster", "bounce", "notifications", "notification", "alerts",
+)
+
+INVOICE_RE = re.compile(
+    r"\b(rechnung|invoice|quittung|beleg|zahlungsaufforderung|fällig bis|due date|zahlbar bis|rechnungsnummer)\b",
+    re.IGNORECASE,
+)
+
+DEADLINE_RE = re.compile(
+    r"(?:fällig(?:keit)?|zahlbar bis|due(?: date)?|bis zum)\s*[:\-]?\s*(\d{1,2}\.\d{1,2}\.\d{2,4}|\d{4}-\d{2}-\d{2}|\d{1,2}\s+[A-Za-zÄÖÜäöü]+\s+\d{4})",
+    re.IGNORECASE,
 )
 
 AUTO_SUBJECT = re.compile(
     r"(automatische antwort|auto-?reply|out of office|abwesenheit|undeliverable|delivery (status|failed)|"
-    r"rechnung|invoice|kontoauszug|bestellbestätigung|buchungsbestätigung|zahlungseingang|"
+    r"kontoauszug|bestellbestätigung|buchungsbestätigung|"
     r"passwort|verifizierung|verify your|sicherheitscode|security alert|ihr .{0,12}code|neues dokument|"
     r"bestätigen sie|newsletter)",
     re.IGNORECASE,
@@ -89,6 +129,213 @@ def _domain_in(domain: str, domains) -> bool:
     return any(domain == d or domain.endswith("." + d) for d in domains)
 
 
+def _detect_lang(text: str) -> str:
+    low = (text or "").lower()
+    en_hits = sum(1 for w in ("hello", "looking for", "interested", "would like", "car", "vehicle", "sell", "buy", "price") if w in low)
+    de_hits = sum(1 for w in ("hallo", "guten tag", "sehr geehrte", "fahrzeug", "auto", "verkaufen", "kaufen", "suche", "interesse") if w in low)
+    return "en" if en_hits > de_hits and en_hits >= 2 else "de"
+
+
+def _extract_regex_params(subject: str, body: str) -> Dict:
+    text = f"{subject}\n{body}"
+    params: Dict[str, Optional[str]] = {}
+
+    # Advertised vehicle from mobile.de / Kleinanzeigen subject
+    m_adv = re.search(r"Fahrzeug:\s*([^\n\r|]+)", subject, re.IGNORECASE)
+    if m_adv:
+        params["manufacturer_model"] = m_adv.group(1).strip()
+    else:
+        m_brand = _BRAND_RE.search(text)
+        if m_brand:
+            # Capture brand + next word if model-like
+            span_start = m_brand.start()
+            snippet = text[span_start:span_start + 35].splitlines()[0]
+            tokens = snippet.split()[:3]
+            params["manufacturer_model"] = " ".join(tokens).strip(",.;:!?")
+
+    m_year = re.search(r"\b(19[89]\d|20[0-2]\d)\b", text)
+    if m_year:
+        params["first_registration"] = m_year.group(1)
+
+    m_km = re.search(r"\b(\d{1,3}(?:[.\s]\d{3})+|\d{4,6})\s*(?:km|kilometer)\b", text, re.IGNORECASE)
+    if m_km:
+        params["mileage"] = m_km.group(0).strip()
+
+    m_price = re.search(r"(\d{1,3}(?:[.\s]\d{3})*(?:,\d{2})?\s*(?:€|eur|euro)|(?:€|eur)\s*\d{1,3}(?:[.\s]\d{3})*)", text, re.IGNORECASE)
+    if m_price:
+        params["price_or_budget"] = m_price.group(0).strip()
+
+    m_phone = re.search(r"(\+?\d[\d\s/\-()]{7,16}\d)", body)
+    if m_phone:
+        params["phone"] = m_phone.group(1).strip()
+
+    m_tf = re.search(r"\b(sofort|dringend|diese woche|nächste woche|in \d+\s*(?:wochen|monaten)|diesen monat|asap|immediately|within \d+ weeks)\b", text, re.IGNORECASE)
+    if m_tf:
+        params["timeframe"] = m_tf.group(0).strip()
+
+    m_loc = re.search(r"\b(?:in|aus|standort|region|plz)\s+([A-ZÄÖÜ][a-zäöüß]{2,25}|\d{5}\s+[A-ZÄÖÜ][a-zäöüß]{2,25})", text)
+    if m_loc:
+        params["location"] = m_loc.group(1).strip()
+
+    m_dl = DEADLINE_RE.search(text)
+    if m_dl:
+        params["payment_deadline"] = m_dl.group(1).strip()
+
+    if re.search(r"\b(besichtigung|probefahrt|termin|anschauen|viewing|test drive)\b", text, re.IGNORECASE):
+        params["viewing_requested"] = "Ja / Yes"
+    if re.search(r"\b(reservier|hold|reserve)\b", text, re.IGNORECASE):
+        params["reservation_requested"] = "Ja / Yes"
+    if re.search(r"\b(noch da|verfügbar|available|noch zu haben)\b", text, re.IGNORECASE):
+        params["availability_question"] = "Ja / Yes"
+
+    return {k: v for k, v in params.items() if v}
+
+
+def compute_missing_fields(category: str, params: Dict, lang: str = "de") -> List[str]:
+    """Return human-readable list of missing required fields for this inquiry category."""
+    idx = 2 if lang == "en" else 1
+    cat = (category or "").lower()
+    if cat in ("seller", "lead_sell"):
+        checklist = SELLER_REQUIRED_FIELDS
+    elif cat in ("sourcing", "lead_buy"):
+        checklist = SOURCING_REQUIRED_FIELDS
+    elif cat == "sell_and_source":
+        checklist = SELLER_REQUIRED_FIELDS + [("sourcing_target", "Gewünschtes neues Fahrzeug (Suchauftrag)", "Desired replacement vehicle")]
+    elif cat in ("advertised_buyer", "marketplace"):
+        return []  # §4: A simple availability/listing question must NOT trigger an extensive qualification checklist
+    else:
+        return []
+
+    missing = []
+    for key, label_de, label_en in checklist:
+        val = params.get(key)
+        if not val:
+            missing.append(label_en if idx == 2 else label_de)
+    return missing
+
+
+def build_draft_reply(
+    category: str,
+    sender_name: str,
+    subject: str,
+    params: Dict,
+    missing_fields: List[str],
+    lang: str = "de",
+) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Generate Phase 1 compliant draft reply (subject, body) tailored to the category,
+    already-provided parameters, and missing fields. Returns (None, None) for spam/invoices.
+    """
+    cat = (category or "").lower()
+    if cat in ("spam", "automated", "invoice", "b2b_advertising", "unknown"):
+        return None, None
+
+    raw_name = (sender_name or "").split("@")[0].strip().strip('"')
+    greet_name = raw_name if raw_name and not raw_name.startswith(("d3n3", "31hj", "gxgq", "rg68", "no-reply", "noreply")) else ("Interessent/in" if lang == "de" else "Customer")
+    subj_out = subject if subject.lower().startswith("re:") else f"Re: {subject or 'Ihre Anfrage bei CAR-AGENTS'}"
+    veh = params.get("manufacturer_model") or ("Ihr Fahrzeug" if lang == "de" else "your vehicle")
+
+    if cat in ("advertised_buyer", "marketplace"):
+        # §4: Flexible, concise response — no mandatory extensive qualification
+        if lang == "en":
+            body = (
+                f"Dear {greet_name},\n\n"
+                f"Thank you for your inquiry regarding the {veh}.\n\n"
+                f"We are checking the current status and would be happy to answer your questions or coordinate a viewing appointment personally.\n"
+                f"Please let us know your phone number and when we can best reach you for a quick call.\n\n"
+                f"Best regards,\nCAR-AGENTS Team\ninfo@car-agents.de | www.car-agents.de"
+            )
+        else:
+            body = (
+                f"Sehr geehrte/r {greet_name},\n\n"
+                f"vielen Dank für Ihr Interesse an unserem inserierten Fahrzeug ({veh}).\n\n"
+                f"Gerne klären wir Ihre Anfrage sowie eine mögliche Besichtigung persönlich mit Ihnen. "
+                f"Unter welcher Telefonnummer und zu welcher Uhrzeit erreichen wir Sie am besten für einen kurzen Rückruf?\n\n"
+                f"Mit freundlichen Grüßen\nCAR-AGENTS Team\ninfo@car-agents.de | www.car-agents.de"
+            )
+        return subj_out, body
+
+    if cat in ("seller", "lead_sell"):
+        # §3: Request only missing basic seller details
+        bullets = "\n".join(f"• {m}" for m in missing_fields) if missing_fields else (
+            "• Telefonnummer und passende Uhrzeit für ein kurzes persönliches Gespräch"
+        )
+        if lang == "en":
+            body = (
+                f"Dear {greet_name},\n\n"
+                f"Thank you for contacting CAR-AGENTS regarding the sale of {veh}.\n\n"
+                f"To prepare our personal consultation, could you briefly share the following details?\n"
+                f"{bullets}\n\n"
+                f"(Optional details such as mileage, price expectation, or VIN are also welcome.)\n\n"
+                f"Best regards,\nCAR-AGENTS Team\ninfo@car-agents.de | www.car-agents.de"
+            )
+        else:
+            body = (
+                f"Sehr geehrte/r {greet_name},\n\n"
+                f"vielen Dank für Ihre Anfrage zur Vermittlung / zum Verkauf Ihres Fahrzeugs ({veh}) über CAR-AGENTS.\n\n"
+                f"Zur Vorbereitung unseres persönlichen Gesprächs bitten wir Sie noch kurz um folgende Angaben:\n"
+                f"{bullets}\n\n"
+                f"(Weitere Angaben wie Kilometerstand, Preisvorstellung oder FIN können Sie gerne optional ergänzen.)\n\n"
+                f"Mit freundlichen Grüßen\nCAR-AGENTS Team\ninfo@car-agents.de | www.car-agents.de"
+            )
+        return subj_out, body
+
+    if cat in ("sourcing", "lead_buy"):
+        # §5: Sourcing — budget is NOT mandatory in initial written message
+        bullets = "\n".join(f"• {m}" for m in missing_fields) if missing_fields else (
+            "• Telefonnummer und passende Uhrzeit für ein persönliches Beratungsgespräch"
+        )
+        if lang == "en":
+            body = (
+                f"Dear {greet_name},\n\n"
+                f"Thank you for your vehicle sourcing inquiry with CAR-AGENTS.\n\n"
+                f"So that we can prepare effectively for a personal call, please let us know:\n"
+                f"{bullets}\n\n"
+                f"Best regards,\nCAR-AGENTS Team\ninfo@car-agents.de | www.car-agents.de"
+            )
+        else:
+            body = (
+                f"Sehr geehrte/r {greet_name},\n\n"
+                f"vielen Dank für Ihre Suchanfrage bei CAR-AGENTS!\n\n"
+                f"Damit wir uns optimal auf ein persönliches Gespräch vorbereiten können, teilen Sie uns bitte noch kurz mit:\n"
+                f"{bullets}\n\n"
+                f"Mit freundlichen Grüßen\nCAR-AGENTS Team\ninfo@car-agents.de | www.car-agents.de"
+            )
+        return subj_out, body
+
+    if cat == "sell_and_source":
+        # §6: Combined sale & sourcing — essential info on both vehicles + timing relationship
+        body = (
+            f"Sehr geehrte/r {greet_name},\n\n"
+            f"vielen Dank für Ihre kombinierte Anfrage zum Verkauf Ihres aktuellen Fahrzeugs und zur Suche eines neuen Fahrzeugs über CAR-AGENTS.\n\n"
+            f"Für unser persönliches Erstgespräch bitten wir Sie kurz um:\n"
+            f"• Eckdaten Ihres aktuellen Fahrzeugs (Marke/Modell, Erstzulassung, Standort)\n"
+            f"• Ihr gewünschtes neues Fahrzeug (Marke/Modell oder Fahrzeugtyp & Einsatzzweck)\n"
+            f"• Den gewünschten zeitlichen Zusammenhang zwischen Verkauf und Neuanschaffung\n"
+            f"• Ihre Telefonnummer und wann wir Sie am besten erreichen können\n\n"
+            f"Mit freundlichen Grüßen\nCAR-AGENTS Team\ninfo@car-agents.de | www.car-agents.de"
+        )
+        return subj_out, body
+
+    if cat in ("b2b_cooperation", "b2b_offer", "b2b_solicitation"):
+        body = (
+            f"Sehr geehrte/r {greet_name},\n\n"
+            f"vielen Dank für Ihre Nachricht und Ihr Interesse an einer Zusammenarbeit mit CAR-AGENTS.\n"
+            f"Wir haben Ihr Anliegen intern vermerkt und melden uns bei Bedarf persönlich bei Ihnen.\n\n"
+            f"Mit freundlichen Grüßen\nCAR-AGENTS Team"
+        )
+        return subj_out, body
+
+    # Other / unclear
+    body = (
+        f"Sehr geehrte/r {greet_name},\n\n"
+        f"vielen Dank für Ihre Nachricht an CAR-AGENTS. "
+        f"Teilen Sie uns gerne kurz mit, wie wir Ihnen weiterhelfen können und unter welcher Telefonnummer wir Sie erreichen.\n\n"
+        f"Mit freundlichen Grüßen\nCAR-AGENTS Team\ninfo@car-agents.de | www.car-agents.de"
+    )
+    return subj_out, body
+
+
 def layer0(mail: Dict) -> Optional[Tuple[str, str, str]]:
     """Return (decision, category, reason) if a hard rule fires, else None."""
     sender = (mail.get("sender_email") or "").lower().strip()
@@ -96,6 +343,7 @@ def layer0(mail: Dict) -> Optional[Tuple[str, str, str]]:
     headers = mail.get("headers") or {}
     subject = mail.get("subject") or ""
     body = (mail.get("body") or "").strip()
+    combined = f"{subject}\n{body[:1200]}"
 
     own = (mail.get("own_address") or "").lower()
     if own and sender == own:
@@ -104,7 +352,13 @@ def layer0(mail: Dict) -> Optional[Tuple[str, str, str]]:
     if _domain_in(dom, MARKETPLACE_DOMAINS):
         if any(sender.startswith(p) for p in BLOCKED_PREFIXES):
             return "drop", "automated", f"marketplace system notification ({sender})"
+        if INVOICE_RE.search(subject):
+            return "review", "invoice", f"marketplace invoice ({dom})"
         return "lead", "marketplace", f"marketplace relay ({dom}) - reply to Reply-To buyer"
+
+    # §7: Invoices, receipts and financial documents -> flagged for manual processing, NOT dropped
+    if INVOICE_RE.search(subject) and not _domain_in(dom, ("sixt.com", "sixt.de")):
+        return "review", "invoice", "invoice/financial document detected in subject"
 
     auto_sub = _h(headers, "Auto-Submitted").lower()
     if auto_sub and auto_sub != "no":
@@ -138,7 +392,7 @@ _BRANDS = (
     "audi bmw mercedes benz vw volkswagen porsche opel ford skoda seat cupra toyota honda mazda nissan "
     "hyundai kia renault peugeot citroen fiat volvo tesla mini jeep land rover jaguar lexus subaru suzuki "
     "mitsubishi dacia alfa romeo ferrari lamborghini maserati bentley bugatti golf passat polo tiguan "
-    "a3 a4 a6 q5 x3 x5 c-klasse e-klasse 911 cayenne"
+    "a3 a4 a6 q5 x3 x5 c-klasse e-klasse 911 cayenne m3 m4 rs4 rs6 alhambra giulietta"
 ).split()
 _BRAND_RE = re.compile(r"\b(" + "|".join(re.escape(b) for b in _BRANDS) + r")\b", re.IGNORECASE)
 
@@ -209,7 +463,7 @@ def layer1_score(mail: Dict) -> Tuple[int, List[str]]:
     return score, signals
 
 
-# ─── Layer 2: Claude Haiku ────────────────────────────────────────────────
+# ─── Layer 2: Claude Haiku Phase 1 Classifier & Parameter Extractor ───────
 
 def clean_for_ai(body: str, limit: int = AI_BODY_CHARS) -> str:
     """Strip quoted replies, signatures and link noise so the model sees only fresh text."""
@@ -227,22 +481,41 @@ def clean_for_ai(body: str, limit: int = AI_BODY_CHARS) -> str:
     return re.sub(r"\s+", " ", txt).strip()[:limit]
 
 
-_AI_PROMPT = """Du bist der E-Mail-Filter eines deutschen Autovermittlers (Kauf-/Verkaufsvermittlung von Fahrzeugen).
-Klassifiziere die E-Mail. Antworte NUR mit JSON:
-{{"category": "lead_buy|lead_sell|lead_other|reply|marketing|automated|b2b_solicitation|spam",
+_AI_PROMPT = """Du bist der Phase-1 KI-Assistent von CAR-AGENTS (deutsche Autovermittlung: Verkauf, Suchauftrag/Beschaffung, Inserate).
+Analysiere die E-Mail nach den Phase-1-Anforderungen und antworte NUR mit gültigem JSON:
+{{
+  "category": "seller|sourcing|sell_and_source|advertised_buyer|b2b_cooperation|b2b_offer|b2b_advertising|invoice|spam|other",
+  "multi_requests": ["optional weitere Kategorien falls mehrere Anliegen in einer Nachricht"],
   "confidence": 0.0-1.0,
-  "language": "de|en|other",
-  "vehicle": null or "kurze Beschreibung",
-  "budget": null or "Betrag",
-  "reason": "max 12 Wörter"}}
+  "language": "de|en",
+  "priority": "HIGH|NORMAL|LOW",
+  "priority_reason": "kurze Begründung der Priorität (z.B. konkretes Kaufangebot, Besichtigungswunsch, dringender Verkauf)",
+  "params": {{
+    "manufacturer_model": null or "Marke & Modell / Fahrzeugtyp",
+    "first_registration": null or "Erstzulassung / Baujahr",
+    "mileage": null or "Kilometerstand",
+    "price_or_budget": null or "Preisvorstellung / Preisangebot / freiwilliges Budget",
+    "timeframe": null or "Gewünschter Verkaufs-/Kaufzeitraum",
+    "location": null or "Standort / Suchregion",
+    "phone": null or "Telefonnummer",
+    "preferred_channel": null or "Bevorzugter Kontaktweg & Uhrzeit",
+    "intended_use": null or "Einsatzzweck & wichtige Anforderungen",
+    "payment_deadline": null or "Zahlungsziel bei Rechnungen"
+  }},
+  "reason": "max 14 Wörter Zusammenfassung des Anliegens"
+}}
 
-Regeln:
-- lead_buy / lead_sell: eine PRIVATE oder gewerbliche Person will selbst ein Auto kaufen/verkaufen/suchen, auch OHNE Stichworte
-  (z.B. "Ich brauche eine BMW Limousine, haben Sie die?" = lead_buy).
-- lead_other: echte Autointeressierte Anfrage, Richtung unklar (Beratung, Finanzierung, Inzahlungnahme).
-- marketing / b2b_solicitation: Werbung, Newsletter, Dienstleister die UNS etwas verkaufen wollen (Personal, SEO, Software...), auch wenn Autowörter vorkommen.
-- automated: Codes, Bestätigungen, Benachrichtigungen, Rechnungen, Plattform-Mails.
-- spam: Betrug, Phishing, unsinnig.
+Kategorien-Regeln:
+- seller: Kunde möchte sein eigenes Fahrzeug über CAR-AGENTS verkaufen.
+- sourcing: Kunde beauftragt/sucht über CAR-AGENTS ein Fahrzeug (auch ohne Wort 'kaufen', z.B. "Haben Sie eine BMW Limousine?").
+- sell_and_source: Kunde möchte gleichzeitig ein Fahrzeug verkaufen UND ein anderes suchen.
+- advertised_buyer: Interessent für ein bereits von CAR-AGENTS inseriertes Fahrzeug (Verfügbarkeit, Besichtigung, Preisangebot, Reservierung).
+- b2b_cooperation: Konkrete B2B-Kooperationsanfrage (z.B. Händler-/Flottenpartnerschaft).
+- b2b_offer: Allgemeines B2B-Dienstleistungsangebot (z.B. Personalvermittlung, Werkstatt, Sachverständiger, Software).
+- b2b_advertising: Erkennbare Werbung / Newsletter.
+- invoice: Rechnung, Quittung, Zahlungsbeleg.
+- spam: Phishing, Betrug, gefälschte Bank-/Paket-Mails, automatische Systemcodes.
+- other: Sonstige oder unklare Nachricht.
 
 Absender: {sender}
 Betreff: {subject}
@@ -263,11 +536,11 @@ async def classify_ai(mail: Dict) -> Optional[Dict]:
     from app.services.claude_service import call_claude
     prompt = _AI_PROMPT.format(
         sender=mail.get("sender_email") or "",
-        subject=(mail.get("subject") or "")[:200],
+        subject=(mail.get("subject") or "")[:220],
         body=clean_for_ai(mail.get("body") or ""),
     )
     try:
-        raw = await call_claude(prompt, max_tokens=200, model=HAIKU_MODEL)
+        raw = await call_claude(prompt, max_tokens=420, model=HAIKU_MODEL)
         return _parse_json(raw)
     except Exception as e:
         logger.warning(f"AI triage failed: {e}")
@@ -276,56 +549,135 @@ async def classify_ai(mail: Dict) -> Optional[Dict]:
 
 # ─── Orchestration ────────────────────────────────────────────────────────
 
-def _result(decision, category, layer, score=0, confidence=None, reason="", extracted=None, signals=None) -> Dict:
+def _enrich_result(
+    mail: Dict,
+    decision: str,
+    category: str,
+    layer,
+    score: int = 0,
+    confidence: Optional[float] = None,
+    reason: str = "",
+    ai_data: Optional[Dict] = None,
+    signals: Optional[List[str]] = None,
+) -> Dict:
+    subject = mail.get("subject") or ""
+    body = mail.get("body") or ""
+    sender_name = mail.get("sender_name") or mail.get("sender_email") or ""
+    lang = (ai_data or {}).get("language") or _detect_lang(f"{subject}\n{body}")
+
+    regex_params = _extract_regex_params(subject, body)
+    ai_params = {k: v for k, v in ((ai_data or {}).get("params") or {}).items() if v}
+    merged_params = {**regex_params, **ai_params}
+
+    missing = compute_missing_fields(category, merged_params, lang=lang)
+    is_Customer_lead = category in LEAD_CATEGORIES
+    is_qualified = bool(is_Customer_lead and (len(missing) <= 1 or category in ("advertised_buyer", "marketplace")))
+
+    draft_subj, draft_body = build_draft_reply(
+        category=category,
+        sender_name=sender_name,
+        subject=subject,
+        params=merged_params,
+        missing_fields=missing,
+        lang=lang,
+    )
+
+    priority = (ai_data or {}).get("priority") or (
+        "HIGH" if (category in ("advertised_buyer", "marketplace") or merged_params.get("viewing_requested") or merged_params.get("phone"))
+        else "LOW" if category in ("spam", "automated", "b2b_advertising")
+        else "NORMAL"
+    )
+    priority_reason = (ai_data or {}).get("priority_reason") or (
+        "Direkte Fahrzeug-/Inseratsanfrage" if priority == "HIGH" else reason
+    )
+
     return {
-        "decision": decision, "category": category, "layer": layer, "score": score,
-        "confidence": confidence, "reason": reason, "extracted": extracted or {}, "signals": signals or [],
+        "decision": decision,
+        "category": category,
+        "layer": layer,
+        "score": score,
+        "confidence": confidence,
+        "reason": reason,
+        "extracted": {
+            "vehicle": merged_params.get("manufacturer_model"),
+            "budget": merged_params.get("price_or_budget"),
+            **merged_params,
+        },
+        "extracted_params": merged_params,
+        "missing_fields": missing,
+        "is_qualified": is_qualified,
+        "draft_subject": draft_subj,
+        "draft_reply": draft_body,
+        "draft_status": "pending" if draft_body else "none",
+        "priority": priority,
+        "priority_reason": priority_reason,
+        "payment_deadline": merged_params.get("payment_deadline"),
+        "multi_requests": (ai_data or {}).get("multi_requests") or [],
+        "signals": signals or [],
     }
 
 
 async def triage(mail: Dict, use_ai: bool = True, sender_rule: Optional[str] = None) -> Dict:
     """
-    sender_rule: 'allow' | 'deny' | None  (from the sender_rules table, founder decisions)
+    sender_rule: 'allow' | 'deny' | None (from sender_rules table, founder decisions)
     """
     if sender_rule == "deny":
-        return _result("drop", "spam", 0, reason="sender on deny list")
+        return _enrich_result(mail, "drop", "spam", 0, reason="sender on deny list")
 
     if mail.get("in_thread"):
         subj = mail.get("subject") or ""
         if AUTO_SUBJECT.search(subj) or _h(mail.get("headers"), "Auto-Submitted").lower() not in ("", "no"):
-            return _result("drop", "automated", "thread", reason="auto-reply inside thread")
-        return _result("reply", "reply", "thread", reason="reply in our conversation")
+            return _enrich_result(mail, "drop", "automated", "thread", reason="auto-reply inside thread")
+        return _enrich_result(mail, "reply", "reply", "thread", reason="reply in our conversation")
 
     if sender_rule != "allow":
         hit = layer0(mail)
         if hit:
             decision, category, reason = hit
-            return _result(decision, category, 0, reason=reason)
+            return _enrich_result(mail, decision, category, 0, reason=reason)
 
     score, signals = layer1_score(mail)
     if sender_rule == "allow":
         score += 3
 
     if score <= DROP_SCORE:
-        return _result("drop", "unknown", 1, score, reason="score too low: " + ", ".join(signals[:4]), signals=signals)
+        # Check if it's a B2B offer so we categorize it accurately instead of generic 'unknown'
+        combined = f"{mail.get('subject') or ''}\n{mail.get('body') or ''}"
+        cat_l1 = "b2b_offer" if _NEG_B2B.search(combined) else ("b2b_advertising" if _NEG_MARKETING.search(combined) else "unknown")
+        return _enrich_result(
+            mail, "drop", cat_l1, 1, score,
+            reason="score too low: " + ", ".join(signals[:4]),
+            signals=signals,
+        )
 
     ai = await classify_ai(mail) if use_ai else None
     if ai is None:
-        # No AI available: never auto-reply on rules alone; strong score goes to human review
         if score >= 4:
-            return _result("review", "lead_other", 1, score, reason="no AI; high score -> review", signals=signals)
-        return _result("drop", "unknown", 1, score, reason="no AI; weak score", signals=signals)
+            return _enrich_result(mail, "review", "sourcing", 1, score, reason="no AI; high score -> review", signals=signals)
+        return _enrich_result(mail, "drop", "unknown", 1, score, reason="no AI; weak score", signals=signals)
 
-    cat = str(ai.get("category") or "spam")
+    cat = str(ai.get("category") or "other").lower()
     conf = float(ai.get("confidence") or 0)
-    extracted = {"vehicle": ai.get("vehicle"), "budget": ai.get("budget")}
     reason = f"AI: {ai.get('reason') or cat}"
-    if cat.startswith("lead"):
+
+    if cat in LEAD_CATEGORIES:
         if conf >= AUTO_LEAD_CONFIDENCE:
-            return _result("lead", cat, 2, score, conf, reason, extracted, signals)
+            return _enrich_result(mail, "lead", cat, 2, score, conf, reason, ai_data=ai, signals=signals)
         if conf >= REVIEW_CONFIDENCE:
-            return _result("review", cat, 2, score, conf, reason, extracted, signals)
-        return _result("drop", "unknown", 2, score, conf, reason + " (low confidence)", extracted, signals)
+            return _enrich_result(mail, "review", cat, 2, score, conf, reason, ai_data=ai, signals=signals)
+        return _enrich_result(mail, "review", "other", 2, score, conf, reason + " (low confidence -> owner review)", ai_data=ai, signals=signals)
+
+    if cat in ("b2b_cooperation", "b2b_offer", "b2b_solicitation"):
+        return _enrich_result(mail, "b2b", cat, 2, score, conf, reason, ai_data=ai, signals=signals)
+
+    if cat == "invoice":
+        return _enrich_result(mail, "invoice", "invoice", 2, score, conf, reason, ai_data=ai, signals=signals)
+
+    if cat == "other":
+        return _enrich_result(mail, "review", "other", 2, score, conf, reason, ai_data=ai, signals=signals)
+
     if cat == "reply":
-        return _result("review", cat, 2, score, conf, reason, extracted, signals)
-    return _result("drop", cat, 2, score, conf, reason, extracted, signals)
+        return _enrich_result(mail, "review", "reply", 2, score, conf, reason, ai_data=ai, signals=signals)
+
+    # spam / automated / b2b_advertising -> flagged (decision='drop' kept for backward test compatibility, stored in email_triage)
+    return _enrich_result(mail, "drop", cat, 2, score, conf, reason, ai_data=ai, signals=signals)

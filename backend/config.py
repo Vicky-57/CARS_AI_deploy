@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 465
     SMTP_USER: str = "info@car-agents.de"
     SMTP_PASSWORD: str = ""
+    EMAIL_AUTO_REPLY: bool = False           # Phase 1: False = Draft-only (owner approves); True = auto-send Q1 to leads
 
     # Anthropic Claude & Groq LLMs
     ANTHROPIC_API_KEY: str = ""

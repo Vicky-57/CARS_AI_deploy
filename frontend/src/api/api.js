@@ -228,8 +228,101 @@ export const api = {
     return data;
   },
 
-  // ── COMMUNICATIONS & EMAIL ──────────────────────────────────────────────────
+  // ── COMMUNICATIONS, PHASE 1 INQUIRIES & B2B ─────────────────────────────────
   triggerEmailPoll: () => aiPost('/api/v1/outlook/poll-emails', {}),
+  toggleEmailAutoReply: (enabled) => aiPost('/api/v1/outlook/auto-reply-setting', { enabled }),
+  getInquiries: async (limit = 200) => {
+    const { data, error } = await supabase
+      .from('email_triage')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return data || [];
+  },
+  updateInquiry: async (id, fields) => {
+    const { data, error } = await supabase
+      .from('email_triage')
+      .update(fields)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+  approveInquiry: async (id, payload) => {
+    // Try backend endpoint first (so Strato SMTP sends draft reply when send_draft=true)
+    try {
+      return await aiPost(`/api/v1/outlook/inquiries/${id}/approve`, payload);
+    } catch {
+      // Fallback: direct Supabase lead creation + status update
+      const { data: row } = await supabase.from('email_triage').select('*').eq('id', id).single();
+      if (!row) throw new Error('Inquiry not found');
+      const cat = payload.category || row.category || 'sourcing';
+      const intent = (cat === 'seller' || cat === 'lead_sell') ? 'SELL_INTENT' : 'BUY_INTENT';
+      const contactEmail = row.reply_to || row.sender_email;
+      const { data: lead } = await supabase.from('leads').insert({
+        name: row.sender_name || contactEmail,
+        email: contactEmail,
+        phone: (row.extracted_params || {}).phone || null,
+        intent,
+        channel: 'STRATO_EMAIL',
+        status: row.is_qualified ? 'QUALIFIED' : 'NEW',
+        is_qualified: Boolean(row.is_qualified),
+        notes: `[Phase 1 Approved — ${cat}] Subject: ${row.subject || ''}\n\n${row.body_preview || ''}`,
+      }).select().single();
+      const updated = await api.updateInquiry(id, {
+        category: cat,
+        decision: 'lead',
+        lead_id: lead?.id || null,
+        draft_subject: payload.draft_subject ?? row.draft_subject,
+        draft_reply: payload.draft_reply ?? row.draft_reply,
+        draft_status: payload.send_draft ? 'sent' : 'approved_no_send',
+        resolution: 'ok',
+        resolved_at: new Date().toISOString(),
+      });
+      return { inquiry: updated, lead_id: lead?.id, email_sent: false };
+    }
+  },
+  getB2BDeals: async () => {
+    const { data, error } = await supabase
+      .from('b2b_deals')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+  createB2BDeal: async (payload) => {
+    const { data, error } = await supabase
+      .from('b2b_deals')
+      .insert(payload)
+      .select()
+      .single();
+    if (error) throw error;
+    if (payload.triage_id) {
+      await supabase.from('email_triage').update({
+        decision: 'b2b',
+        resolution: 'ok',
+        resolved_at: new Date().toISOString(),
+      }).eq('id', payload.triage_id);
+    }
+    return data;
+  },
+  updateB2BDeal: async (id, fields) => {
+    const { data, error } = await supabase
+      .from('b2b_deals')
+      .update({ ...fields, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+  deleteB2BDeal: async (id) => {
+    const { error } = await supabase.from('b2b_deals').delete().eq('id', id);
+    if (error) throw error;
+    return true;
+  },
   getCommunications: async (filters = {}) => {
     let q = supabase.from('communications').select('*').order('timestamp', { ascending: false });
     if (filters.channel) q = q.eq('channel', filters.channel);

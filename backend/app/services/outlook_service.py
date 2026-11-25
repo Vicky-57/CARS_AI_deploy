@@ -29,7 +29,98 @@ from database import get_supabase
 logger = logging.getLogger("outlook_service")
 
 
-# ─── Calendar: ICS Feed Reader ───────────────────────────────────────────────
+async def approve_inquiry_and_send(
+    triage_id: str,
+    send_draft: bool = True,
+    custom_draft_body: Optional[str] = None,
+    custom_draft_subject: Optional[str] = None,
+    new_category: Optional[str] = None,
+) -> Dict:
+    """
+    Phase 1 Owner Approval Action:
+      - Optionally updates classification category
+      - Creates or links the CRM Lead record
+      - If send_draft=True, sends the prepared (or owner-edited) draft reply via Strato SMTP
+      - Updates email_triage resolution & draft_status
+    """
+    from app.services import email_triage_store as tstore
+
+    row = tstore.find_inquiry(triage_id) or tstore.get_inquiry(triage_id)
+    if not row:
+        raise ValueError(f"Inquiry '{triage_id}' not found")
+
+    cat = (new_category or row.get("category") or "sourcing").lower()
+    contact_email = row.get("reply_to") or row.get("sender_email") or ""
+    sender_name = row.get("sender_name") or contact_email
+    intent = "SELL" if cat in ("seller", "lead_sell") else "BUY"
+    strict_intent = "SELL_INTENT" if intent == "SELL" else "BUY_INTENT"
+
+    tstore.set_rule(contact_email, "allow")
+
+    sb = get_supabase()
+    lead_id = row.get("lead_id")
+    if not lead_id:
+        existing_lead = sb.table("leads").select("id").eq("email", contact_email).limit(1).execute().data or []
+        if existing_lead:
+            lead_id = existing_lead[0]["id"]
+        else:
+            params_obj = row.get("extracted_params") or {}
+            params_lines = "\n".join(f"• {k}: {v}" for k, v in params_obj.items() if v)
+            res = sb.table("leads").insert({
+                "name": sender_name,
+                "email": contact_email,
+                "phone": params_obj.get("phone"),
+                "intent": strict_intent,
+                "channel": "STRATO_EMAIL",
+                "status": "QUALIFIED" if row.get("is_qualified") else "NEW",
+                "qualification_stage": "q1_sent" if send_draft else "uncontacted",
+                "is_qualified": bool(row.get("is_qualified")),
+                "notes": (
+                    f"[Phase 1 Approved — {cat}]\n"
+                    f"Subject: {row.get('subject')}\n"
+                    f"{params_lines}\n\n"
+                    f"{row.get('body_preview') or ''}"
+                ).strip(),
+            }).execute()
+            if res.data:
+                lead_id = res.data[0]["id"]
+
+    sent_ok = False
+    draft_body = (custom_draft_body if custom_draft_body is not None else row.get("draft_reply")) or _Q1_TEMPLATE
+    draft_subj = (custom_draft_subject if custom_draft_subject is not None else row.get("draft_subject")) or (row.get("subject") or "Ihre Anfrage bei CAR-AGENTS")
+
+    if send_draft and contact_email:
+        # Escape braces if custom draft body doesn't use {name} placeholder
+        safe_template = draft_body.replace("{", "{{").replace("}", "}}").replace("{{name}}", "{name}")
+        sent_ok = _send_or_log_reply(
+            to_email=contact_email,
+            sender_name=sender_name,
+            subject=draft_subj,
+            body_template=safe_template,
+            in_reply_to=row.get("message_id") or "",
+            references=row.get("message_id") or "",
+            stage="q1_sent",
+            lead_id=lead_id,
+            intent=intent,
+            force_send=True,
+        )
+
+    updated = tstore.update_decision(row["id"], {
+        "category": cat,
+        "decision": "lead",
+        "lead_id": lead_id,
+        "draft_subject": draft_subj,
+        "draft_reply": draft_body,
+        "draft_status": "sent" if (send_draft and sent_ok) else ("approved_no_send" if not send_draft else "send_failed"),
+        "resolution": "ok",
+        "resolved_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return {
+        "inquiry": updated or row,
+        "lead_id": lead_id,
+        "email_sent": sent_ok,
+        "recipient": contact_email,
+    }
 
 def _parse_ics_events(ics_content: str) -> List[Dict]:
     """Parse an .ICS feed and return a list of event dicts for today."""
@@ -581,6 +672,7 @@ def _send_or_log_reply(
     stage: str,
     lead_id: Optional[str],
     intent: str,
+    force_send: bool = False,
 ) -> bool:
     """
     Send reply via SMTP or log it locally (DRY_RUN=true).
@@ -610,9 +702,9 @@ def _send_or_log_reply(
     msg.attach(MIMEText(body_text, "plain", "utf-8"))
 
     out_message_id = msg["Message-ID"]
-    is_dry_run_flag = DRY_RUN
+    is_dry_run_flag = DRY_RUN and not force_send
 
-    if DRY_RUN:
+    if is_dry_run_flag:
         # Log to local file — zero SMTP calls
         dry_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "dry_run_emails")
         os.makedirs(dry_dir, exist_ok=True)
@@ -792,8 +884,8 @@ async def poll_outlook_inbound_emails() -> List[Dict]:
                     }, use_ai=True, sender_rule=rule)
 
                     cat = t_res.get("category") or "unknown"
-                    intent = "SELL" if cat == "lead_sell" else ("BUY" if cat in ("lead_buy", "marketplace", "lead_other") else (_detect_intent_keywords(subject, body) or "BUY"))
-                    lead_contact_email = reply_to_email if cat == "marketplace" and reply_to_email else sender_email
+                    intent = "SELL" if cat in ("seller", "lead_sell") else ("BUY" if cat in ("sourcing", "sell_and_source", "advertised_buyer", "lead_buy", "marketplace", "lead_other") else (_detect_intent_keywords(subject, body) or "BUY"))
+                    lead_contact_email = reply_to_email if cat in ("advertised_buyer", "marketplace") and reply_to_email else sender_email
 
                     triage_row = tstore.log_decision({
                         "message_id": message_id,
@@ -801,7 +893,7 @@ async def poll_outlook_inbound_emails() -> List[Dict]:
                         "sender_name": sender_name,
                         "reply_to": lead_contact_email,
                         "subject": subject,
-                        "body_preview": body[:600],
+                        "body_preview": body[:1000],
                         "intent": intent,
                         "decision": t_res["decision"],
                         "category": cat,
@@ -809,33 +901,78 @@ async def poll_outlook_inbound_emails() -> List[Dict]:
                         "score": t_res.get("score"),
                         "confidence": t_res.get("confidence"),
                         "reason": t_res.get("reason"),
+                        "extracted_params": t_res.get("extracted_params") or {},
+                        "missing_fields": t_res.get("missing_fields") or [],
+                        "draft_subject": t_res.get("draft_subject"),
+                        "draft_reply": t_res.get("draft_reply"),
+                        "draft_status": t_res.get("draft_status") or "pending",
+                        "priority": t_res.get("priority") or "NORMAL",
+                        "priority_reason": t_res.get("priority_reason"),
+                        "payment_deadline": t_res.get("payment_deadline"),
+                        "multi_requests": t_res.get("multi_requests") or [],
+                        "is_qualified": bool(t_res.get("is_qualified")),
+                        "email_date": email_date.isoformat() if email_date else datetime.now(timezone.utc).isoformat(),
                     })
+                    sid = tstore.short_id(triage_row)
 
                     if t_res["decision"] == "drop":
-                        logger.info(f"[TRIAGE DROP L{t_res['layer']}] {sender_email} | {subject[:50]} | {t_res['reason']}")
+                        logger.info(f"[TRIAGE FLAGGED L{t_res['layer']} #{sid}] {sender_email} | {subject[:50]} | {t_res['reason']}")
                         continue
 
-                    if t_res["decision"] == "review":
-                        sid = tstore.short_id(triage_row)
-                        logger.info(f"[TRIAGE REVIEW #{sid}] {sender_email} | {subject[:50]}")
+                    if t_res["decision"] == "invoice":
+                        logger.info(f"[TRIAGE INVOICE #{sid}] {sender_email} | {subject[:50]} | deadline={t_res.get('payment_deadline')}")
+                        processed.append({"email": sender_email, "stage": "invoice", "triage_id": sid})
+                        continue
+
+                    if t_res["decision"] == "b2b":
+                        logger.info(f"[TRIAGE B2B #{sid}] {sender_email} | {subject[:50]} ({cat})")
                         try:
                             from app.services.whatsapp_service import send_whatsapp_message
                             from config import settings as _s
-                            conf_txt = f"{t_res['confidence']:.2f}" if t_res.get("confidence") is not None else f"score {t_res.get('score')}"
                             alert = (
-                                f"🤔 *E-Mail prüfen (#{sid})*\n"
+                                f"🤝 *Neue B2B-Anfrage (#{sid})*\n"
                                 f"👤 {sender_name} <{lead_contact_email}>\n"
                                 f"📝 {subject}\n"
-                                f"📊 {cat} ({conf_txt}) — {t_res.get('reason')}\n\n"
-                                f"Antworten:\n"
-                                f"• `mail ok {sid}` → Lead anlegen & Q1 senden\n"
-                                f"• `mail no {sid}` → Ignorieren & Absender sperren"
+                                f"📌 Typ: {cat} — {t_res.get('reason')}\n\n"
+                                f"Im Portal unter *B2B & Partners* einsehbar."
                             )
                             for num in [n.strip() for n in _s.WHATSAPP_OWNER_PHONES.split(",") if n.strip()]:
                                 await send_whatsapp_message(num, alert)
                         except Exception as wa_err:
-                            logger.warning(f"WhatsApp review alert failed: {wa_err}")
-                        processed.append({"email": sender_email, "stage": "review", "triage_id": sid})
+                            logger.warning(f"WhatsApp B2B alert failed: {wa_err}")
+                        processed.append({"email": sender_email, "stage": "b2b", "triage_id": sid})
+                        continue
+
+                    # Phase 1 Principle: Unless EMAIL_AUTO_REPLY=True (and not advertised_buyer/marketplace) or an active thread reply,
+                    # hold all new customer inquiries in Draft & Approval mode so the AI never messages customers or alters CRM unapproved.
+                    auto_reply_on = bool(getattr(settings, "EMAIL_AUTO_REPLY", False)) and cat not in ("advertised_buyer", "marketplace")
+                    if t_res["decision"] == "review" or (t_res["decision"] == "lead" and not auto_reply_on and not thread_lead):
+                        params_map = t_res.get("extracted_params") or {}
+                        params_txt = ", ".join(f"{k}: {v}" for k, v in list(params_map.items())[:5]) or "—"
+                        missing_list = t_res.get("missing_fields") or []
+                        missing_txt = ", ".join(missing_list[:4]) or "Vollständig (Ready)"
+                        qual_badge = "✅ Qualifiziert" if t_res.get("is_qualified") else "⏳ Angaben fehlen"
+                        logger.info(f"[PHASE-1 DRAFT #{sid}] {sender_email} | {cat} | {qual_badge}")
+                        try:
+                            from app.services.whatsapp_service import send_whatsapp_message
+                            from config import settings as _s
+                            alert = (
+                                f"📩 *Neue Anfrage (#{sid}) — {qual_badge}*\n"
+                                f"👤 {sender_name} <{lead_contact_email}>\n"
+                                f"📌 Typ: *{cat}* • Priorität: *{t_res.get('priority', 'NORMAL')}*\n"
+                                f"📝 Betreff: {subject}\n"
+                                f"🔍 Parameter: {params_txt}\n"
+                                f"❓ Fehlend: {missing_txt}\n\n"
+                                f"Freigabe:\n"
+                                f"• `mail send {sid}` → Lead anlegen & Entwurf senden\n"
+                                f"• `mail ok {sid}` → Nur Lead anlegen (ohne E-Mail)\n"
+                                f"• `mail no {sid}` → Als Spam markieren"
+                            )
+                            for num in [n.strip() for n in _s.WHATSAPP_OWNER_PHONES.split(",") if n.strip()]:
+                                await send_whatsapp_message(num, alert)
+                        except Exception as wa_err:
+                            logger.warning(f"WhatsApp inquiry draft alert failed: {wa_err}")
+                        processed.append({"email": sender_email, "stage": "draft_prepared", "triage_id": sid})
                         continue
 
                     # If it's a thread reply (already talking to us), keep intent from lead

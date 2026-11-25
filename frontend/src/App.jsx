@@ -18,6 +18,8 @@ import Auth from './pages/Auth';
 import Profile from './pages/Profile';
 import SellForm from './pages/SellForm';
 import BuyForm from './pages/BuyForm';
+import TodayInquiries from './pages/TodayInquiries';
+import B2BDeals from './pages/B2BDeals';
 import { api, supabase } from './api/api';
 import GoogleTranslate from './components/GoogleTranslate';
 
@@ -31,8 +33,10 @@ const NAV = [
   {
     section: 'CRM & Brokerage',
     items: [
+      { path: '/today', icon: Bell, label: 'Today / AI Triage' },
       { path: '/leads', icon: Users, label: 'Leads / Customers' },
       { path: '/projects', icon: FolderKanban, label: 'Deals & Projects' },
+      { path: '/b2b', icon: Briefcase, label: 'B2B & Partners' },
     ],
   },
   {
@@ -47,10 +51,12 @@ const NAV = [
 
 const BREADCRUMB_MAP = {
   '/': ['Workspace', 'Dashboard'],
+  '/today': ['Phase 1 AI', 'Today / Inquiry Triage'],
   '/leads': ['CRM', 'Leads / Customers'],
   '/customers': ['CRM', 'Leads / Customers'],
   '/projects': ['Brokerage', 'Deals & Projects'],
   '/deals': ['Brokerage', 'Deals & Projects'],
+  '/b2b': ['CRM', 'B2B & Partners'],
   '/communications': ['Brokerage', 'Communications'],
   '/contracts': ['Documentation', 'Contract Engine'],
   '/calendar': ['Tools', 'Calendar & Schedule'],
@@ -407,11 +413,13 @@ function AppRoutes({ isAuthenticated, online, userProfile, onLogin, onLogout }) 
           <div className="page-content">
             <Routes>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/today" element={<TodayInquiries />} />
               <Route path="/leads" element={<Leads />} />
               <Route path="/customers" element={<Navigate to="/leads?tab=customers" replace />} />
               <Route path="/communications" element={<Communications />} />
               <Route path="/projects" element={<Projects />} />
               <Route path="/deals" element={<Projects />} />
+              <Route path="/b2b" element={<B2BDeals />} />
               <Route path="/contracts" element={<Contracts />} />
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/profile" element={<Profile />} />
