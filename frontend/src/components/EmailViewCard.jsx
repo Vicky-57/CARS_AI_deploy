@@ -54,7 +54,8 @@ export default function EmailViewCard({ msg, toAddress = 'info@car-agents.de' })
   const subject = cleanText(msg.subject) || '(No Subject)';
   const body = cleanBodyDisplay(msg.body);
   const aiSummary = msg.ai_summary || msg.summary || null;
-  const isInbound = msg.is_inbound !== false;
+  const isDraft = Boolean(msg.is_draft);
+  const isInbound = !isDraft && msg.is_inbound !== false;
   const ts = msg.timestamp;
   let dateStr = '';
   try { dateStr = format(new Date(ts), 'MMM d, yyyy · HH:mm'); } catch { dateStr = ''; }
@@ -67,9 +68,15 @@ export default function EmailViewCard({ msg, toAddress = 'info@car-agents.de' })
       <div className="email-view-header">
         <div className="email-view-meta">
           <div className="email-view-head-top">
-            <span className={`email-dir-pill ${isInbound ? 'in' : 'out'}`}>
-              {isInbound ? <ArrowDownLeft size={11} /> : <ArrowUpRight size={11} />}
-              <span>{isInbound ? 'Received (Inbound)' : 'Sent by CAR-AGENTS (Outbound)'}</span>
+            <span className={`email-dir-pill ${isDraft ? 'draft' : isInbound ? 'in' : 'out'}`}>
+              {isDraft ? <Sparkles size={11} /> : isInbound ? <ArrowDownLeft size={11} /> : <ArrowUpRight size={11} />}
+              <span>
+                {isDraft
+                  ? 'AI Drafted Reply'
+                  : isInbound
+                    ? 'Received (Inbound)'
+                    : 'Sent by CAR-AGENTS (Outbound)'}
+              </span>
             </span>
             {dateStr && <span className="email-view-date">{dateStr}</span>}
           </div>
@@ -87,7 +94,7 @@ export default function EmailViewCard({ msg, toAddress = 'info@car-agents.de' })
                   </>
                 ) : (
                   <>
-                    <strong>CAR-AGENTS Broker</strong>
+                    <strong>{isDraft ? 'CAR-AGENTS AI Draft' : 'CAR-AGENTS Broker'}</strong>
                     <span className="email-meta-addr">info@car-agents.de</span>
                   </>
                 )}
@@ -114,17 +121,33 @@ export default function EmailViewCard({ msg, toAddress = 'info@car-agents.de' })
       {/* Body */}
       <div className="email-view-body">{body}</div>
 
-      {/* AI Summary (only for inbound) */}
-      {aiSummary && isInbound && (
+      {/* AI Summary (inbound) or AI Draft context (read-only) */}
+      {isDraft ? (
         <div className="email-ai-summary">
           <span className="email-ai-icon">
             <Sparkles size={11} />
           </span>
           <div className="email-ai-text">
-            <strong>AI Intent Summary</strong>
-            <span>{aiSummary}</span>
+            <strong>Drafted by AI (Read-Only)</strong>
+            <span>
+              {msg.original_subject
+                ? `In reply to "${cleanText(msg.original_subject)}"${aiSummary ? ` · ${aiSummary}` : ''}`
+                : (aiSummary || 'Automatically generated AI reply awaiting review.')}
+            </span>
           </div>
         </div>
+      ) : (
+        aiSummary && isInbound && (
+          <div className="email-ai-summary">
+            <span className="email-ai-icon">
+              <Sparkles size={11} />
+            </span>
+            <div className="email-ai-text">
+              <strong>AI Intent Summary</strong>
+              <span>{aiSummary}</span>
+            </div>
+          </div>
+        )
       )}
     </article>
   );

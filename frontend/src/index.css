@@ -2609,6 +2609,12 @@ select.select {
   border: 1px solid #BFDBFE;
 }
 
+.email-dir-pill.draft {
+  background: var(--status-amber-bg);
+  color: var(--status-amber-text);
+  border: 1px solid var(--status-amber-border);
+}
+
 .email-subject-line {
   font-size: 1.04rem;
   font-weight: 700;

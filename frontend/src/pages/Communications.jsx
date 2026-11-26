@@ -40,8 +40,8 @@ function cleanText(raw) {
       str = doc.body.textContent || doc.body.innerText || '';
     } catch {
       str = str.replace(/<style[\s\S]*?<\/style>/gi, '')
-               .replace(/<script[\s\S]*?<\/script>/gi, '')
-               .replace(/<[^>]+>/g, ' ');
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<[^>]+>/g, ' ');
     }
   }
   return str.replace(/\s+/g, ' ').trim();
@@ -58,16 +58,32 @@ function cleanBodyDisplay(raw) {
       return clean.replace(/\n\s*\n\s*\n+/g, '\n\n').trim();
     } catch {
       return str.replace(/<style[\s\S]*?<\/style>/gi, '')
-                .replace(/<script[\s\S]*?<\/script>/gi, '')
-                .replace(/<[^>]+>/g, ' ')
-                .replace(/\s+/g, ' ').trim();
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ').trim();
     }
   }
   return str.trim();
 }
 
+const EXCLUDED_DRAFT_CATEGORIES = new Set(['spam', 'automated', 'marketing', 'b2b_advertising']);
+
+function isDraftInquiry(row) {
+  if (!row) return false;
+  if (!row.draft_reply || !String(row.draft_reply).trim()) return false;
+  if (row.decision === 'drop' || row.resolution === 'no') return false;
+  const cat = (row.category || '').toLowerCase();
+  if (EXCLUDED_DRAFT_CATEGORIES.has(cat)) return false;
+  const status = (row.draft_status || 'pending').toLowerCase();
+  if (status !== 'pending' && status !== 'send_failed') return false;
+  const contact = row.reply_to || row.sender_email || '';
+  if (isSpamMessage({ sender_contact: contact, sender_name: row.sender_name })) return false;
+  return true;
+}
+
 export default function Communications() {
   const [contacts, setContacts] = useState([]);
+  const [drafts, setDrafts] = useState([]);
   const [thread, setThread] = useState([]);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -75,7 +91,7 @@ export default function Communications() {
   const [converting, setConverting] = useState(false);
   const [convertedMap, setConvertedMap] = useState({});
   const [filter, setFilter] = useState('EMAIL');
-  const [directionFilter, setDirectionFilter] = useState('INBOUND'); // 'INBOUND' | 'OUTBOUND' | 'ALL'
+  const [directionFilter, setDirectionFilter] = useState('INBOUND'); // 'INBOUND' | 'OUTBOUND' | 'DRAFT' | 'ALL'
   const [showSpam, setShowSpam] = useState(false);
   const [search, setSearch] = useState('');
   const [pollingEmail, setPollingEmail] = useState(false);
@@ -84,9 +100,10 @@ export default function Communications() {
   const loadCommunications = async () => {
     setLoading(true);
     try {
-      const [supabaseComms, existingLeads] = await Promise.all([
+      const [supabaseComms, existingLeads, triageInquiries] = await Promise.all([
         api.getCommunications().catch(() => []),
-        api.getLeads().catch(() => [])
+        api.getLeads().catch(() => []),
+        api.getInquiries(200).catch(() => [])
       ]);
 
       const leadEmailSet = new Set(existingLeads.map(l => (l.email || '').toLowerCase()));
@@ -106,11 +123,43 @@ export default function Communications() {
         }
       }
 
+      const seenDraftKeys = new Set();
+      const aiDrafts = [];
+      for (const row of triageInquiries) {
+        if (!isDraftInquiry(row)) continue;
+        const recipientEmail = (row.reply_to || row.sender_email || '').trim();
+        const recipientName = cleanText(row.sender_name) || recipientEmail || 'Unknown';
+        const draftSubject = row.draft_subject || `Re: ${cleanText(row.subject) || 'Ihre Anfrage bei CAR-AGENTS'}`;
+        const dKey = `${recipientEmail.toLowerCase()}::${draftSubject.toLowerCase().trim()}::${String(row.draft_reply).slice(0, 40)}`;
+        if (seenDraftKeys.has(dKey)) continue;
+        seenDraftKeys.add(dKey);
+        aiDrafts.push({
+          id: `draft_${row.id}`,
+          triage_id: row.id,
+          lead_id: row.lead_id || null,
+          channel: 'STRATO_EMAIL',
+          sender_name: recipientName,
+          sender_contact: recipientEmail,
+          subject: draftSubject,
+          original_subject: row.subject || '',
+          body: row.draft_reply,
+          is_inbound: false,
+          is_draft: true,
+          draft_status: row.draft_status || 'pending',
+          category: row.category,
+          intent: row.intent,
+          ai_summary: row.reason || null,
+          timestamp: row.email_date || row.created_at || new Date().toISOString(),
+        });
+      }
+
       setConvertedMap(initialConvertedMap);
       setContacts(uniqueContacts);
+      setDrafts(aiDrafts);
     } catch (err) {
       console.error('Error loading communications:', err);
       setContacts([]);
+      setDrafts([]);
     } finally {
       setLoading(false);
     }
@@ -122,6 +171,11 @@ export default function Communications() {
 
   const selectContact = async (c) => {
     setSelected(c);
+    if (c.is_draft) {
+      setThread([c]);
+      setThreadLoading(false);
+      return;
+    }
     setThreadLoading(true);
     try {
       const peerEmail = (c.sender_contact || '').toLowerCase().trim();
@@ -178,9 +232,13 @@ export default function Communications() {
   const nonSpamContacts = contacts.filter(c => !isSpamMessage(c));
   const inboundCount = nonSpamContacts.filter(c => c.is_inbound !== false).length;
   const outboundCount = nonSpamContacts.filter(c => c.is_inbound === false).length;
+  const draftCount = drafts.length;
 
-  const filtered = contacts
+  const baseList = !showSpam && directionFilter === 'DRAFT' ? drafts : contacts;
+
+  const filtered = baseList
     .filter(c => {
+      if (c.is_draft) return !showSpam && directionFilter === 'DRAFT';
       const isSpam = isSpamMessage(c);
       if (showSpam) {
         if (!isSpam) return false;
@@ -210,6 +268,22 @@ export default function Communications() {
   };
 
   const directionBadge = (c) => {
+    if (c.is_draft) {
+      return (
+        <span
+          className="badge"
+          style={{
+            fontSize: '0.62rem',
+            padding: '1px 6px',
+            background: 'rgba(217, 144, 0, 0.14)',
+            color: '#b45309',
+            fontWeight: 600,
+          }}
+        >
+          AI Draft
+        </span>
+      );
+    }
     const isInbound = c.is_inbound !== false;
     return (
       <span
@@ -233,11 +307,11 @@ export default function Communications() {
       <div className="page-header" style={{ marginBottom: 16 }}>
         <div className="page-header-left">
           <h1 className="page-title">Communications Inbox</h1>
-          <p className="page-subtitle">Live unified inbox (Strato IMAP & Outlook) + Telegram Bot integration</p>
+          <p className="page-subtitle">Live unified inbox (Strato IMAP & Outlook) integration</p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           {/* Channel Tabs */}
-          <div style={{ display: 'inline-flex', background: 'var(--border)', padding: 2, borderRadius: 'var(--radius-sm)' }}>
+          {/* <div style={{ display: 'inline-flex', background: 'var(--border)', padding: 2, borderRadius: 'var(--radius-sm)' }}>
             {['EMAIL', 'TELEGRAM'].map(f => (
               <button key={f} onClick={() => {
                 if (f === 'TELEGRAM') setShowTelegramModal(true);
@@ -250,19 +324,26 @@ export default function Communications() {
                 boxShadow: filter === f ? 'var(--shadow-xs)' : 'none',
               }}>{f === 'EMAIL' ? 'EMAIL' : f}</button>
             ))}
-          </div>
+          </div> */}
 
-          {/* Direction Filter Tabs: Received vs Sent vs All */}
+          {/* Direction Filter Tabs: Received vs Sent vs Draft vs All */}
           {!showSpam && (
             <div style={{ display: 'inline-flex', background: 'var(--border)', padding: 2, borderRadius: 'var(--radius-sm)' }}>
               {[
                 { id: 'INBOUND', label: `↓ Received (${inboundCount})` },
                 { id: 'OUTBOUND', label: `↑ Sent (${outboundCount})` },
+                { id: 'DRAFT', label: `Draft (${draftCount})` },
                 { id: 'ALL', label: `All (${inboundCount + outboundCount})` },
               ].map(tab => (
                 <button
                   key={tab.id}
-                  onClick={() => setDirectionFilter(tab.id)}
+                  onClick={() => {
+                    if (tab.id === 'DRAFT' || directionFilter === 'DRAFT') {
+                      setSelected(null);
+                      setThread([]);
+                    }
+                    setDirectionFilter(tab.id);
+                  }}
                   style={{
                     padding: '5px 10px', borderRadius: 4, fontWeight: 600, fontSize: '0.73rem',
                     border: 'none', cursor: 'pointer',
@@ -314,19 +395,31 @@ export default function Communications() {
           ) : filtered.length === 0 ? (
             <div className="empty-state">
               <MessageSquare size={24} />
-              <h3>{showSpam ? 'No filtered spam messages' : 'No messages found'}</h3>
+              <h3>
+                {showSpam
+                  ? 'No filtered spam messages'
+                  : directionFilter === 'DRAFT'
+                    ? 'No AI-drafted replies'
+                    : 'No messages found'}
+              </h3>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                {showSpam ? 'Spam folder is clean.' : 'Try selecting another filter or clear search.'}
+                {showSpam
+                  ? 'Spam folder is clean.'
+                  : directionFilter === 'DRAFT'
+                    ? 'Replies drafted by AI will appear here.'
+                    : 'Try selecting another filter or clear search.'}
               </p>
             </div>
           ) : (
             filtered.map(c => {
               const av = getAvatar(c);
               const isActive = selected?.id === c.id;
-              const isInbound = c.is_inbound !== false;
-              const displayName = isInbound
-                ? (cleanText(c.sender_name) || c.sender_contact || 'Unknown')
-                : `To: ${(c.sender_contact || 'Client').split('@')[0]}`;
+              const isInbound = !c.is_draft && c.is_inbound !== false;
+              const displayName = c.is_draft
+                ? `To: ${formatContactName(cleanText(c.sender_name) || c.sender_contact, c.sender_contact)}`
+                : isInbound
+                  ? (cleanText(c.sender_name) || c.sender_contact || 'Unknown')
+                  : `To: ${(c.sender_contact || 'Client').split('@')[0]}`;
               const preview = cleanText(c.body).slice(0, 65) || cleanText(c.subject) || '—';
               return (
                 <div key={c.id} className={`contact-item${isActive ? ' active' : ''}`} onClick={() => {
@@ -354,8 +447,12 @@ export default function Communications() {
           {!selected ? (
             <div className="empty-state" style={{ height: '100%', justifyContent: 'center' }}>
               <MessageSquare size={32} style={{ opacity: .2 }} />
-              <h3>Select a conversation</h3>
-              <p>Click a message thread to view full details & convert to a CRM Lead.</p>
+              <h3>{!showSpam && directionFilter === 'DRAFT' ? 'Select an AI draft' : 'Select a conversation'}</h3>
+              <p>
+                {!showSpam && directionFilter === 'DRAFT'
+                  ? 'Click an item on the left to view the email reply drafted by AI.'
+                  : 'Click a message thread to view full details & convert to a CRM Lead.'}
+              </p>
             </div>
           ) : (
             <>
@@ -370,7 +467,9 @@ export default function Communications() {
                   <div className="thread-header-info">
                     <div className="thread-header-name">
                       {formatContactName(
-                        selected.is_inbound === false ? selected.sender_contact : (cleanText(selected.sender_name) || selected.sender_contact),
+                        selected.is_draft
+                          ? (cleanText(selected.sender_name) || selected.sender_contact)
+                          : (selected.is_inbound === false ? selected.sender_contact : (cleanText(selected.sender_name) || selected.sender_contact)),
                         selected.sender_contact
                       )}
                     </div>
@@ -379,19 +478,25 @@ export default function Communications() {
                 </div>
 
                 <div className="thread-header-actions">
-                  {thread.length > 0 && selected.channel !== 'TELEGRAM' && (
-                    <span className="thread-count-pill">
-                      {thread.length} {thread.length === 1 ? 'message' : 'messages'}
-                    </span>
+                  {selected.is_draft ? (
+                    <span className="thread-count-pill">AI Draft · Read-Only</span>
+                  ) : (
+                    <>
+                      {thread.length > 0 && selected.channel !== 'TELEGRAM' && (
+                        <span className="thread-count-pill">
+                          {thread.length} {thread.length === 1 ? 'message' : 'messages'}
+                        </span>
+                      )}
+                      <button
+                        className={`btn ${convertedMap[selected.id] ? 'btn-secondary' : 'btn-primary'} btn-sm`}
+                        onClick={() => handleConvertToLead(selected)}
+                        disabled={converting || convertedMap[selected.id]}
+                      >
+                        {convertedMap[selected.id] ? <CheckCircle2 size={13} /> : <UserPlus size={13} />}
+                        <span>{convertedMap[selected.id] ? 'Converted to Lead' : 'Convert to Lead'}</span>
+                      </button>
+                    </>
                   )}
-                  <button
-                    className={`btn ${convertedMap[selected.id] ? 'btn-secondary' : 'btn-primary'} btn-sm`}
-                    onClick={() => handleConvertToLead(selected)}
-                    disabled={converting || convertedMap[selected.id]}
-                  >
-                    {convertedMap[selected.id] ? <CheckCircle2 size={13} /> : <UserPlus size={13} />}
-                    <span>{convertedMap[selected.id] ? 'Converted to Lead' : 'Convert to Lead'}</span>
-                  </button>
                 </div>
               </div>
 
