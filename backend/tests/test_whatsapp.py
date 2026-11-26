@@ -482,6 +482,28 @@ def test_mail_review_queue_approve_and_deny():
     assert tstore.get_rule("unsure.buyer@gmail.com") == "deny"
 
 
+def test_whatsapp_reminders_and_done_sync():
+    from datetime import datetime, timezone
+    from app.services import reminder_service as rs
+
+    reset()
+    rs.reset_memory()
+    rem = rs.create_reminder(
+        title="Erstkontakt fällig: Herr Weber",
+        due_at=datetime(2026, 11, 25, 8, 0, tzinfo=timezone.utc),
+        customer_name="Herr Weber",
+        customer_contact="weber@mail.de",
+    )
+    sid = rs.short_id(rem)
+
+    run(handler.handle_message(text_msg(OWNER, "reminders", "rem_1")))
+    assert sid in body_of(sent_to(OWNER)[-1]) and "Herr Weber" in body_of(sent_to(OWNER)[-1])
+
+    run(handler.handle_message(text_msg(OWNER, f"done {sid}", "rem_2")))
+    assert "marked as completed" in body_of(sent_to(OWNER)[-1])
+    assert rs.find_reminder(rem["id"])["status"] == "COMPLETED"
+
+
 # ─── Transport security ───────────────────────────────────────────────────
 
 def test_signature_verification():

@@ -151,24 +151,43 @@ async def run_inactivity_check():
 
 
 async def run_outlook_email_poll():
-    """Polls Outlook/Strato inbox for new inbound leads every 5 minutes."""
-    logger.info("Executing Outlook inbound email poll...")
+    """Polls Outlook/Strato inbox for new inbound leads and checks due Phase 1 reminders every 5 minutes."""
+    logger.info("Executing Outlook inbound email poll & due reminder check...")
     try:
         from app.services.outlook_service import poll_outlook_inbound_emails
         await poll_outlook_inbound_emails()
     except Exception as e:
         logger.error(f"Outlook email poll error: {str(e)}")
+    try:
+        from app.services.reminder_service import process_due_reminders
+        await process_due_reminders()
+    except Exception as e:
+        logger.error(f"Due reminder check error: {str(e)}")
+
+
+async def run_morning_overdue_reminders():
+    """§10: Sends daily consolidated overdue reminder overview at start of working day ONLY if overdue items exist."""
+    try:
+        from app.services.reminder_service import get_working_hours, is_working_day, send_daily_overdue_overview, BERLIN_TZ
+        today = datetime.now(BERLIN_TZ).date()
+        if is_working_day(today, get_working_hours()):
+            await send_daily_overdue_overview()
+    except Exception as e:
+        logger.error(f"Morning overdue reminder digest error: {e}")
 
 
 def start_scheduler():
     """Starts all background scheduler jobs."""
-    # 1. Poll Outlook inbox every 5 minutes for new leads
+    # 1. Poll Outlook inbox & due reminders every 5 minutes
     scheduler.add_job(run_outlook_email_poll, "interval", minutes=5, id="poll_outlook_emails")
 
     # 2. W5 Daily Briefing at 07:00 CET
     scheduler.add_job(run_daily_briefing, "cron", hour=7, minute=0, id="daily_briefing")
 
-    # 3. W6 Inactivity Check daily at 12:00 CET
+    # 3. Phase 1 (§10) Daily Consolidated Overdue Reminder Overview at 09:00 Europe/Berlin
+    scheduler.add_job(run_morning_overdue_reminders, "cron", hour=9, minute=0, id="morning_overdue_reminders")
+
+    # 4. W6 Inactivity Check daily at 12:00 CET
     scheduler.add_job(run_inactivity_check, "cron", hour=12, minute=0, id="inactivity_check")
 
     scheduler.start()

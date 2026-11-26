@@ -252,3 +252,92 @@ async def delete_b2b_deal_endpoint(deal_id: str):
     from app.services import email_triage_store as tstore
     tstore.delete_b2b_deal(deal_id)
     return {"deleted": True}
+
+
+# ─── Phase 1 (§10) Reminders, Working Hours & Bavarian Holidays Endpoints ─
+
+class WorkingHoursUpdateRequest(BaseModel):
+    work_days: list = [0, 1, 2, 3, 4, 5]
+    start_hour: int = 9
+    end_hour: int = 18
+
+
+class CreateReminderRequest(BaseModel):
+    title: str
+    due_at: Optional[str] = None
+    hours_from_now: Optional[float] = 4.0
+    reminder_type: str = "custom"
+    triage_id: Optional[str] = None
+    lead_id: Optional[str] = None
+    project_id: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_contact: Optional[str] = None
+    category: Optional[str] = None
+    notes: Optional[str] = None
+
+
+@router.get("/working-hours")
+async def get_crm_working_hours():
+    from app.services import reminder_service as rs
+    cfg = rs.get_working_hours()
+    year = datetime.now().year
+    holidays = {d.isoformat(): name for d, name in rs.bavarian_holidays(year).items()}
+    return {"working_hours": cfg, "bavarian_holidays": holidays}
+
+
+@router.put("/working-hours")
+async def update_crm_working_hours(req: WorkingHoursUpdateRequest):
+    from app.services import reminder_service as rs
+    updated = rs.update_working_hours(req.work_days, req.start_hour, req.end_hour)
+    return {"working_hours": updated}
+
+
+@router.get("/reminders")
+async def get_crm_reminders(status: str = "OPEN", limit: int = 100):
+    from app.services import reminder_service as rs
+    return {
+        "reminders": rs.list_reminders(status=status, limit=limit),
+        "working_hours": rs.get_working_hours(),
+    }
+
+
+@router.post("/reminders")
+async def create_crm_reminder(req: CreateReminderRequest):
+    from app.services import reminder_service as rs
+    if req.due_at:
+        due = datetime.fromisoformat(req.due_at.replace("Z", "+00:00"))
+    else:
+        due = rs.add_working_hours(datetime.now(timezone.utc), float(req.hours_from_now or 4.0))
+    row = rs.create_reminder(
+        title=req.title,
+        due_at=due,
+        reminder_type=req.reminder_type,
+        triage_id=req.triage_id,
+        lead_id=req.lead_id,
+        project_id=req.project_id,
+        customer_name=req.customer_name,
+        customer_contact=req.customer_contact,
+        category=req.category,
+        notes=req.notes,
+    )
+    return {"reminder": row}
+
+
+@router.post("/reminders/{reminder_id}/complete")
+async def complete_crm_reminder(reminder_id: str):
+    from app.services import reminder_service as rs
+    updated = rs.mark_completed(reminder_id, via="CRM")
+    if not updated:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+    return {"reminder": updated}
+
+
+@router.post("/inquiries/{triage_id}/split-sell-source")
+async def split_combined_sell_and_source(triage_id: str):
+    """§6: Manually split or link a combined Sell + Source inquiry into two linked inquiries."""
+    from app.services import email_triage_store as tstore
+    row = tstore.find_inquiry(triage_id) or tstore.get_inquiry(triage_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Inquiry not found")
+    companion = tstore.create_linked_sell_and_source(row)
+    return {"primary": tstore.get_inquiry(row["id"]) or row, "companion": companion}

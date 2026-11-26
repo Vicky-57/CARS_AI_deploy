@@ -323,6 +323,68 @@ export const api = {
     if (error) throw error;
     return true;
   },
+  getReminders: async (status = 'OPEN') => {
+    let q = supabase.from('crm_reminders').select('*').order('due_at', { ascending: true });
+    if (status && status !== 'ALL') q = q.eq('status', status);
+    const { data, error } = await q.limit(100);
+    if (error) throw error;
+    return data || [];
+  },
+  createReminder: async (payload) => {
+    try {
+      const res = await aiPost('/api/v1/outlook/reminders', payload);
+      return res.reminder;
+    } catch {
+      const due = payload.due_at || new Date(Date.now() + (payload.hours_from_now || 4) * 3600000).toISOString();
+      const { data, error } = await supabase.from('crm_reminders').insert({
+        title: payload.title,
+        due_at: due,
+        reminder_type: payload.reminder_type || 'custom',
+        triage_id: payload.triage_id || null,
+        customer_name: payload.customer_name || null,
+        customer_contact: payload.customer_contact || null,
+        category: payload.category || null,
+        notes: payload.notes || null,
+        status: 'OPEN',
+      }).select().single();
+      if (error) throw error;
+      return data;
+    }
+  },
+  completeReminder: async (id) => {
+    try {
+      const res = await aiPost(`/api/v1/outlook/reminders/${id}/complete`, {});
+      return res.reminder;
+    } catch {
+      const { data, error } = await supabase.from('crm_reminders').update({
+        status: 'COMPLETED',
+        completed_at: new Date().toISOString(),
+        completed_via: 'CRM',
+      }).eq('id', id).select().single();
+      if (error) throw error;
+      return data;
+    }
+  },
+  getWorkingHours: async () => {
+    const { data } = await supabase.from('crm_working_hours').select('*').eq('id', 'default').single();
+    return data || { id: 'default', work_days: [0, 1, 2, 3, 4, 5], start_hour: 9, end_hour: 18, state_holidays: 'BY' };
+  },
+  updateWorkingHours: async (payload) => {
+    const { data, error } = await supabase.from('crm_working_hours').upsert({
+      id: 'default',
+      work_days: payload.work_days,
+      start_hour: Number(payload.start_hour),
+      end_hour: Number(payload.end_hour),
+      timezone: 'Europe/Berlin',
+      state_holidays: 'BY',
+      updated_at: new Date().toISOString(),
+    }).select().single();
+    if (error) throw error;
+    return data;
+  },
+  splitCombinedSellAndSource: async (triageId) => {
+    return aiPost(`/api/v1/outlook/inquiries/${triageId}/split-sell-source`, {});
+  },
   getCommunications: async (filters = {}) => {
     let q = supabase.from('communications').select('*').order('timestamp', { ascending: false });
     if (filters.channel) q = q.eq('channel', filters.channel);

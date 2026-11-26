@@ -123,6 +123,63 @@ def update_decision(row_id: str, fields: Dict) -> Optional[Dict]:
         return None
 
 
+def create_linked_sell_and_source(primary_row: Dict) -> Optional[Dict]:
+    """
+    §6 Combined Vehicle Sale and Sourcing Inquiries:
+      - Uses one central customer contact (`parent_contact_key`).
+      - Maintains two separate, linked inquiries (Primary: `seller`, Companion: `sourcing`).
+      - Highlights timing and financial dependencies (`dependency_notes`).
+      - Does NOT automatically transfer subsequent edits from one inquiry to the other.
+    """
+    if not primary_row or primary_row.get("linked_inquiry_id"):
+        return None
+
+    contact_key = (primary_row.get("reply_to") or primary_row.get("sender_email") or "").lower().strip()
+    dep_note = (
+        primary_row.get("dependency_notes")
+        or "§6 Gekoppelte Anfrage: Verkauf Bestandsfahrzeug & Suchauftrag Neufahrzeug (zeitliche/finanzielle Abhängigkeit beachten)."
+    )
+    from app.services.email_triage_service import build_draft_reply, compute_missing_fields
+    params = dict(primary_row.get("extracted_params") or {})
+    sourcing_missing = compute_missing_fields("sourcing", params)
+    _, sourcing_draft = build_draft_reply("sourcing", primary_row.get("sender_name") or "", primary_row.get("subject") or "", params, sourcing_missing)
+
+    companion = log_decision({
+        "message_id": f"{primary_row.get('message_id') or primary_row['id']}#sourcing",
+        "sender_email": primary_row.get("sender_email"),
+        "sender_name": primary_row.get("sender_name"),
+        "reply_to": primary_row.get("reply_to") or primary_row.get("sender_email"),
+        "subject": f"[Suchauftrag / Sourcing §6] {primary_row.get('subject') or ''}",
+        "body_preview": primary_row.get("body_preview"),
+        "intent": "BUY",
+        "decision": primary_row.get("decision") or "lead",
+        "category": "sourcing",
+        "layer": primary_row.get("layer"),
+        "score": primary_row.get("score"),
+        "confidence": primary_row.get("confidence"),
+        "reason": "§6 Verknüpfter Suchauftrag zur Verkaufsanfrage",
+        "extracted_params": params,
+        "missing_fields": sourcing_missing,
+        "draft_subject": primary_row.get("draft_subject"),
+        "draft_reply": sourcing_draft,
+        "draft_status": "pending",
+        "priority": primary_row.get("priority") or "NORMAL",
+        "priority_reason": primary_row.get("priority_reason"),
+        "is_qualified": False,
+        "linked_inquiry_id": primary_row.get("id"),
+        "parent_contact_key": contact_key,
+        "dependency_notes": dep_note,
+        "email_date": primary_row.get("email_date"),
+    })
+
+    update_decision(primary_row["id"], {
+        "linked_inquiry_id": companion.get("id"),
+        "parent_contact_key": contact_key,
+        "dependency_notes": dep_note,
+    })
+    return companion
+
+
 def list_inquiries(limit: int = 100, days: Optional[int] = None) -> List[Dict]:
     if _use_memory():
         return list(reversed(_mem_triage))[:limit]

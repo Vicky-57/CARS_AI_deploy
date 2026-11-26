@@ -44,6 +44,7 @@ HELP_TEXT = (
     "  _(e.g. `customer +49170...` or `customer max@mail.de`)_\n"
     "• `docs <name | phone | email>` — list customer documents\n"
     "• `today` — today's inquiries (qualified & unqualified, params & drafts)\n"
+    "• `reminders` / `done <id>` — follow-up reminders & completion sync\n"
     "• `mail` / `mail send <id>` / `mail ok <id>` / `mail no <id>`\n"
     "• `convert <lead>` • `stage <client> <stage>`\n"
     "• `cancel meeting` • `reschedule`"
@@ -60,6 +61,8 @@ OWNER_CMDS = {
     "mail", "/mail", "emails", "triage",
     "today", "/today", "heute", "inquiries",
     "b2b", "/b2b",
+    "reminders", "/reminders", "erinnerungen", "tasks",
+    "done", "/done", "erledigt",
     "convert", "/convert",
     "stage", "/stage",
     "schedule", "/schedule", "meeting", "termin",
@@ -312,6 +315,12 @@ async def _dispatch_command(phone: str, cmd: str, arg: str, raw_text: str) -> No
     if cmd in ("summary", "zusammenfassung", "status"):
         await send_message(phone, format_summary(store.list_leads(200), store.list_active_projects(100)))
         return
+    if cmd in ("reminders", "erinnerungen", "tasks"):
+        await _cmd_reminders(phone, arg)
+        return
+    if cmd in ("done", "erledigt"):
+        await _cmd_reminder_done(phone, arg)
+        return
     if cmd in ("today", "heute", "inquiries"):
         await _cmd_today(phone, arg)
         return
@@ -520,6 +529,50 @@ async def _cmd_docs(phone: str, query: str) -> None:
     store.save_session(phone, {"mode": "owner_customer_pick", "done": True, "matches": refs, "action": "docs"})
     btns = [(f"cust_{i}", crm.disambiguate_row_title(m), crm.disambiguate_row_desc(m)) for i, m in enumerate(matches)]
     await send_message(phone, f"📂 Found {len(matches)} customers matching '{query}'. Pick one:", buttons=btns)
+
+
+async def _cmd_reminders(phone: str, arg: str = "") -> None:
+    from app.services import reminder_service as rs
+
+    rows = rs.list_reminders(status="OPEN", limit=20)
+    cfg = rs.get_working_hours()
+    now_iso = datetime.now(timezone.utc).isoformat()
+    overdue = [r for r in rows if (r.get("due_at") or "") <= now_iso]
+    upcoming = [r for r in rows if (r.get("due_at") or "") > now_iso]
+
+    lines = [
+        f"⏰ *Phase 1 Reminders & Follow-Ups*",
+        f"Working hours: {cfg.get('start_hour', 9):02d}:00–{cfg.get('end_hour', 18):02d}:00 (Bavaria / BY holidays active)",
+        f"Open: {len(rows)} • Overdue: {len(overdue)} • Upcoming: {len(upcoming)}",
+    ]
+    if not rows:
+        lines.append("\nNo open reminders.")
+    else:
+        for r in rows[:12]:
+            sid = rs.short_id(r)
+            is_od = (r.get("due_at") or "") <= now_iso
+            tag = "🔴 OVERDUE" if is_od else "🟡 DUE"
+            due_txt = str(r.get("due_at") or "")[:16].replace("T", " ")
+            lines.append(
+                f"\n• `#{sid}` [{tag}] *{r.get('title')}*\n"
+                f"  👤 {r.get('customer_name') or r.get('customer_contact') or '—'} • {due_txt}\n"
+                f"  👉 `done {sid}`"
+            )
+    await send_message(phone, "\n".join(lines))
+
+
+async def _cmd_reminder_done(phone: str, arg: str = "") -> None:
+    from app.services import reminder_service as rs
+
+    sid = (arg or "").strip()
+    if not sid:
+        await send_message(phone, "Usage: `done <reminder_id>` (e.g. `done a1b2c3`). Type `reminders` to see open items.")
+        return
+    updated = rs.mark_completed(sid, via="WHATSAPP")
+    if not updated:
+        await send_message(phone, f"No reminder found matching `{sid}`. Type `reminders` to list open reminders.")
+        return
+    await send_message(phone, f"✅ Reminder `#{rs.short_id(updated)}` (*{updated.get('title')}*) marked as completed & synced with CRM.")
 
 
 async def _cmd_today(phone: str, arg: str = "") -> None:
@@ -1230,17 +1283,67 @@ async def _handle_scan_step(phone: str, state: Dict, raw_text: str, btn_id: str)
                 await send_message(phone, "✅ Extraction reviewed (no customer was linked).")
                 return
             applied = docs.apply_ocr_to_crm(state.get("extracted") or {}, cust)
-            store.delete_session(phone)
             targets = ", ".join(applied["updated_targets"]) or "CRM"
+            rec_tpl = applied["recommended_template"]
+
+            # Advance to optional 1-click PDF contract generation step (§11)
+            state["step"] = "sc_pick_template"
+            state["canonical_fields"] = applied.get("canonical_fields") or {}
+            store.save_session(phone, state)
             await send_message(
                 phone,
                 f"✅ *OCR Fields Saved!*\n"
                 f"👤 Customer: {cust['name']}\n"
                 f"💾 Updated: {targets}\n"
-                f"📄 Template ready: `{applied['recommended_template']}`",
+                f"📄 Template ready: `{rec_tpl}`\n\n"
+                f"Would you like to generate a pre-filled Contract PDF draft now? (Reply 1-5 or tap):",
+                buttons=[
+                    ("sctpl_sell_b2c", "1. Vermittlung B2C", "Verkauf Aktiv (sell_b2c)"),
+                    ("sctpl_buy_passiv", "2. Beschaffung", "Suchauftrag Passiv (buy_passiv)"),
+                    ("sctpl_kaufvertrag", "3. Kaufvertrag C2C", "Bilingualer Kaufvertrag"),
+                    ("sctpl_handover", "4. Übergabeprotokoll", "Fahrzeug-Übergabe"),
+                    ("sctpl_skip", "5. Skip (Done)", "Do not generate PDF now"),
+                ],
             )
             return
         await send_message(phone, "Reply 1 to Save into CRM & Templates, or 2 to Discard.")
+        return
+
+    if step == "sc_pick_template":
+        tpl_keys = ["sell_b2c", "buy_passiv", "kaufvertrag", "handover"]
+        if btn_id == "sctpl_skip" or low in ("5", "skip", "no", "done"):
+            store.delete_session(phone)
+            await send_message(phone, "✅ Done! You can also generate or edit contracts anytime in the Web Portal (`/contracts`).")
+            return
+        chosen_tpl = None
+        if btn_id.startswith("sctpl_") and btn_id[6:] in tpl_keys:
+            chosen_tpl = btn_id[6:]
+        elif low in ("1", "2", "3", "4"):
+            chosen_tpl = tpl_keys[int(low) - 1]
+        elif low in tpl_keys:
+            chosen_tpl = low
+        if not chosen_tpl:
+            store.delete_session(phone)
+            await send_message(phone, "✅ OCR saved.")
+            return
+
+        cust = state.get("customer") or {}
+        canonical = state.get("canonical_fields") or docs.to_canonical_template_fields(state.get("extracted") or {})
+        store.delete_session(phone)
+        try:
+            pdf_res = await docs.generate_and_store_contract_pdf(chosen_tpl, canonical, cust)
+            url_line = f"\n🔗 {pdf_res['file_url']}" if pdf_res.get("file_url") else ""
+            await send_message(
+                phone,
+                f"📄 *Pre-Filled Contract Draft Generated!*\n"
+                f"👤 Customer: {cust.get('name')}\n"
+                f"📋 Template: *{pdf_res.get('template_label')}*\n"
+                f"📁 File: `{pdf_res.get('file_name')}`{url_line}",
+            )
+        except Exception as e:
+            logger.warning(f"WhatsApp contract PDF generation failed: {e}")
+            await send_message(phone, f"⚠️ Could not render PDF directly ({e}). Fields are saved in CRM for `/contracts`.")
+        return
 
     if step == "sc_wait_file":
         await send_message(phone, "📷 Waiting for photo or PDF to scan (or type `cancel`).")

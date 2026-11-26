@@ -181,14 +181,82 @@ def _extract_regex_params(subject: str, body: str) -> Dict:
     if m_dl:
         params["payment_deadline"] = m_dl.group(1).strip()
 
+    # §4 Advertised vehicle buyer specifics: price offer, requested viewing time, reservation
+    m_offer = re.search(
+        r"(?:biete|preisangebot|mein angebot|offer|würde|zahle)\s*(?:ihnen\s*)?(\d{1,3}(?:[.\s]\d{3})*(?:,\d{2})?\s*(?:€|eur|euro)|(?:€|eur)\s*\d{1,3}(?:[.\s]\d{3})*)",
+        text,
+        re.IGNORECASE,
+    )
+    if m_offer:
+        params["buyer_offer_price"] = m_offer.group(1).strip()
+
+    m_view_time = re.search(
+        r"(?:besichtigung|probefahrt|anschauen|viewing|termin).{0,35}?\b(heute|morgen|übermorgen|montag|dienstag|mittwoch|donnerstag|freitag|samstag|\d{1,2}\.\d{1,2}\.(?:\d{2,4})?|\d{1,2}[:.]\d{2}\s*uhr)",
+        text,
+        re.IGNORECASE,
+    )
+    if m_view_time:
+        params["viewing_requested_time"] = m_view_time.group(1).strip()
+
+    # §6 Combined Sell + Source detection
+    has_sell = bool(re.search(r"\b(verkaufen|verkaufe|inzahlungnahme|in zahlung|mein\s+(?:aktuelles\s+)?(?:auto|fahrzeug|wagen)\s+abgeben|sell my)\b", text, re.IGNORECASE))
+    has_buy = bool(re.search(r"\b(gleichzeitig.{0,25}(?:suche|kaufen)|neues\s+(?:auto|fahrzeug)\s+suchen|ersatzfahrzeug|und\s+suche\s+ein|source another|buy another)\b", text, re.IGNORECASE))
+    if has_sell and has_buy:
+        params["combined_sell_and_source"] = "Ja (Verkauf + Neuanschaffung gekoppelt)"
+        params["dependency_notes"] = "Zeitliche & finanzielle Abhängigkeit zwischen Verkauf des Bestandsfahrzeugs und Beschaffung des Neufahrzeugs (§6)"
+
     if re.search(r"\b(besichtigung|probefahrt|termin|anschauen|viewing|test drive)\b", text, re.IGNORECASE):
         params["viewing_requested"] = "Ja / Yes"
-    if re.search(r"\b(reservier|hold|reserve)\b", text, re.IGNORECASE):
+    if re.search(r"(reservier|hold|reserve)", text, re.IGNORECASE):
         params["reservation_requested"] = "Ja / Yes"
     if re.search(r"\b(noch da|verfügbar|available|noch zu haben)\b", text, re.IGNORECASE):
         params["availability_question"] = "Ja / Yes"
 
     return {k: v for k, v in params.items() if v}
+
+
+def match_advertised_vehicle(vehicle_hint: Optional[str], projects: Optional[List[Dict]] = None) -> Dict:
+    """
+    §4: Match an advertised-vehicle inquiry against active CRM deals/listings (`projects`).
+    Returns {"matched_project_id": ..., "matched_vehicle_title": ..., "advertised_price": ...} or {}.
+    """
+    hint = (vehicle_hint or "").strip().lower()
+    if not hint or len(hint) < 2:
+        return {}
+
+    if projects is None:
+        from app.services import whatsapp_store as ws
+        if ws.MEMORY:
+            projects = list(ws._mem_projects)
+        else:
+            try:
+                from database import get_supabase
+                projects = get_supabase().table("projects").select("*").eq("status", "ACTIVE").limit(100).execute().data or []
+            except Exception:
+                projects = []
+
+    tokens = [t for t in re.split(r"[\s,\-|/]+", hint) if len(t) >= 2]
+    best_proj = None
+    best_hits = 0
+    for p in projects:
+        target = (p.get("target_vehicle") or f"{p.get('manufacturer', '')} {p.get('model', '')}").strip()
+        t_low = target.lower()
+        if not t_low:
+            continue
+        hits = sum(1 for tok in tokens if tok in t_low)
+        if hits > best_hits:
+            best_hits = hits
+            best_proj = p
+
+    if not best_proj or best_hits == 0:
+        return {}
+
+    adv_price = best_proj.get("budget") or best_proj.get("min_price") or best_proj.get("price")
+    return {
+        "matched_project_id": best_proj.get("id"),
+        "matched_vehicle_title": best_proj.get("target_vehicle") or f"{best_proj.get('manufacturer', '')} {best_proj.get('model', '')}".strip(),
+        "advertised_price": f"{adv_price} €" if adv_price and "€" not in str(adv_price) else (str(adv_price) if adv_price else None),
+    }
 
 
 def compute_missing_fields(category: str, params: Dict, lang: str = "de") -> List[str]:
@@ -583,13 +651,19 @@ def _enrich_result(
     )
 
     priority = (ai_data or {}).get("priority") or (
-        "HIGH" if (category in ("advertised_buyer", "marketplace") or merged_params.get("viewing_requested") or merged_params.get("phone"))
+        "HIGH" if (category in ("advertised_buyer", "marketplace") or merged_params.get("viewing_requested") or merged_params.get("buyer_offer_price") or merged_params.get("reservation_requested") or merged_params.get("phone"))
         else "LOW" if category in ("spam", "automated", "b2b_advertising")
         else "NORMAL"
     )
     priority_reason = (ai_data or {}).get("priority_reason") or (
-        "Direkte Fahrzeug-/Inseratsanfrage" if priority == "HIGH" else reason
+        "Konkretes Preisangebot / Reservierungswunsch (§4)" if (merged_params.get("buyer_offer_price") or merged_params.get("reservation_requested"))
+        else "Direkte Fahrzeug-/Inseratsanfrage" if priority == "HIGH"
+        else reason
     )
+
+    adv_match = {}
+    if category in ("advertised_buyer", "marketplace"):
+        adv_match = match_advertised_vehicle(merged_params.get("manufacturer_model"))
 
     return {
         "decision": decision,
@@ -613,6 +687,13 @@ def _enrich_result(
         "priority_reason": priority_reason,
         "payment_deadline": merged_params.get("payment_deadline"),
         "multi_requests": (ai_data or {}).get("multi_requests") or [],
+        "matched_project_id": adv_match.get("matched_project_id"),
+        "matched_vehicle_title": adv_match.get("matched_vehicle_title") or (merged_params.get("manufacturer_model") if category in ("advertised_buyer", "marketplace") else None),
+        "advertised_price": adv_match.get("advertised_price"),
+        "buyer_offer_price": merged_params.get("buyer_offer_price") or (merged_params.get("price_or_budget") if category in ("advertised_buyer", "marketplace") else None),
+        "viewing_requested_time": merged_params.get("viewing_requested_time"),
+        "reservation_requested": bool(merged_params.get("reservation_requested")),
+        "dependency_notes": merged_params.get("dependency_notes"),
         "signals": signals or [],
     }
 

@@ -428,3 +428,55 @@ def apply_ocr_to_crm(extracted: Dict, customer: Dict) -> Dict:
         "recommended_template": template_type,
         "session_synced": session_synced,
     }
+
+
+async def generate_and_store_contract_pdf(
+    template_type: str,
+    canonical_fields: Dict[str, str],
+    customer: Dict,
+) -> Dict:
+    """
+    §11 Automatic Document Pre-filling (1-click after WhatsApp OCR scan):
+      - Renders the pre-filled PDF contract via pdf_service.render_contract_pdf()
+      - Stores the generated PDF draft into the customer's Google Drive (`2. Legal Docs`)
+        or Supabase Storage (`customer-documents`) and records it in `customer_documents`.
+      - Returns {"file_name": ..., "file_url": ..., "template_label": ...}.
+    """
+    import tempfile
+    from app.services.pdf_service import TEMPLATE_LABELS, render_contract_pdf
+
+    data = dict(canonical_fields or {})
+    if customer.get("name") and not data.get("full_name"):
+        data["full_name"] = customer["name"]
+    if customer.get("phone") and not data.get("phone"):
+        data["phone"] = customer["phone"]
+    if customer.get("email") and not data.get("email"):
+        data["email"] = customer["email"]
+    if template_type == "kaufvertrag" and not data.get("seller_name"):
+        data["seller_name"] = data.get("full_name") or customer.get("name") or ""
+    if template_type == "handover" and not data.get("giving_person"):
+        data["giving_person"] = data.get("full_name") or customer.get("name") or ""
+    data.setdefault("date", datetime.now(timezone.utc).strftime("%d.%m.%Y"))
+
+    tmp_dir = tempfile.mkdtemp(prefix="car_agents_pdf_")
+    out_path = await asyncio.to_thread(render_contract_pdf, template_type, data, tmp_dir)
+    with open(out_path, "rb") as f:
+        pdf_bytes = f.read()
+
+    fname = os.path.basename(out_path)
+    stored = await store_uploaded_document(
+        file_bytes=pdf_bytes,
+        filename=fname,
+        mime_type="application/pdf",
+        customer=customer,
+        category="contract",
+        source="WHATSAPP_OCR_CONTRACT",
+        notes=f"Pre-filled contract draft ({TEMPLATE_LABELS.get(template_type, template_type)})",
+    )
+    return {
+        "file_name": fname,
+        "file_url": stored.get("file_url") or stored.get("drive_url"),
+        "template_type": template_type,
+        "template_label": TEMPLATE_LABELS.get(template_type, template_type),
+        "document_row": stored,
+    }

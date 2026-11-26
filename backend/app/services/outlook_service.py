@@ -115,6 +115,17 @@ async def approve_inquiry_and_send(
         "resolution": "ok",
         "resolved_at": datetime.now(timezone.utc).isoformat(),
     })
+
+    # §10: Mark initial_response reminder completed; if we sent a message requiring customer reply, schedule 2-working-day follow-up
+    try:
+        from app.services.reminder_service import complete_reminders_for_contact, schedule_inquiry_reminder
+        complete_reminders_for_contact(row["id"], via="CRM")
+        complete_reminders_for_contact(contact_email, via="CRM")
+        if send_draft and sent_ok:
+            schedule_inquiry_reminder({**row, "lead_id": lead_id}, reminder_type="awaiting_reply")
+    except Exception as rem_err:
+        logger.warning(f"Post-approval reminder sync warning: {rem_err}")
+
     return {
         "inquiry": updated or row,
         "lead_id": lead_id,
@@ -911,9 +922,28 @@ async def poll_outlook_inbound_emails() -> List[Dict]:
                         "payment_deadline": t_res.get("payment_deadline"),
                         "multi_requests": t_res.get("multi_requests") or [],
                         "is_qualified": bool(t_res.get("is_qualified")),
+                        "matched_project_id": t_res.get("matched_project_id"),
+                        "matched_vehicle_title": t_res.get("matched_vehicle_title"),
+                        "advertised_price": t_res.get("advertised_price"),
+                        "buyer_offer_price": t_res.get("buyer_offer_price"),
+                        "viewing_requested_time": t_res.get("viewing_requested_time"),
+                        "reservation_requested": bool(t_res.get("reservation_requested")),
+                        "dependency_notes": t_res.get("dependency_notes"),
+                        "parent_contact_key": lead_contact_email.lower().strip(),
                         "email_date": email_date.isoformat() if email_date else datetime.now(timezone.utc).isoformat(),
                     })
                     sid = tstore.short_id(triage_row)
+
+                    # §6 Combined Sell + Source: automatically create the second linked inquiry under the same contact
+                    if cat == "sell_and_source" or "sourcing" in (t_res.get("multi_requests") or []) and cat == "seller":
+                        tstore.create_linked_sell_and_source(triage_row)
+
+                    # §3–§7, §10: Schedule automatic initial-response reminder (deduplicated per contact_key)
+                    try:
+                        from app.services.reminder_service import schedule_inquiry_reminder
+                        schedule_inquiry_reminder(triage_row, reminder_type="initial_response")
+                    except Exception as rem_err:
+                        logger.warning(f"Reminder scheduling warning: {rem_err}")
 
                     if t_res["decision"] == "drop":
                         logger.info(f"[TRIAGE FLAGGED L{t_res['layer']} #{sid}] {sender_email} | {subject[:50]} | {t_res['reason']}")
