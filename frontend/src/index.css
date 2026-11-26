@@ -7121,22 +7121,28 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
   border-bottom: 1px solid var(--border);
-  background: var(--bg-surface-subtle);
+  background: var(--bg-surface);
 }
 
 .today-inspector-tabs {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius);
+  background: var(--bg-surface-subtle);
+  border: 1px solid var(--border);
 }
 
 .today-inspector-tab {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 11px;
+  padding: 5px 12px;
   border-radius: var(--radius-sm);
   font-size: 0.76rem;
   font-weight: 600;
@@ -7170,11 +7176,50 @@ body {
   border: 1px solid var(--status-amber-border);
 }
 
+.today-inspector-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.today-inspector-status.ok {
+  background: var(--status-green-bg);
+  color: var(--status-green-text);
+  border: 1px solid var(--status-green-border);
+}
+
+.today-inspector-status.warn {
+  background: var(--status-amber-bg);
+  color: var(--status-amber-text);
+  border: 1px solid var(--status-amber-border);
+}
+
 .today-inspector-split {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
-  gap: 20px;
+  gap: 0;
   animation: todayListFade 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.today-inspector-pane {
+  padding: 16px;
+  min-width: 0;
+}
+
+.today-inspector-pane:first-child {
+  border-right: 1px solid var(--border);
+}
+
+.today-pane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .today-section-kicker {
@@ -7183,7 +7228,43 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-muted);
-  margin-bottom: 10px;
+  margin-bottom: 0;
+}
+
+.today-kicker-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  font-size: 0.67rem;
+  font-weight: 700;
+  background: var(--bg-surface-subtle);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.today-kicker-count.ok {
+  background: var(--status-green-bg);
+  border-color: var(--status-green-border);
+  color: var(--status-green-text);
+}
+
+.today-kicker-count.warn {
+  background: var(--status-amber-bg);
+  border-color: var(--status-amber-border);
+  color: var(--status-amber-text);
+}
+
+.today-pane-empty {
+  padding: 14px 12px;
+  border-radius: var(--radius);
+  border: 1px dashed var(--border);
+  background: var(--bg-surface-subtle);
+  font-size: 0.78rem;
+  color: var(--text-muted);
 }
 
 .today-missing-chips {
@@ -7196,7 +7277,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 4px 9px;
+  padding: 5px 10px;
   border-radius: var(--radius-full);
   background: var(--status-amber-bg);
   border: 1px solid var(--status-amber-border);
@@ -7219,54 +7300,103 @@ body {
   font-weight: 600;
 }
 
-.today-param-list {
-  display: flex;
-  flex-direction: column;
+.today-param-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
   gap: 8px;
 }
 
-.today-param-row {
+.today-param-tile {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding-bottom: 7px;
-  border-bottom: 1px dashed var(--border);
-  font-size: 0.8rem;
-}
-
-.today-param-row:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
-.today-param-label {
-  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  color: var(--text-secondary);
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--bg-surface-subtle);
+  border: 1px solid var(--border);
+  min-width: 0;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.today-param-tile:hover {
+  border-color: var(--gray-300);
+}
+
+.today-param-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  display: grid;
+  place-items: center;
   flex-shrink: 0;
 }
 
+.today-param-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.today-param-label {
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  line-height: 1.25;
+}
+
 .today-param-val {
+  font-size: 0.82rem;
   font-weight: 600;
   color: var(--text-primary);
-  text-align: right;
+  line-height: 1.3;
   word-break: break-word;
 }
 
 .today-complete-note {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
-  padding: 10px 12px;
+  padding: 11px 13px;
   border-radius: var(--radius);
   background: var(--status-green-bg);
   border: 1px solid var(--status-green-border);
   color: var(--status-green-text);
+  line-height: 1.35;
+}
+
+.today-complete-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bg-surface);
+  border: 1px solid var(--status-green-border);
+  color: var(--status-green-text);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.today-complete-title {
   font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--status-green-text);
+}
+
+.today-complete-sub {
+  font-size: 0.74rem;
   font-weight: 500;
-  line-height: 1.45;
+  color: var(--status-green-text);
+  opacity: 0.88;
+}
+
+.today-message-wrap {
+  padding: 16px;
 }
 
 .today-message-box {
@@ -7309,6 +7439,11 @@ body {
 
   .today-inspector-split {
     grid-template-columns: 1fr;
+  }
+
+  .today-inspector-pane:first-child {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
   }
 }
 
@@ -7509,7 +7644,7 @@ body {
   }
 
   .today-inspector-bar {
-    padding: 6px 10px;
+    padding: 8px 12px;
   }
 
   .today-inspector-tabs {
@@ -7522,6 +7657,22 @@ body {
     padding: 4px 8px;
     font-size: 0.72rem;
     gap: 5px;
+  }
+
+  .today-inspector-status {
+    display: none;
+  }
+
+  .today-inspector-pane {
+    padding: 12px;
+  }
+
+  .today-param-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .today-message-wrap {
+    padding: 12px;
   }
 
   .today-draft-actions {

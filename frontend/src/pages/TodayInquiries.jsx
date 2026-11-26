@@ -81,6 +81,15 @@ function cleanMultilineText(raw) {
     .trim();
 }
 
+function getParamIcon(key) {
+  if (key === 'manufacturer_model') return <Car size={13} strokeWidth={2} />;
+  if (key === 'first_registration' || key === 'timeframe' || key === 'payment_deadline') return <Calendar size={13} strokeWidth={2} />;
+  if (key === 'phone') return <Phone size={13} strokeWidth={2} />;
+  if (key === 'preferred_channel') return <MessageSquare size={13} strokeWidth={2} />;
+  if (key === 'price_or_budget' || key === 'mileage') return <Tag size={13} strokeWidth={2} />;
+  return <FileText size={13} strokeWidth={2} />;
+}
+
 export default function TodayInquiries() {
   const navigate = useNavigate();
   const [inquiries, setInquiries] = useState([]);
@@ -720,92 +729,118 @@ export default function TodayInquiries() {
               </div>
 
               {/* 2. Tabbed Inspector Card: Specs & Missing Info | Original Message */}
-              <div className="today-card">
-                <div className="today-inspector-bar">
-                  <div className="today-inspector-tabs" role="tablist">
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={detailTab === 'SPECS'}
-                      className={`today-inspector-tab${detailTab === 'SPECS' ? ' active' : ''}`}
-                      onClick={() => setDetailTab('SPECS')}
-                    >
-                      <CheckCircle2 size={13} />
-                      <span>Specs &amp; Checklist</span>
-                      {(selected.missing_fields || []).length > 0 && (
-                        <span className="today-inspector-badge warn">
-                          {(selected.missing_fields || []).length} missing
-                        </span>
-                      )}
-                    </button>
+              {(() => {
+                const paramEntries = Object.entries(selected.extracted_params || {}).filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== '');
+                const missingFields = selected.missing_fields || [];
+                const missingCount = missingFields.length;
+                return (
+                  <div className="today-card today-inspector-card">
+                    <div className="today-inspector-bar">
+                      <div className="today-inspector-tabs" role="tablist">
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={detailTab === 'SPECS'}
+                          className={`today-inspector-tab${detailTab === 'SPECS' ? ' active' : ''}`}
+                          onClick={() => setDetailTab('SPECS')}
+                        >
+                          <CheckCircle2 size={13} />
+                          <span>Specs &amp; Checklist</span>
+                          {missingCount > 0 && (
+                            <span className="today-inspector-badge warn">
+                              {missingCount} missing
+                            </span>
+                          )}
+                        </button>
 
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={detailTab === 'MESSAGE'}
-                      className={`today-inspector-tab${detailTab === 'MESSAGE' ? ' active' : ''}`}
-                      onClick={() => setDetailTab('MESSAGE')}
-                    >
-                      <MessageSquare size={13} />
-                      <span>Original Message</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="today-card-body">
-                  {detailTab === 'SPECS' ? (
-                    <div className="today-inspector-split" key={`specs-${selected.id}`}>
-                      {/* Extracted Parameters */}
-                      <div>
-                        <div className="today-section-kicker">Extracted Details</div>
-                        {Object.keys(selected.extracted_params || {}).length === 0 ? (
-                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                            No structured parameters detected yet.
-                          </div>
-                        ) : (
-                          <div className="today-param-list">
-                            {Object.entries(selected.extracted_params || {}).map(([k, v]) => (
-                              <div key={k} className="today-param-row">
-                                <span className="today-param-label">
-                                  {k === 'manufacturer_model' && <Car size={12} strokeWidth={2} style={{ color: 'var(--text-primary)' }} />}
-                                  <span>{PARAM_LABELS[k] || k}</span>
-                                </span>
-                                <span className="today-param-val">{cleanText(String(v))}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={detailTab === 'MESSAGE'}
+                          className={`today-inspector-tab${detailTab === 'MESSAGE' ? ' active' : ''}`}
+                          onClick={() => setDetailTab('MESSAGE')}
+                        >
+                          <MessageSquare size={13} />
+                          <span>Original Message</span>
+                        </button>
                       </div>
 
-                      {/* Missing Info Chips */}
-                      <div>
-                        <div className="today-section-kicker">
-                          Missing Info ({(selected.missing_fields || []).length})
+                      <span className={`today-inspector-status ${missingCount === 0 ? 'ok' : 'warn'}`}>
+                        {missingCount === 0 ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
+                        <span>{missingCount === 0 ? 'Ready to reply' : `${missingCount} field${missingCount === 1 ? '' : 's'} missing`}</span>
+                      </span>
+                    </div>
+
+                    {detailTab === 'SPECS' ? (
+                      <div className="today-inspector-split" key={`specs-${selected.id}`}>
+                        {/* Extracted Parameters */}
+                        <div className="today-inspector-pane">
+                          <div className="today-pane-header">
+                            <span className="today-section-kicker">Extracted Details</span>
+                            <span className="today-kicker-count">{paramEntries.length}</span>
+                          </div>
+                          {paramEntries.length === 0 ? (
+                            <div className="today-pane-empty">
+                              No structured parameters detected yet.
+                            </div>
+                          ) : (
+                            <div className="today-param-grid">
+                              {paramEntries.map(([k, v]) => {
+                                const valText = cleanText(String(v));
+                                return (
+                                  <div key={k} className="today-param-tile" title={valText}>
+                                    <span className="today-param-icon">{getParamIcon(k)}</span>
+                                    <div className="today-param-content">
+                                      <span className="today-param-label">{PARAM_LABELS[k] || k}</span>
+                                      <span className="today-param-val">{valText}</span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
-                        {(selected.missing_fields || []).length === 0 ? (
-                          <div className="today-complete-note">
-                            <CheckCircle2 size={15} style={{ flexShrink: 0 }} />
-                            <span>All key fields present. Ready to call or reply.</span>
+
+                        {/* Missing Info */}
+                        <div className="today-inspector-pane">
+                          <div className="today-pane-header">
+                            <span className="today-section-kicker">Missing Info</span>
+                            <span className={`today-kicker-count ${missingCount === 0 ? 'ok' : 'warn'}`}>
+                              {missingCount}
+                            </span>
                           </div>
-                        ) : (
-                          <div className="today-missing-chips">
-                            {(selected.missing_fields || []).map((m, idx) => (
-                              <span key={idx} className="today-missing-chip">
-                                <AlertCircle size={11} style={{ flexShrink: 0 }} />
-                                <span>{cleanText(m)}</span>
+                          {missingCount === 0 ? (
+                            <div className="today-complete-note">
+                              <span className="today-complete-icon">
+                                <CheckCircle2 size={14} />
                               </span>
-                            ))}
-                          </div>
-                        )}
+                              <div>
+                                <div className="today-complete-title">All key fields present</div>
+                                <div className="today-complete-sub">Ready to call or reply.</div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="today-missing-chips">
+                              {missingFields.map((m, idx) => (
+                                <span key={idx} className="today-missing-chip">
+                                  <AlertCircle size={11} style={{ flexShrink: 0 }} />
+                                  <span>{cleanText(m)}</span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="today-message-box" key={`msg-${selected.id}`}>
-                      {cleanMultilineText(selected.body_preview) || '(Empty message body)'}
-                    </div>
-                  )}
-                </div>
-              </div>
+                    ) : (
+                      <div className="today-message-wrap">
+                        <div className="today-message-box" key={`msg-${selected.id}`}>
+                          {cleanMultilineText(selected.body_preview) || '(Empty message body)'}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Action Bar for B2B Inquiries */}
               {isB2BCategory(editCategory, selected.decision) && (
