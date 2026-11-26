@@ -6513,6 +6513,8 @@ body {
   display: flex;
   align-items: flex-start;
   gap: 10px;
+  min-width: 0;
+  width: 100%;
   padding: 11px 12px;
   border-radius: var(--radius);
   border: 1px solid transparent;
@@ -6596,9 +6598,12 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-width: 0;
 }
 
 .today-item-sender {
+  flex: 1;
+  min-width: 0;
   font-size: 0.83rem;
   font-weight: 600;
   color: var(--text-primary);
@@ -6766,6 +6771,15 @@ body {
   align-items: flex-start;
   gap: 16px;
   flex-wrap: wrap;
+}
+
+.today-detail-head-info {
+  flex: 1;
+  min-width: 240px;
+}
+
+.today-spam-btn {
+  margin-left: auto;
 }
 
 .today-detail-subject {
@@ -7078,16 +7092,54 @@ body {
 @media (max-width: 820px) {
   .today-page {
     height: auto;
-    min-height: calc(100vh - 100px);
+    min-height: 0;
+    padding-bottom: 24px;
+  }
+
+  .today-hero {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .today-hero-actions {
+    width: 100%;
+    gap: 6px;
   }
 
   .today-workspace {
-    grid-template-columns: 1fr;
-    min-height: 540px;
+    grid-template-columns: minmax(0, 1fr);
+    flex: none;
+    min-height: 0;
   }
 
   .today-queue {
     border-right: none;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .today-queue-list {
+    max-height: none;
+    overflow-y: visible;
+  }
+
+  .today-detail {
+    padding: 12px;
+    min-width: 0;
+    overflow-y: visible;
+  }
+
+  .today-message-box {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .today-pill-car {
+    min-width: 0;
+    flex-shrink: 1;
+    max-width: 170px;
   }
 
   .today-workspace.has-selection .today-queue {
@@ -7100,6 +7152,188 @@ body {
 
   .today-mobile-back {
     display: inline-flex;
+  }
+}
+
+@media (max-width: 640px) {
+  .today-title {
+    font-size: 1.14rem;
+  }
+
+  .today-hero-actions {
+    gap: 6px;
+  }
+
+  .today-scope-switch {
+    flex: 1 1 auto;
+    height: 30px;
+    padding: 2px;
+    justify-content: space-between;
+  }
+
+  .today-scope-btn {
+    flex: 1;
+    height: 24px;
+    padding: 0 8px;
+    font-size: 0.71rem;
+    gap: 4px;
+    justify-content: center;
+  }
+
+  .today-scope-count {
+    font-size: 0.62rem;
+    padding: 0 4px;
+  }
+
+  .today-mode-btn {
+    height: 30px;
+    padding: 0 9px;
+    font-size: 0.71rem;
+    gap: 5px;
+  }
+
+  .today-action-group {
+    height: 30px;
+  }
+
+  .today-sync-btn {
+    padding: 0 9px;
+    font-size: 0.71rem;
+    gap: 5px;
+  }
+
+  .today-refresh-btn {
+    width: 30px;
+  }
+
+  .today-tabs-bar {
+    padding: 3px;
+    gap: 2px;
+  }
+
+  .today-tab-indicator {
+    top: 3px;
+    height: calc(100% - 6px);
+  }
+
+  .today-tab {
+    padding: 4px 9px;
+    font-size: 0.71rem;
+    gap: 4px;
+  }
+
+  .today-tab-count {
+    font-size: 0.62rem;
+    padding: 0 5px;
+  }
+
+  .today-mobile-back {
+    padding: 4px 9px;
+    font-size: 0.72rem;
+    gap: 4px;
+  }
+
+  .today-card-head {
+    flex-wrap: wrap;
+    padding: 9px 12px;
+  }
+
+  .today-card-body {
+    padding: 12px;
+  }
+
+  .today-detail-head-info {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .today-detail-sender {
+    overflow-wrap: anywhere;
+  }
+
+  .today-override-box {
+    width: 100%;
+    padding: 2px 8px;
+    gap: 6px;
+    border-radius: var(--radius-sm);
+  }
+
+  .today-override-select {
+    min-width: 0;
+    width: 100%;
+    flex: 1;
+    height: 28px;
+    padding: 2px 4px 2px 0;
+    font-size: 0.73rem;
+  }
+
+  .today-facts-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .today-inspector-bar {
+    padding: 6px 10px;
+  }
+
+  .today-inspector-tabs {
+    width: 100%;
+  }
+
+  .today-inspector-tab {
+    flex: 1;
+    justify-content: center;
+    padding: 4px 8px;
+    font-size: 0.72rem;
+    gap: 5px;
+  }
+
+  .today-draft-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    gap: 6px;
+    padding-top: 10px;
+  }
+
+  .today-draft-actions .btn,
+  .today-b2b-card .btn {
+    padding: 6px 10px;
+    font-size: 0.72rem;
+    gap: 5px;
+  }
+
+  .today-draft-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .today-draft-actions .btn-primary {
+    grid-column: 1 / -1;
+    padding: 7px 12px;
+    font-size: 0.75rem;
+  }
+
+  .today-spam-btn {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .today-hero-actions {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 6px;
+  }
+
+  .today-scope-switch {
+    grid-column: 1 / -1;
+  }
+
+  .today-mode-btn {
+    justify-content: center;
+  }
+
+  .today-facts-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -7257,12 +7491,20 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.b2b-new-btn {
+  height: 34px;
+}
+
 .b2b-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.b2b-toolbar .today-tabs-bar {
+  width: fit-content;
 }
 
 .b2b-stage-bar {
@@ -7642,16 +7884,107 @@ body {
 }
 
 @media (max-width: 640px) {
+  .b2b-page .today-hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+
   .b2b-search-box {
+    flex: 1 1 100%;
     width: 100%;
+    height: 30px;
+    padding: 0 9px;
+  }
+
+  .b2b-new-btn {
+    width: auto;
+    flex: 0 0 auto;
+    height: 30px;
+    padding: 0 10px;
+    font-size: 0.72rem;
+    gap: 5px;
+    justify-content: center;
+  }
+
+  .b2b-refresh-btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  .b2b-toolbar {
+    gap: 8px;
+  }
+
+  .b2b-toolbar .today-tabs-bar {
+    width: 100%;
+  }
+
+  .b2b-toolbar .today-tab {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .b2b-stage-bar {
+    width: 100%;
+    padding: 3px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .b2b-stage-indicator {
+    top: 3px;
+    height: calc(100% - 6px);
+  }
+
+  .b2b-stage-tab {
+    padding: 4px 8px;
+    font-size: 0.71rem;
+    gap: 4px;
+  }
+
+  .b2b-stage-count {
+    font-size: 0.62rem;
+    padding: 0 5px;
   }
 
   .b2b-grid {
     grid-template-columns: 1fr;
   }
 
+  .b2b-card {
+    padding: 13px;
+    gap: 10px;
+  }
+
+  .b2b-card-footer {
+    flex-wrap: wrap;
+    padding-top: 8px;
+  }
+
+  .b2b-stage-select-wrap {
+    max-width: 100%;
+    padding: 3px 8px;
+    gap: 5px;
+  }
+
+  .b2b-stage-select {
+    font-size: 0.71rem;
+    padding: 1px 0;
+  }
+
+  .b2b-card-actions .btn-icon {
+    padding: 4px;
+  }
+
   .b2b-mail-row {
     flex-wrap: wrap;
+    padding: 12px 14px;
+    gap: 10px;
+  }
+
+  .b2b-mail-email {
+    word-break: break-all;
   }
 
   .b2b-mail-time {
@@ -7662,5 +7995,57 @@ body {
     width: 100%;
     display: flex;
     justify-content: flex-end;
+  }
+
+  .b2b-mail-action .btn {
+    width: auto;
+    padding: 5px 10px;
+    font-size: 0.72rem;
+    justify-content: center;
+  }
+
+  .b2b-page .modal-header {
+    padding: 12px 16px;
+  }
+
+  .b2b-page .modal-body {
+    padding: 14px 16px;
+  }
+
+  .b2b-page .modal-body .input,
+  .b2b-page .modal-body .select,
+  .b2b-page .modal-body .textarea {
+    padding: 6px 9px;
+    font-size: 0.78rem;
+  }
+
+  .b2b-page .modal-footer {
+    padding: 10px 16px;
+    gap: 6px;
+  }
+
+  .b2b-page .modal-footer .btn {
+    padding: 5px 11px;
+    font-size: 0.74rem;
+  }
+}
+
+@media (max-width: 440px) {
+  .b2b-stat-card {
+    padding: 11px 12px;
+    gap: 9px;
+  }
+
+  .b2b-stat-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .b2b-stat-label {
+    font-size: 0.64rem;
+  }
+
+  .b2b-stat-value {
+    font-size: 1.18rem;
   }
 }

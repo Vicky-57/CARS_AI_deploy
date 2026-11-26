@@ -242,7 +242,7 @@ export default function B2BDeals() {
             )}
           </div>
 
-          <button className="btn btn-primary" onClick={() => setShowModal(true)} style={{ height: 34 }}>
+          <button className="btn btn-primary b2b-new-btn" onClick={() => setShowModal(true)}>
             <Plus size={14} />
             <span>New Partner Deal</span>
           </button>
@@ -308,7 +308,7 @@ export default function B2BDeals() {
 
       {/* Smooth Sliding Tabs + Stage Filters */}
       <div className="b2b-toolbar">
-        <div className="today-tabs-bar" ref={tabsBarRef} role="tablist" style={{ width: 'fit-content' }}>
+        <div className="today-tabs-bar" ref={tabsBarRef} role="tablist">
           {tabIndicator.ready && (
             <span
               className="today-tab-indicator"
