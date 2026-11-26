@@ -189,10 +189,13 @@ export default function TodayInquiries() {
         draft_reply: draftBody,
         category: editCategory,
       });
+      const recipientAddr = selected.reply_to || selected.sender_email || '';
+      const veh = cleanText((selected.extracted_params || {}).manufacturer_model || '');
+      const recipientLabel = formatContactName(selected.sender_name || recipientAddr, recipientAddr, veh);
       toast.success(
         sendEmail
-          ? `Approved! Lead created in CRM & response sent to ${selected.reply_to || selected.sender_email}.`
-          : 'Approved! Lead created in CRM without sending an email.'
+          ? `Approved! Lead saved & reply sent to ${recipientLabel}.`
+          : 'Approved! Lead saved in CRM (no email sent).'
       );
       await loadData();
     } catch (err) {
@@ -399,12 +402,20 @@ export default function TodayInquiries() {
           </div>
 
           <button
+            type="button"
+            role="switch"
+            aria-checked={autoReply}
             className={`today-mode-btn${autoReply ? ' auto' : ''}`}
             onClick={handleToggleAutoReply}
-            title="Phase 1 default: Draft-Only (Owner approves every message)"
+            title={autoReply
+              ? 'AI sends replies automatically (click to switch to AI Draft & Approve)'
+              : 'AI prepares draft replies — sent only after your approval'}
           >
             {autoReply ? <Zap size={13} /> : <ShieldCheck size={13} />}
-            <span>{autoReply ? 'Auto-Reply: ON' : 'Draft & Approve'}</span>
+            <span>{autoReply ? 'AI Auto-Reply: ON' : 'AI Draft & Approve'}</span>
+            <span className="today-toggle-track" aria-hidden="true">
+              <span className="today-toggle-thumb" />
+            </span>
           </button>
 
           <div className="today-action-group">
@@ -837,10 +848,10 @@ export default function TodayInquiries() {
                 <div className="today-card">
                   <div className="today-card-head">
                     <div className="today-card-title">
-                      <Mail size={15} style={{ color: 'var(--text-secondary)' }} />
-                      <span>Draft Reply</span>
+                      <Sparkles size={14} style={{ color: 'var(--text-primary)' }} />
+                      <span>AI Draft Reply</span>
                       <span style={{ fontSize: '0.72rem', fontWeight: 400, color: 'var(--text-muted)' }}>
-                        &middot; Sent only on approval
+                        &middot; {autoReply ? 'Auto-reply enabled' : 'Sent only after your approval'}
                       </span>
                     </div>
                     <span className="today-pill today-pill-approved" style={{ textTransform: 'capitalize' }}>

@@ -6401,9 +6401,9 @@ body {
 .today-mode-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   height: 34px;
-  padding: 0 12px;
+  padding: 0 10px 0 12px;
   border-radius: var(--radius);
   font-size: 0.75rem;
   font-weight: 600;
@@ -6412,6 +6412,7 @@ body {
   color: var(--text-primary);
   box-shadow: var(--shadow-xs);
   transition: all var(--transition);
+  white-space: nowrap;
 }
 
 .today-mode-btn:hover {
@@ -6422,6 +6423,37 @@ body {
   background: var(--status-green-bg);
   color: var(--status-green-text);
   border-color: var(--status-green-border);
+}
+
+.today-toggle-track {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 28px;
+  height: 16px;
+  padding: 2px;
+  border-radius: var(--radius-full);
+  background: var(--gray-300);
+  transition: background-color 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  flex-shrink: 0;
+}
+
+.today-toggle-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+  transform: translateX(0);
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.today-mode-btn.auto .today-toggle-track {
+  background: var(--status-green-text);
+}
+
+.today-mode-btn.auto .today-toggle-thumb {
+  transform: translateX(12px);
 }
 
 .today-action-group {
@@ -7372,9 +7404,23 @@ body {
 
   .today-mode-btn {
     height: 30px;
-    padding: 0 9px;
+    padding: 0 8px 0 9px;
     font-size: 0.71rem;
-    gap: 5px;
+    gap: 6px;
+  }
+
+  .today-toggle-track {
+    width: 24px;
+    height: 14px;
+  }
+
+  .today-toggle-thumb {
+    width: 10px;
+    height: 10px;
+  }
+
+  .today-mode-btn.auto .today-toggle-thumb {
+    transform: translateX(10px);
   }
 
   .today-action-group {
@@ -7526,6 +7572,8 @@ body {
 
   .today-scope-indicator,
   .today-tab-indicator,
+  .today-toggle-track,
+  .today-toggle-thumb,
   .today-tab,
   .today-tab svg,
   .today-queue-list,
@@ -8213,6 +8261,30 @@ body {
     padding: 5px 11px;
     font-size: 0.74rem;
   }
+}
+
+.app-toast {
+  max-width: min(420px, calc(100vw - 24px)) !important;
+  width: fit-content;
+  padding: 10px 14px !important;
+  border-radius: var(--radius-lg) !important;
+  border: 1px solid var(--border) !important;
+  background: var(--bg-surface) !important;
+  color: var(--text-primary) !important;
+  font-size: 0.82rem !important;
+  font-weight: 500 !important;
+  line-height: 1.4 !important;
+  box-shadow: var(--shadow-lg) !important;
+  overflow: hidden;
+}
+
+.app-toast > div[role="status"] {
+  flex: 1;
+  min-width: 0;
+  margin: 0 0 0 8px !important;
+  justify-content: flex-start !important;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 @media (max-width: 440px) {
