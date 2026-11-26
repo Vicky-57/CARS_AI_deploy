@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import {
   Sparkles, CheckCircle2, Clock, FileText, ShieldAlert, Briefcase,
-  Send, RefreshCw, Search, Mail, AlertCircle, Tag, Check, X, ArrowRight
+  Send, RefreshCw, Search, Mail, AlertCircle, Tag, Check, X, ArrowRight,
+  Car, Calendar, ShieldCheck, Zap, ChevronLeft, MessageSquare, Phone
 } from 'lucide-react';
 import { api } from '../api/api';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+import { cleanText, formatContactName, getCleanInitials } from '../utils/textUtils';
 
 const CATEGORY_OPTIONS = [
   { value: 'seller', label: 'Vehicle Seller (§3)' },
@@ -21,6 +23,26 @@ const CATEGORY_OPTIONS = [
   { value: 'other', label: 'Other / Unclear Inquiry' },
   { value: 'spam', label: 'Flagged: Suspected Spam / Phishing (§7)' },
 ];
+
+const CATEGORY_SHORT_LABELS = {
+  seller: 'Seller',
+  sourcing: 'Sourcing',
+  sell_and_source: 'Sell + Source',
+  advertised_buyer: 'Advertised Buyer',
+  marketplace: 'Marketplace',
+  lead_buy: 'Buy Lead',
+  lead_sell: 'Sell Lead',
+  lead_other: 'Lead',
+  b2b_cooperation: 'B2B Coop',
+  b2b_offer: 'B2B Offer',
+  b2b_solicitation: 'B2B Solicitation',
+  b2b_advertising: 'B2B Ad',
+  invoice: 'Invoice',
+  other: 'Other',
+  spam: 'Spam',
+  automated: 'Automated',
+  marketing: 'Marketing',
+};
 
 const PARAM_LABELS = {
   manufacturer_model: 'Vehicle / Model',
@@ -50,6 +72,15 @@ function isFlaggedCategory(cat, decision) {
   return decision === 'drop' || ['spam', 'automated', 'marketing', 'b2b_advertising'].includes(cat);
 }
 
+function cleanMultilineText(raw) {
+  if (!raw) return '';
+  return String(raw)
+    .replace(/(\\+u[fF]{3}[dD]|[\ufffd\uFFFD\u0000-\u0008\u000B\u000C\u000E-\u001F])+/gi, ' ')
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 export default function TodayInquiries() {
   const navigate = useNavigate();
   const [inquiries, setInquiries] = useState([]);
@@ -58,12 +89,32 @@ export default function TodayInquiries() {
   const [dateScope, setDateScope] = useState('ALL'); // TODAY | ALL
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(null);
+  const [detailTab, setDetailTab] = useState('SPECS'); // SPECS | MESSAGE
+  const [mobileShowDetail, setMobileShowDetail] = useState(false);
   const [draftSubject, setDraftSubject] = useState('');
   const [draftBody, setDraftBody] = useState('');
   const [editCategory, setEditCategory] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [autoReply, setAutoReply] = useState(false);
   const [syncing, setSyncing] = useState(false);
+
+  const tabsBarRef = useRef(null);
+  const tabBtnRefs = useRef({});
+  const [tabIndicator, setTabIndicator] = useState({ left: 0, width: 0, ready: false });
+
+  const scopeSwitchRef = useRef(null);
+  const scopeBtnRefs = useRef({});
+  const [scopeIndicator, setScopeIndicator] = useState({ left: 0, width: 0, ready: false });
+
+  const selectRow = (row, openMobileDetail = false) => {
+    setSelected(row);
+    setDraftSubject(row?.draft_subject || `Re: ${cleanText(row?.subject) || 'Ihre Anfrage bei CAR-AGENTS'}`);
+    setDraftBody(row?.draft_reply || '');
+    setEditCategory(row?.category || 'sourcing');
+    const hasStructured = Object.keys(row?.extracted_params || {}).length > 0 || (row?.missing_fields || []).length > 0;
+    setDetailTab(hasStructured ? 'SPECS' : 'MESSAGE');
+    if (openMobileDetail) setMobileShowDetail(true);
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -87,13 +138,6 @@ export default function TodayInquiries() {
   useEffect(() => {
     loadData();
   }, []);
-
-  const selectRow = (row) => {
-    setSelected(row);
-    setDraftSubject(row?.draft_subject || `Re: ${row?.subject || 'Ihre Anfrage bei CAR-AGENTS'}`);
-    setDraftBody(row?.draft_reply || '');
-    setEditCategory(row?.category || 'sourcing');
-  };
 
   const handleSync = async () => {
     setSyncing(true);
@@ -127,7 +171,7 @@ export default function TodayInquiries() {
       const isB2B = ['b2b_cooperation', 'b2b_offer'].includes(newCat);
       const nextDecision = isSpam ? 'drop' : isB2B ? 'b2b' : newCat === 'invoice' ? 'invoice' : 'lead';
       const updated = await api.updateInquiry(selected.id, { category: newCat, decision: nextDecision });
-      toast.success(`Classification updated to "${newCat}"`);
+      toast.success(`Classification updated to "${CATEGORY_SHORT_LABELS[newCat] || newCat}"`);
       selectRow(updated);
       setInquiries(prev => prev.map(r => (r.id === updated.id ? updated : r)));
     } catch (err) {
@@ -139,7 +183,7 @@ export default function TodayInquiries() {
     if (!selected) return;
     setSubmitting(true);
     try {
-      const res = await api.approveInquiry(selected.id, {
+      await api.approveInquiry(selected.id, {
         send_draft: sendEmail,
         draft_subject: draftSubject,
         draft_reply: draftBody,
@@ -206,27 +250,35 @@ export default function TodayInquiries() {
 
   // Date & tab filtering
   const todayStr = new Date().toISOString().slice(0, 10);
-  const dateFiltered = inquiries.filter(r => {
-    if (dateScope !== 'TODAY') return true;
+  const filterByScope = (rows, scope) => rows.filter(r => {
+    if (scope !== 'TODAY') return true;
     const dt = (r.email_date || r.created_at || '').slice(0, 10);
     return dt === todayStr;
   });
 
-  const allLeads = dateFiltered.filter(r => !isFlaggedCategory(r.category, r.decision) && !isB2BCategory(r.category, r.decision) && r.category !== 'invoice');
-  const qualifiedLeads = allLeads.filter(r => r.is_qualified);
-  const needsInfoLeads = allLeads.filter(r => !r.is_qualified);
-  const b2bList = dateFiltered.filter(r => isB2BCategory(r.category, r.decision));
-  const invoiceList = dateFiltered.filter(r => r.category === 'invoice' || r.decision === 'invoice');
-  const flaggedList = dateFiltered.filter(r => isFlaggedCategory(r.category, r.decision));
+  const getTabSlices = (rows) => {
+    const all = rows.filter(r => !isFlaggedCategory(r.category, r.decision) && !isB2BCategory(r.category, r.decision) && r.category !== 'invoice');
+    return {
+      ALL_LEADS: all,
+      QUALIFIED: all.filter(r => r.is_qualified),
+      NEEDS_INFO: all.filter(r => !r.is_qualified),
+      B2B: rows.filter(r => isB2BCategory(r.category, r.decision)),
+      INVOICES: rows.filter(r => r.category === 'invoice' || r.decision === 'invoice'),
+      FLAGGED: rows.filter(r => isFlaggedCategory(r.category, r.decision)),
+    };
+  };
 
-  const activeList = (
-    activeTab === 'ALL_LEADS' ? allLeads :
-    activeTab === 'QUALIFIED' ? qualifiedLeads :
-    activeTab === 'NEEDS_INFO' ? needsInfoLeads :
-    activeTab === 'B2B' ? b2bList :
-    activeTab === 'INVOICES' ? invoiceList :
-    flaggedList
-  ).filter(r => {
+  const todayCount = inquiries.filter(r => (r.email_date || r.created_at || '').slice(0, 10) === todayStr).length;
+  const dateFiltered = filterByScope(inquiries, dateScope);
+  const tabSlices = getTabSlices(dateFiltered);
+  const allLeads = tabSlices.ALL_LEADS;
+  const qualifiedLeads = tabSlices.QUALIFIED;
+  const needsInfoLeads = tabSlices.NEEDS_INFO;
+  const b2bList = tabSlices.B2B;
+  const invoiceList = tabSlices.INVOICES;
+  const flaggedList = tabSlices.FLAGGED;
+
+  const matchesSearch = (r) => {
     if (!search) return true;
     const q = search.toLowerCase();
     return (
@@ -236,365 +288,618 @@ export default function TodayInquiries() {
       (r.body_preview || '').toLowerCase().includes(q) ||
       JSON.stringify(r.extracted_params || {}).toLowerCase().includes(q)
     );
-  });
+  };
+
+  const activeList = (tabSlices[activeTab] || allLeads).filter(matchesSearch);
+
+  const selectedVehicle = cleanText((selected?.extracted_params || {}).manufacturer_model || '');
+
+  // Keep detail selection synced cleanly when switching tabs or date scope
+  const syncSelectionFor = (tabId, scope) => {
+    const nextSlices = getTabSlices(filterByScope(inquiries, scope));
+    const targetList = (nextSlices[tabId] || []).filter(matchesSearch);
+    if (targetList.length === 0) {
+      setSelected(null);
+      setMobileShowDetail(false);
+    } else if (!selected || !targetList.some(item => item.id === selected.id)) {
+      selectRow(targetList[0]);
+    }
+  };
+
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    syncSelectionFor(tabId, dateScope);
+  };
+
+  const handleScopeChange = (nextScope) => {
+    setDateScope(nextScope);
+    syncSelectionFor(activeTab, nextScope);
+  };
+
+  // Measure and glide the active tab & scope pill indicators
+  useLayoutEffect(() => {
+    const updateIndicators = () => {
+      const activeTabEl = tabBtnRefs.current[activeTab];
+      if (activeTabEl) {
+        setTabIndicator({
+          left: activeTabEl.offsetLeft,
+          width: activeTabEl.offsetWidth,
+          ready: true,
+        });
+      }
+      const activeScopeEl = scopeBtnRefs.current[dateScope];
+      if (activeScopeEl) {
+        setScopeIndicator({
+          left: activeScopeEl.offsetLeft,
+          width: activeScopeEl.offsetWidth,
+          ready: true,
+        });
+      }
+    };
+
+    updateIndicators();
+    const activeTabEl = tabBtnRefs.current[activeTab];
+    if (activeTabEl?.scrollIntoView) {
+      activeTabEl.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
+    }
+
+    let ro;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(updateIndicators);
+      if (tabsBarRef.current) ro.observe(tabsBarRef.current);
+      if (scopeSwitchRef.current) ro.observe(scopeSwitchRef.current);
+    }
+    window.addEventListener('resize', updateIndicators);
+    return () => {
+      window.removeEventListener('resize', updateIndicators);
+      if (ro) ro.disconnect();
+    };
+  }, [activeTab, dateScope, inquiries.length]);
 
   return (
-    <div style={{ height: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
-      <div className="page-header" style={{ marginBottom: 12 }}>
-        <div className="page-header-left">
-          <h1 className="page-title">Phase 1 — AI Inquiry Triage & Qualification</h1>
-          <p className="page-subtitle">
-            All customer inquiries (qualified & missing info) with extracted parameters, requirements & owner-approved draft replies
-          </p>
+    <div className="today-page">
+      {/* Clean Single-Row Header */}
+      <header className="today-hero">
+        <div className="today-hero-left">
+          <div className="today-hero-meta">
+            <Calendar size={12} />
+            <span>{format(new Date(), 'EEEE, dd. MMMM yyyy')}</span>
+            <span className="today-meta-dot" aria-hidden="true">&middot;</span>
+            <span>Phase 1 AI Triage</span>
+          </div>
+          <h1 className="today-title">Today&rsquo;s Inquiries</h1>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Today vs All Time Toggle */}
-          <div style={{ display: 'inline-flex', background: 'var(--border)', padding: 2, borderRadius: 'var(--radius-sm)' }}>
+        <div className="today-hero-actions">
+          <div className="today-scope-switch" ref={scopeSwitchRef} role="group" aria-label="Date scope">
+            {scopeIndicator.ready && (
+              <span
+                className="today-scope-indicator"
+                aria-hidden="true"
+                style={{
+                  width: scopeIndicator.width,
+                  transform: `translateX(${scopeIndicator.left}px)`,
+                }}
+              />
+            )}
             {[
-              { id: 'TODAY', label: 'Today Only' },
-              { id: 'ALL', label: 'All Inquiries' },
+              { id: 'TODAY', label: 'Today', count: todayCount },
+              { id: 'ALL', label: 'All', count: inquiries.length },
             ].map(sc => (
               <button
                 key={sc.id}
-                onClick={() => setDateScope(sc.id)}
-                style={{
-                  padding: '5px 10px', borderRadius: 4, fontWeight: 600, fontSize: '0.73rem',
-                  border: 'none', cursor: 'pointer',
-                  background: dateScope === sc.id ? 'var(--surface)' : 'transparent',
-                  color: dateScope === sc.id ? 'var(--text-primary)' : 'var(--text-muted)',
-                }}
+                ref={el => { scopeBtnRefs.current[sc.id] = el; }}
+                onClick={() => handleScopeChange(sc.id)}
+                className={`today-scope-btn${dateScope === sc.id ? ' active' : ''}`}
               >
-                {sc.label}
+                <span>{sc.label}</span>
+                <span className="today-scope-count">{sc.count}</span>
               </button>
             ))}
           </div>
 
           <button
-            className={`btn btn-sm ${autoReply ? 'btn-primary' : 'btn-secondary'}`}
+            className={`today-mode-btn${autoReply ? ' auto' : ''}`}
             onClick={handleToggleAutoReply}
             title="Phase 1 default: Draft-Only (Owner approves every message)"
           >
-            {autoReply ? '⚡ Auto-Reply: ON' : '🛡️ Mode: Draft & Approve (Phase 1)'}
+            {autoReply ? <Zap size={13} /> : <ShieldCheck size={13} />}
+            <span>{autoReply ? 'Auto-Reply: ON' : 'Draft & Approve'}</span>
           </button>
 
-          <button className="btn btn-secondary btn-sm" onClick={handleSync} disabled={syncing}>
-            <Mail size={13} />
-            {syncing ? 'Syncing…' : 'Sync Strato'}
-          </button>
-
-          <button className="btn btn-secondary btn-sm" onClick={loadData}>
-            <RefreshCw size={13} />
-          </button>
+          <div className="today-action-group">
+            <button className="today-sync-btn" onClick={handleSync} disabled={syncing}>
+              <Mail size={13} />
+              <span>{syncing ? 'Syncing…' : 'Sync Strato'}</span>
+            </button>
+            <button
+              className="today-refresh-btn"
+              onClick={loadData}
+              disabled={loading}
+              title="Refresh inquiries"
+              aria-label="Refresh inquiries"
+            >
+              <RefreshCw size={13} className={loading ? 'spin' : ''} />
+            </button>
+          </div>
         </div>
-      </div>
+      </header>
 
-      {/* Category Tabs */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+      {/* Segmented Category Tabs */}
+      <div className="today-tabs-bar" ref={tabsBarRef} role="tablist">
+        {tabIndicator.ready && (
+          <span
+            className="today-tab-indicator"
+            aria-hidden="true"
+            style={{
+              width: tabIndicator.width,
+              transform: `translateX(${tabIndicator.left}px)`,
+            }}
+          />
+        )}
         {[
-          { id: 'ALL_LEADS', label: `All Customer Inquiries (${allLeads.length})`, icon: <Sparkles size={13} /> },
-          { id: 'QUALIFIED', label: `Qualified (${qualifiedLeads.length})`, icon: <CheckCircle2 size={13} /> },
-          { id: 'NEEDS_INFO', label: `Needs Info / Unqualified (${needsInfoLeads.length})`, icon: <Clock size={13} /> },
-          { id: 'B2B', label: `B2B Offers (${b2bList.length})`, icon: <Briefcase size={13} /> },
-          { id: 'INVOICES', label: `Invoices & Receipts (${invoiceList.length})`, icon: <FileText size={13} /> },
-          { id: 'FLAGGED', label: `Flagged Spam (${flaggedList.length})`, icon: <ShieldAlert size={13} /> },
+          { id: 'ALL_LEADS', label: 'All Inquiries', count: allLeads.length, icon: <Sparkles size={13} /> },
+          { id: 'QUALIFIED', label: 'Qualified', count: qualifiedLeads.length, icon: <CheckCircle2 size={13} /> },
+          { id: 'NEEDS_INFO', label: 'Needs Info', count: needsInfoLeads.length, icon: <Clock size={13} /> },
+          { id: 'B2B', label: 'B2B Offers', count: b2bList.length, icon: <Briefcase size={13} /> },
+          { id: 'INVOICES', label: 'Invoices', count: invoiceList.length, icon: <FileText size={13} /> },
+          { id: 'FLAGGED', label: 'Spam', count: flaggedList.length, icon: <ShieldAlert size={13} /> },
         ].map(t => (
           <button
             key={t.id}
-            onClick={() => setActiveTab(t.id)}
-            className={`btn btn-sm ${activeTab === t.id ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            ref={el => { tabBtnRefs.current[t.id] = el; }}
+            role="tab"
+            aria-selected={activeTab === t.id}
+            onClick={() => handleTabChange(t.id)}
+            className={`today-tab${activeTab === t.id ? ' active' : ''}`}
           >
             {t.icon}
-            {t.label}
+            <span>{t.label}</span>
+            <span className="today-tab-count">{t.count}</span>
           </button>
         ))}
       </div>
 
       {/* Split Workspace */}
-      <div className="split-panel" style={{ flex: 1, minHeight: 0 }}>
-        {/* Left List */}
-        <div className="split-left">
-          <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
-            <div className="search-bar" style={{ maxWidth: '100%' }}>
-              <Search size={13} />
+      <div className={`today-workspace${mobileShowDetail && selected ? ' has-selection' : ''}`}>
+        {/* Left Queue */}
+        <div className="today-queue">
+          <div className="today-queue-top">
+            <div className="today-search-box">
+              <Search size={14} />
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Search customer, vehicle, parameter, or query…"
+                placeholder="Search customer, vehicle, parameter…"
               />
+              {search && (
+                <button
+                  type="button"
+                  className="today-search-clear"
+                  onClick={() => setSearch('')}
+                  aria-label="Clear search"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+            <div className="today-queue-meta">
+              <span>{activeList.length} {activeList.length === 1 ? 'inquiry' : 'inquiries'} shown</span>
+              <span>{dateScope === 'TODAY' ? 'Today' : 'All time'}</span>
             </div>
           </div>
 
           {loading ? (
-            <div className="loading-spinner"><div className="spinner" /></div>
+            <div className="loading-spinner">
+              <div className="spinner spinner-dark" />
+            </div>
           ) : activeList.length === 0 ? (
-            <div className="empty-state">
-              <Sparkles size={24} />
-              <h3>No inquiries in this view</h3>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                {dateScope === 'TODAY' ? 'Switch to "All Inquiries" to see historical items.' : 'Click Sync Strato to fetch new messages.'}
-              </p>
+            <div className="empty-state" style={{ flex: 1, justifyContent: 'center' }}>
+              <Sparkles size={26} style={{ opacity: 0.35 }} />
+              <div className="empty-state-title">No inquiries in this view</div>
+              <div className="empty-state-sub">
+                {dateScope === 'TODAY'
+                  ? 'Switch to "All Inquiries" to review earlier messages.'
+                  : 'Click Sync Strato to fetch new incoming messages.'}
+              </div>
             </div>
           ) : (
-            activeList.map(r => {
-              const isSelected = selected?.id === r.id;
-              const params = r.extracted_params || {};
-              const veh = params.manufacturer_model || '';
-              const dtStr = (() => {
-                try { return format(new Date(r.email_date || r.created_at), 'dd.MM · HH:mm'); } catch { return ''; }
-              })();
-              return (
-                <div
-                  key={r.id}
-                  className={`contact-item${isSelected ? ' active' : ''}`}
-                  onClick={() => selectRow(r)}
-                >
-                  <div className="contact-info" style={{ width: '100%' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                      <span className="contact-name" style={{ fontWeight: 600 }}>
-                        {r.sender_name || r.sender_email}
-                      </span>
-                      <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>{dtStr}</span>
+            <div className="today-queue-list" key={`${activeTab}-${dateScope}`}>
+              {activeList.map((r, idx) => {
+                const isSelected = selected?.id === r.id;
+                const params = r.extracted_params || {};
+                const veh = cleanText(params.manufacturer_model || '');
+                const flagged = isFlaggedCategory(r.category, r.decision);
+                const b2b = isB2BCategory(r.category, r.decision);
+                const displayName = formatContactName(r.sender_name || r.sender_email, r.sender_email, veh);
+                const initials = getCleanInitials(r.sender_name || r.sender_email, r.sender_email);
+                const dtStr = (() => {
+                  try { return format(new Date(r.email_date || r.created_at), 'dd.MM · HH:mm'); } catch { return ''; }
+                })();
+                const avatarTone = flagged ? 'flagged' : b2b ? 'b2b' : r.is_qualified ? 'qualified' : 'needs-info';
+                const isLeadItem = !flagged && !b2b && r.category !== 'invoice';
+
+                return (
+                  <div
+                    key={r.id}
+                    className={`today-item${isSelected ? ' active' : ''}`}
+                    style={{ '--i': Math.min(idx, 10) }}
+                    onClick={() => selectRow(r, true)}
+                  >
+                    <div className={`today-item-avatar ${avatarTone}`}>
+                      {initials}
                     </div>
 
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 4 }}>
-                      <span className="badge badge-info" style={{ fontSize: '0.62rem' }}>{r.category}</span>
-                      {!isFlaggedCategory(r.category, r.decision) && (
-                        <span
-                          className="badge"
-                          style={{
-                            fontSize: '0.62rem',
-                            background: r.is_qualified ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)',
-                            color: r.is_qualified ? '#059669' : '#d97706',
-                          }}
-                        >
-                          {r.is_qualified ? '✓ Qualified' : '⏳ Needs Info'}
-                        </span>
-                      )}
-                      {r.priority === 'HIGH' && (
-                        <span className="badge" style={{ fontSize: '0.62rem', background: 'rgba(239,68,68,0.15)', color: '#dc2626' }}>
-                          🔥 HIGH
-                        </span>
-                      )}
-                      {veh && (
-                        <span className="badge" style={{ fontSize: '0.62rem', background: 'var(--bg-muted)' }}>
-                          🚗 {veh}
-                        </span>
-                      )}
-                      {r.resolution === 'ok' && (
-                        <span className="badge" style={{ fontSize: '0.62rem', background: 'rgba(59,130,246,0.15)', color: '#2563eb' }}>
-                          Approved
-                        </span>
-                      )}
-                    </div>
+                    <div className="today-item-body">
+                      <div className="today-item-top">
+                        <span className="today-item-sender">{displayName}</span>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                          {r.priority === 'HIGH' && (
+                            <span className="today-pill today-pill-high">HIGH</span>
+                          )}
+                          <span className="today-item-time">{dtStr}</span>
+                        </div>
+                      </div>
 
-                    <div className="contact-preview" style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
-                      {(r.subject || '(No Subject)').slice(0, 62)}
-                    </div>
-                    <div className="contact-preview" style={{ fontSize: '0.73rem' }}>
-                      {(r.reason || r.body_preview || '').slice(0, 75)}
+                      <div className="today-item-subject">
+                        {cleanText(r.subject) || '(No Subject)'}
+                      </div>
+
+                      <div className="today-item-footer">
+                        {veh ? (
+                          <span className="today-pill today-pill-car" title={veh}>
+                            <Car size={11} strokeWidth={2} style={{ flexShrink: 0 }} />
+                            <span>{veh}</span>
+                          </span>
+                        ) : (
+                          <span className="today-pill today-pill-cat">
+                            {CATEGORY_SHORT_LABELS[r.category] || r.category}
+                          </span>
+                        )}
+
+                        {isLeadItem && (
+                          <span className={`today-pill ${r.is_qualified ? 'today-pill-qualified' : 'today-pill-needs'}`}>
+                            {r.is_qualified ? <CheckCircle2 size={10} /> : <Clock size={10} />}
+                            {r.is_qualified ? 'Qualified' : 'Needs Info'}
+                          </span>
+                        )}
+
+                        {r.resolution === 'ok' && (
+                          <span className="today-pill today-pill-approved">
+                            <Check size={10} />
+                            Sent
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })
+                );
+              })}
+            </div>
           )}
         </div>
 
-        {/* Right Detail & Approval Pane */}
-        <div className="split-right" style={{ overflowY: 'auto', padding: 20 }}>
+        {/* Right Detail & Approval Studio */}
+        <div className="today-detail">
           {!selected ? (
             <div className="empty-state" style={{ height: '100%', justifyContent: 'center' }}>
-              <Sparkles size={32} style={{ opacity: 0.2 }} />
-              <h3>Select an inquiry</h3>
-              <p>Inspect extracted parameters, missing requirements, customer query, and approve the AI draft reply.</p>
+              <Sparkles size={30} style={{ opacity: 0.25 }} />
+              <div className="empty-state-title">Select an inquiry</div>
+              <div className="empty-state-sub">
+                Inspect extracted vehicle parameters, missing requirements, customer message, and approve the AI draft reply.
+              </div>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {/* Top Bar: Sender, Classification Override & Quick Actions */}
-              <div className="card" style={{ padding: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
-                  <div>
-                    <div style={{ fontSize: '1.05rem', fontWeight: 700 }}>{selected.subject || '(No Subject)'}</div>
-                    <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                      From: <strong>{selected.sender_name || selected.sender_email}</strong> &lt;{selected.reply_to || selected.sender_email}&gt;
-                      {' · '}ID: <code>#{String(selected.id).slice(0, 6)}</code>
-                    </div>
-                    {selected.reason && (
-                      <div style={{ fontSize: '0.8rem', color: 'var(--primary)', marginTop: 6, fontWeight: 500 }}>
-                        🤖 {selected.reason}
-                        {selected.priority_reason ? ` — Priority (${selected.priority}): ${selected.priority_reason}` : ''}
+            <div className="today-detail-stack" key={selected.id}>
+              <button
+                type="button"
+                className="today-mobile-back"
+                onClick={() => setMobileShowDetail(false)}
+              >
+                <ChevronLeft size={14} />
+                Back to inquiries
+              </button>
+
+              {/* 1. Focus Summary Card */}
+              <div className="today-card">
+                <div className="today-card-body">
+                  <div className="today-detail-top">
+                    <div style={{ flex: 1, minWidth: 240 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                        {!isFlaggedCategory(selected.category, selected.decision) && !isB2BCategory(selected.category, selected.decision) && selected.category !== 'invoice' && (
+                          <span className={`today-pill ${selected.is_qualified ? 'today-pill-qualified' : 'today-pill-needs'}`}>
+                            {selected.is_qualified ? <CheckCircle2 size={11} /> : <Clock size={11} />}
+                            {selected.is_qualified ? 'Qualified' : 'Needs Info'}
+                          </span>
+                        )}
+
+                        {selected.priority === 'HIGH' && (
+                          <span className="today-pill today-pill-high">HIGH</span>
+                        )}
+
+                        {selected.resolution === 'ok' && (
+                          <span className="today-pill today-pill-approved">
+                            <Check size={11} />
+                            Approved
+                          </span>
+                        )}
+
+                        <span className="today-id-chip">#{String(selected.id).slice(0, 6)}</span>
                       </div>
-                    )}
+
+                      <h2 className="today-detail-subject">
+                        {cleanText(selected.subject) || '(No Subject)'}
+                      </h2>
+
+                      <div className="today-detail-sender">
+                        <strong>{formatContactName(selected.sender_name || selected.sender_email, selected.sender_email, selectedVehicle)}</strong>
+                        <span style={{ color: 'var(--text-muted)' }}>
+                          {selected.reply_to || selected.sender_email}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Owner Classification Override (§2) */}
+                    <div className="today-override-box">
+                      <Tag size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                      <select
+                        className="today-override-select"
+                        value={editCategory}
+                        onChange={e => handleCategoryChange(e.target.value)}
+                        aria-label="Classification Override"
+                      >
+                        {CATEGORY_OPTIONS.map(opt => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
-                  {/* Owner Classification Override (§2) */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Tag size={14} style={{ color: 'var(--text-muted)' }} />
-                    <select
-                      className="input"
-                      value={editCategory}
-                      onChange={e => handleCategoryChange(e.target.value)}
-                      style={{ fontSize: '0.78rem', padding: '5px 10px', minWidth: 220 }}
+                  {/* Key Facts Glance Strip */}
+                  {(() => {
+                    const p = selected.extracted_params || {};
+                    const facts = [
+                      selectedVehicle && { icon: <Car size={14} strokeWidth={2} />, label: 'Vehicle', value: selectedVehicle },
+                      p.price_or_budget && { icon: <Tag size={13} />, label: 'Budget / Price', value: cleanText(String(p.price_or_budget)) },
+                      (p.first_registration || p.mileage) && {
+                        icon: <Clock size={13} />,
+                        label: p.first_registration && p.mileage ? 'Year · Mileage' : p.first_registration ? 'First Reg.' : 'Mileage',
+                        value: [p.first_registration, p.mileage].filter(Boolean).map(v => cleanText(String(v))).join(' · '),
+                      },
+                      (p.phone || p.location) && {
+                        icon: <Phone size={13} />,
+                        label: p.phone ? 'Phone' : 'Location',
+                        value: cleanText(String(p.phone || p.location)),
+                      },
+                    ].filter(Boolean);
+
+                    if (facts.length === 0) return null;
+                    return (
+                      <div className="today-facts-grid">
+                        {facts.map(f => (
+                          <div key={f.label} className="today-fact-tile">
+                            <span className="today-fact-icon">{f.icon}</span>
+                            <div style={{ minWidth: 0 }}>
+                              <div className="today-fact-label">{f.label}</div>
+                              <div className="today-fact-value" title={f.value}>{f.value}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+
+                  {selected.reason && (
+                    <div className="today-ai-line">
+                      <Sparkles size={13} style={{ flexShrink: 0, color: 'var(--text-primary)' }} />
+                      <span>
+                        {cleanText(selected.reason)}
+                        {selected.priority_reason ? ` · ${cleanText(selected.priority_reason)}` : ''}
+                      </span>
+                    </div>
+                  )}
+
+                  {selected.payment_deadline && (
+                    <div className="today-deadline-banner">
+                      <Calendar size={14} style={{ flexShrink: 0 }} />
+                      <span>Payment Deadline (§7): {cleanText(selected.payment_deadline)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 2. Tabbed Inspector Card: Specs & Missing Info | Original Message */}
+              <div className="today-card">
+                <div className="today-inspector-bar">
+                  <div className="today-inspector-tabs" role="tablist">
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={detailTab === 'SPECS'}
+                      className={`today-inspector-tab${detailTab === 'SPECS' ? ' active' : ''}`}
+                      onClick={() => setDetailTab('SPECS')}
                     >
-                      {CATEGORY_OPTIONS.map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
+                      <CheckCircle2 size={13} />
+                      <span>Specs &amp; Checklist</span>
+                      {(selected.missing_fields || []).length > 0 && (
+                        <span className="today-inspector-badge warn">
+                          {(selected.missing_fields || []).length} missing
+                        </span>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={detailTab === 'MESSAGE'}
+                      className={`today-inspector-tab${detailTab === 'MESSAGE' ? ' active' : ''}`}
+                      onClick={() => setDetailTab('MESSAGE')}
+                    >
+                      <MessageSquare size={13} />
+                      <span>Original Message</span>
+                    </button>
                   </div>
                 </div>
 
-                {selected.payment_deadline && (
-                  <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 6, background: 'rgba(245,158,11,0.14)', color: '#b45309', fontSize: '0.82rem', fontWeight: 600 }}>
-                    📅 Highlighted Payment Deadline (§7): {selected.payment_deadline}
-                  </div>
-                )}
-              </div>
+                <div className="today-card-body">
+                  {detailTab === 'SPECS' ? (
+                    <div className="today-inspector-split" key={`specs-${selected.id}`}>
+                      {/* Extracted Parameters */}
+                      <div>
+                        <div className="today-section-kicker">Extracted Details</div>
+                        {Object.keys(selected.extracted_params || {}).length === 0 ? (
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            No structured parameters detected yet.
+                          </div>
+                        ) : (
+                          <div className="today-param-list">
+                            {Object.entries(selected.extracted_params || {}).map(([k, v]) => (
+                              <div key={k} className="today-param-row">
+                                <span className="today-param-label">
+                                  {k === 'manufacturer_model' && <Car size={12} strokeWidth={2} style={{ color: 'var(--text-primary)' }} />}
+                                  <span>{PARAM_LABELS[k] || k}</span>
+                                </span>
+                                <span className="today-param-val">{cleanText(String(v))}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
 
-              {/* Parameters & Missing Information Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
-                {/* Extracted Parameters */}
-                <div className="card" style={{ padding: 14 }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.85rem', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <CheckCircle2 size={15} style={{ color: '#059669' }} />
-                    Extracted Parameters & Requirements
-                  </div>
-                  {Object.keys(selected.extracted_params || {}).length === 0 ? (
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      No structured vehicle/contact parameters detected yet.
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {Object.entries(selected.extracted_params || {}).map(([k, v]) => (
-                        <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', borderBottom: '1px dashed var(--border)', paddingBottom: 4 }}>
-                          <span style={{ color: 'var(--text-muted)' }}>{PARAM_LABELS[k] || k}:</span>
-                          <strong style={{ textAlign: 'right' }}>{String(v)}</strong>
+                      {/* Missing Info Chips */}
+                      <div>
+                        <div className="today-section-kicker">
+                          Missing Info ({(selected.missing_fields || []).length})
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Missing Qualification Fields */}
-                <div className="card" style={{ padding: 14 }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.85rem', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <AlertCircle size={15} style={{ color: (selected.missing_fields || []).length ? '#d97706' : '#059669' }} />
-                    Missing Information Checklist
-                  </div>
-                  {(selected.missing_fields || []).length === 0 ? (
-                    <div style={{ fontSize: '0.8rem', color: '#059669', fontWeight: 500 }}>
-                      ✓ All initial Phase 1 fields present (or concise listing inquiry). Ready for personal call / response.
+                        {(selected.missing_fields || []).length === 0 ? (
+                          <div className="today-complete-note">
+                            <CheckCircle2 size={15} style={{ flexShrink: 0 }} />
+                            <span>All key fields present. Ready to call or reply.</span>
+                          </div>
+                        ) : (
+                          <div className="today-missing-chips">
+                            {(selected.missing_fields || []).map((m, idx) => (
+                              <span key={idx} className="today-missing-chip">
+                                <AlertCircle size={11} style={{ flexShrink: 0 }} />
+                                <span>{cleanText(m)}</span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ) : (
-                    <ul style={{ margin: 0, paddingLeft: 18, fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      {(selected.missing_fields || []).map((m, idx) => (
-                        <li key={idx} style={{ color: 'var(--text-primary)' }}>{m}</li>
-                      ))}
-                    </ul>
+                    <div className="today-message-box" key={`msg-${selected.id}`}>
+                      {cleanMultilineText(selected.body_preview) || '(Empty message body)'}
+                    </div>
                   )}
-                </div>
-              </div>
-
-              {/* Customer Original Query */}
-              <div className="card" style={{ padding: 14 }}>
-                <div style={{ fontWeight: 700, fontSize: '0.85rem', marginBottom: 8 }}>
-                  💬 Customer Query / Message Content
-                </div>
-                <div style={{
-                  fontSize: '0.83rem',
-                  whiteSpace: 'pre-wrap',
-                  background: 'var(--bg-muted)',
-                  padding: 12,
-                  borderRadius: 6,
-                  maxHeight: 200,
-                  overflowY: 'auto',
-                  lineHeight: 1.5,
-                }}>
-                  {selected.body_preview || '(Empty message body)'}
                 </div>
               </div>
 
               {/* Action Bar for B2B Inquiries */}
               {isB2BCategory(editCategory, selected.decision) && (
-                <div className="card" style={{ padding: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>🤝 B2B Cooperation / Service Offer (§7)</div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                      Convert this B2B message into a manual B2B Deal on the dedicated B2B & Partners page.
+                <div className="today-card today-b2b-card">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 'var(--radius)',
+                        background: '#EFF6FF',
+                        color: '#2563EB',
+                        border: '1px solid #BFDBFE',
+                        display: 'grid',
+                        placeItems: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Briefcase size={16} />
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-primary)' }}>
+                        B2B Cooperation / Service Offer (§7)
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                        Convert this message into a B2B Deal in B2B &amp; Partners.
+                      </div>
                     </div>
                   </div>
                   <button className="btn btn-primary btn-sm" onClick={handleCreateB2BFromInquiry} disabled={submitting}>
                     <Briefcase size={13} />
-                    Create B2B Deal <ArrowRight size={13} />
+                    <span>Create B2B Deal</span>
+                    <ArrowRight size={13} />
                   </button>
                 </div>
               )}
 
-              {/* Owner-Approved Draft Response Editor (§1, §3, §4, §5) */}
+              {/* 3. Owner-Approved Draft Response Editor (§1, §3, §4, §5) */}
               {isCustomerCategory(editCategory) && (
-                <div className="card" style={{ padding: 16 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>
-                      ✉️ Prepared Draft Response (Sent only upon your approval)
+                <div className="today-card">
+                  <div className="today-card-head">
+                    <div className="today-card-title">
+                      <Mail size={15} style={{ color: 'var(--text-secondary)' }} />
+                      <span>Draft Reply</span>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 400, color: 'var(--text-muted)' }}>
+                        &middot; Sent only on approval
+                      </span>
                     </div>
-                    <span className="badge badge-info" style={{ fontSize: '0.68rem' }}>
-                      Status: {selected.draft_status || 'pending'}
+                    <span className="today-pill today-pill-approved" style={{ textTransform: 'capitalize' }}>
+                      {selected.draft_status || 'pending'}
                     </span>
                   </div>
 
-                  <div style={{ marginBottom: 8 }}>
-                    <label style={{ fontSize: '0.73rem', fontWeight: 600, color: 'var(--text-muted)' }}>Subject</label>
-                    <input
-                      className="input"
-                      value={draftSubject}
-                      onChange={e => setDraftSubject(e.target.value)}
-                      style={{ width: '100%', marginTop: 3, fontSize: '0.82rem' }}
-                    />
-                  </div>
+                  <div className="today-card-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div>
+                      <label className="form-label" style={{ display: 'block', marginBottom: 4 }}>Subject</label>
+                      <input
+                        className="input"
+                        value={draftSubject}
+                        onChange={e => setDraftSubject(e.target.value)}
+                      />
+                    </div>
 
-                  <div style={{ marginBottom: 12 }}>
-                    <label style={{ fontSize: '0.73rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                      Draft Message (Editable before approval)
-                    </label>
-                    <textarea
-                      className="input"
-                      rows={8}
-                      value={draftBody}
-                      onChange={e => setDraftBody(e.target.value)}
-                      style={{ width: '100%', marginTop: 3, fontSize: '0.82rem', fontFamily: 'inherit', lineHeight: 1.45 }}
-                    />
-                  </div>
+                    <div>
+                      <label className="form-label" style={{ display: 'block', marginBottom: 4 }}>
+                        Message
+                      </label>
+                      <textarea
+                        className="textarea"
+                        rows={6}
+                        value={draftBody}
+                        onChange={e => setDraftBody(e.target.value)}
+                        style={{ lineHeight: 1.55 }}
+                      />
+                    </div>
 
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={() => handleApproveAndSend(true)}
-                      disabled={submitting}
-                    >
-                      <Send size={13} />
-                      Approve Lead & Send Draft Reply
-                    </button>
+                    <div className="today-draft-actions">
+                      <button
+                        className="btn btn-primary"
+                        onClick={() => handleApproveAndSend(true)}
+                        disabled={submitting}
+                      >
+                        <Send size={13} />
+                        <span>Approve &amp; Send Reply</span>
+                      </button>
 
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => handleApproveAndSend(false)}
-                      disabled={submitting}
-                    >
-                      <Check size={13} />
-                      Approve Lead Only (Call Personally / No Email)
-                    </button>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => handleApproveAndSend(false)}
+                        disabled={submitting}
+                      >
+                        <Check size={13} />
+                        <span>Approve Only (No Email)</span>
+                      </button>
 
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      onClick={handleFlagAsSpam}
-                      disabled={submitting}
-                      style={{ marginLeft: 'auto', color: '#dc2626' }}
-                    >
-                      <X size={13} />
-                      Flag as Spam
-                    </button>
+                      <button
+                        className="btn btn-danger"
+                        onClick={handleFlagAsSpam}
+                        disabled={submitting}
+                        style={{ marginLeft: 'auto' }}
+                      >
+                        <X size={13} />
+                        <span>Mark as Spam</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
