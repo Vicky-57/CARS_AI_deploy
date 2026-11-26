@@ -47,14 +47,14 @@ function cleanText(raw) {
 export default function EmailViewCard({ msg, toAddress = 'info@car-agents.de' }) {
   if (!msg) return null;
 
-  const fromName    = cleanText(msg.sender_name) || 'Unknown Sender';
-  const fromEmail   = msg.sender_contact || '';
-  const subject     = cleanText(msg.subject) || '(No Subject)';
-  const body        = cleanBodyDisplay(msg.body);
-  const aiSummary   = msg.ai_summary || msg.summary || null;
-  const isInbound   = msg.is_inbound !== false;
-  const ts          = msg.timestamp;
-  let   dateStr     = '';
+  const fromName = cleanText(msg.sender_name) || 'Unknown Sender';
+  const fromEmail = msg.sender_contact || '';
+  const subject = cleanText(msg.subject) || '(No Subject)';
+  const body = cleanBodyDisplay(msg.body);
+  const aiSummary = msg.ai_summary || msg.summary || null;
+  const isInbound = msg.is_inbound !== false;
+  const ts = msg.timestamp;
+  let dateStr = '';
   try { dateStr = format(new Date(ts), 'MMM d, yyyy · HH:mm'); } catch { dateStr = ''; }
 
   return (
