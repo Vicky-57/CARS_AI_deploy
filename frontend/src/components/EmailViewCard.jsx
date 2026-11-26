@@ -1,5 +1,6 @@
-import { Sparkles, Mail } from 'lucide-react';
+import { Sparkles, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { format } from 'date-fns';
+import { formatContactName } from '../utils/textUtils';
 
 function cleanBodyDisplay(raw) {
   if (!raw) return '—';
@@ -47,8 +48,9 @@ function cleanText(raw) {
 export default function EmailViewCard({ msg, toAddress = 'info@car-agents.de' }) {
   if (!msg) return null;
 
-  const fromName = cleanText(msg.sender_name) || 'Unknown Sender';
-  const fromEmail = msg.sender_contact || '';
+  const rawFromName = cleanText(msg.sender_name);
+  const fromEmail = (msg.sender_contact || '').trim();
+  const friendlyName = formatContactName(rawFromName || fromEmail, fromEmail);
   const subject = cleanText(msg.subject) || '(No Subject)';
   const body = cleanBodyDisplay(msg.body);
   const aiSummary = msg.ai_summary || msg.summary || null;
@@ -57,50 +59,56 @@ export default function EmailViewCard({ msg, toAddress = 'info@car-agents.de' })
   let dateStr = '';
   try { dateStr = format(new Date(ts), 'MMM d, yyyy · HH:mm'); } catch { dateStr = ''; }
 
+  const showEmailAddr = Boolean(fromEmail && fromEmail.toLowerCase() !== friendlyName.toLowerCase());
+
   return (
-    <div className="email-view-card">
-      {/* Header — From / To / Subject */}
+    <article className="email-view-card">
+      {/* Header — Direction, Date, Subject & Structured From/To Envelope */}
       <div className="email-view-header">
         <div className="email-view-meta">
-          {/* Subject first — most prominent */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <div className="email-subject-line">{subject}</div>
-            <span
-              className="badge"
-              style={{
-                fontSize: '0.65rem',
-                padding: '2px 7px',
-                background: isInbound ? 'rgba(16, 185, 129, 0.14)' : 'rgba(59, 130, 246, 0.14)',
-                color: isInbound ? '#059669' : '#2563eb',
-                fontWeight: 600,
-              }}
-            >
-              {isInbound ? '↓ Received (Inbound)' : '↑ Sent by CAR-AGENTS (Outbound)'}
+          <div className="email-view-head-top">
+            <span className={`email-dir-pill ${isInbound ? 'in' : 'out'}`}>
+              {isInbound ? <ArrowDownLeft size={11} /> : <ArrowUpRight size={11} />}
+              <span>{isInbound ? 'Received (Inbound)' : 'Sent by CAR-AGENTS (Outbound)'}</span>
             </span>
+            {dateStr && <span className="email-view-date">{dateStr}</span>}
           </div>
 
-          <div className="email-meta-row" style={{ marginTop: 6 }}>
-            <span className="email-meta-label">From</span>
-            <span className="email-meta-value">
-              {isInbound
-                ? <><strong>{fromName}</strong>{fromEmail && ` <${fromEmail}>`}</>
-                : <>CAR-AGENTS Broker {'<info@car-agents.de>'}</>
-              }
-            </span>
-          </div>
+          <h3 className="email-subject-line">{subject}</h3>
 
-          <div className="email-meta-row">
-            <span className="email-meta-label">To</span>
-            <span className="email-meta-value">
-              {isInbound
-                ? toAddress
-                : <>{fromName}{fromEmail && ` <${fromEmail}>`}</>
-              }
-            </span>
+          <div className="email-envelope">
+            <div className="email-meta-row">
+              <span className="email-meta-label">From</span>
+              <div className="email-meta-value">
+                {isInbound ? (
+                  <>
+                    <strong>{friendlyName}</strong>
+                    {showEmailAddr && <span className="email-meta-addr">{fromEmail}</span>}
+                  </>
+                ) : (
+                  <>
+                    <strong>CAR-AGENTS Broker</strong>
+                    <span className="email-meta-addr">info@car-agents.de</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="email-meta-row">
+              <span className="email-meta-label">To</span>
+              <div className="email-meta-value">
+                {isInbound ? (
+                  <span className="email-meta-addr strong">{toAddress}</span>
+                ) : (
+                  <>
+                    <strong>{friendlyName}</strong>
+                    {showEmailAddr && <span className="email-meta-addr">{fromEmail}</span>}
+                  </>
+                )}
+              </div>
+            </div>
           </div>
         </div>
-
-        <div className="email-view-date">{dateStr}</div>
       </div>
 
       {/* Body */}
@@ -109,13 +117,15 @@ export default function EmailViewCard({ msg, toAddress = 'info@car-agents.de' })
       {/* AI Summary (only for inbound) */}
       {aiSummary && isInbound && (
         <div className="email-ai-summary">
-          <Sparkles size={13} style={{ flexShrink: 0, marginTop: 1 }} />
-          <div>
-            <strong style={{ display: 'block', marginBottom: 2 }}>AI Intent Summary</strong>
-            {aiSummary}
+          <span className="email-ai-icon">
+            <Sparkles size={11} />
+          </span>
+          <div className="email-ai-text">
+            <strong>AI Intent Summary</strong>
+            <span>{aiSummary}</span>
           </div>
         </div>
       )}
-    </div>
+    </article>
   );
 }

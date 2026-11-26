@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Mail, MessageSquare, Search, MessageCircle, User, Sparkles, RefreshCw, CheckCircle2, ChevronLeft, Send, ExternalLink, X } from 'lucide-react';
+import { Mail, MessageSquare, Search, MessageCircle, User, Sparkles, RefreshCw, CheckCircle2, ChevronLeft, Send, ExternalLink, X, UserPlus } from 'lucide-react';
 import { api } from '../api/api';
 import { format } from 'date-fns';
 import EmailViewCard from '../components/EmailViewCard';
 import toast from 'react-hot-toast';
+import { formatContactName } from '../utils/textUtils';
 
 function getAvatar(contact) {
   const ch = (contact.channel || '').toUpperCase();
@@ -359,28 +360,39 @@ export default function Communications() {
           ) : (
             <>
               <div className="thread-header">
-                <button className="btn-icon show-on-mobile" style={{ marginRight: 8, padding: 4 }} onClick={() => setSelected(null)}>
+                <button className="btn-icon show-on-mobile" style={{ padding: 4, flexShrink: 0 }} onClick={() => setSelected(null)}>
                   <ChevronLeft size={18} />
                 </button>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                <div className="thread-header-peer">
                   <div className={`contact-avatar ${getAvatar(selected).cls}`} style={{ fontSize: '0.7rem' }}>
                     {getAvatar(selected).icon}
                   </div>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{cleanText(selected.sender_name) || selected.sender_contact}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{selected.sender_contact}</div>
+                  <div className="thread-header-info">
+                    <div className="thread-header-name">
+                      {formatContactName(
+                        selected.is_inbound === false ? selected.sender_contact : (cleanText(selected.sender_name) || selected.sender_contact),
+                        selected.sender_contact
+                      )}
+                    </div>
+                    <div className="thread-header-email">{selected.sender_contact}</div>
                   </div>
                 </div>
 
-                <button
-                  className={`btn ${convertedMap[selected.id] ? 'btn-secondary' : 'btn-primary'} btn-sm`}
-                  style={{ marginLeft: 'auto' }}
-                  onClick={() => handleConvertToLead(selected)}
-                  disabled={converting || convertedMap[selected.id]}
-                >
-                  {convertedMap[selected.id] ? <CheckCircle2 size={13} /> : <Sparkles size={13} />}
-                  <span>{convertedMap[selected.id] ? 'Converted to Lead' : 'Convert to Lead'}</span>
-                </button>
+                <div className="thread-header-actions">
+                  {thread.length > 0 && selected.channel !== 'TELEGRAM' && (
+                    <span className="thread-count-pill">
+                      {thread.length} {thread.length === 1 ? 'message' : 'messages'}
+                    </span>
+                  )}
+                  <button
+                    className={`btn ${convertedMap[selected.id] ? 'btn-secondary' : 'btn-primary'} btn-sm`}
+                    onClick={() => handleConvertToLead(selected)}
+                    disabled={converting || convertedMap[selected.id]}
+                  >
+                    {convertedMap[selected.id] ? <CheckCircle2 size={13} /> : <UserPlus size={13} />}
+                    <span>{convertedMap[selected.id] ? 'Converted to Lead' : 'Convert to Lead'}</span>
+                  </button>
+                </div>
               </div>
 
               <div style={{ flex: 1, overflowY: 'auto' }}>
