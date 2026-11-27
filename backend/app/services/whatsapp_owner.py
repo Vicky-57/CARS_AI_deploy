@@ -380,7 +380,7 @@ async def _dispatch_command(phone: str, cmd: str, arg: str, raw_text: str) -> No
 # ─── Customer Search & Disambiguation ─────────────────────────────────────
 
 def _drive_folder_for(cust: Dict) -> Optional[str]:
-    """Customer's Drive folder URL (created on demand, so it is shown even when empty)."""
+    """Customer's Drive folder URL (fast 2-call lookup without creating all 3 subfolders)."""
     if store.MEMORY:
         return None
     try:
@@ -391,7 +391,7 @@ def _drive_folder_for(cust: Dict) -> Optional[str]:
         ref_id = str(cust.get("project_id") or cust.get("lead_id") or "")[:8]
         if not ref_id:
             return None
-        struct = create_customer_folder_structure(cust.get("name") or "Customer", ref_id)
+        struct = create_customer_folder_structure(cust.get("name") or "Customer", ref_id, create_subfolders=False)
         return struct.get("customer_folder_url")
     except Exception as e:
         logger.warning(f"Drive folder lookup failed for {cust.get('name')}: {e}")
@@ -401,11 +401,24 @@ def _drive_folder_for(cust: Dict) -> Optional[str]:
 async def _card_with_drive(cust: Dict) -> str:
     import asyncio
     card = crm.format_customer_card(cust)
-    url = await asyncio.to_thread(_drive_folder_for, cust)
+    url = None
+    try:
+        url = await asyncio.wait_for(asyncio.to_thread(_drive_folder_for, cust), timeout=3.5)
+    except asyncio.TimeoutError:
+        logger.info(f"Drive folder lookup timed out (>3.5s) for {cust.get('name')}; warming in background.")
+        import threading
+        threading.Thread(target=_drive_folder_for, args=(cust,), daemon=True).start()
+    except Exception:
+        pass
     if url:
         card += f"\n📁 Documents: {url}"
     else:
-        card += "\n📁 Documents: (Drive not connected or no record ID)"
+        # Check if any stored document in DB already has a drive_url
+        db_docs = _collect_db_docs(cust)
+        if db_docs and db_docs[0].get("url"):
+            card += f"\n📄 Latest Doc: {db_docs[0]['url']}"
+        else:
+            card += "\n📁 Documents: Use `docs` or `upload` to view/add files"
     return card
 
 
@@ -471,25 +484,8 @@ _DOCS_SUBFOLDERS = [
 ]
 
 
-def _collect_docs(cust: Dict) -> Dict:
-    """Live Drive listing per subfolder; falls back to customer_documents DB records."""
-    out: Dict = {"folder_url": None, "groups": [], "source": "db"}
-    if not store.MEMORY:
-        try:
-            from app.services.google_service import is_connected
-            if is_connected():
-                from app.services.gdrive_service import create_customer_folder_structure, list_folder_files
-                ref_id = str(cust.get("project_id") or cust.get("lead_id") or "")[:8]
-                if ref_id:
-                    struct = create_customer_folder_structure(cust.get("name") or "Customer", ref_id)
-                    out["folder_url"] = struct.get("customer_folder_url")
-                    out["source"] = "drive"
-                    for label, key in _DOCS_SUBFOLDERS:
-                        out["groups"].append((label, list_folder_files(struct[key])))
-                    return out
-        except Exception as e:
-            logger.warning(f"Drive listing failed for {cust.get('name')}: {e}")
-
+def _collect_db_docs(cust: Dict) -> List[Dict]:
+    """Fast (<80ms) Supabase lookup of customer_documents by lead_id, project_id, or customer_name."""
     rows: List[Dict] = []
     seen = set()
     for kw in ({"lead_id": cust.get("lead_id")}, {"project_id": cust.get("project_id")}):
@@ -499,29 +495,95 @@ def _collect_docs(cust: Dict) -> Dict:
             if d.get("id") not in seen:
                 seen.add(d.get("id"))
                 rows.append(d)
-    out["groups"].append((
-        "Saved documents",
-        [{"name": d.get("filename"), "url": d.get("file_url") or d.get("drive_url"),
-          "created": str(d.get("created_at") or "")[:10]} for d in rows],
-    ))
+    if not rows and not store.MEMORY and cust.get("name"):
+        try:
+            from database import get_supabase
+            by_name = (
+                get_supabase()
+                .table("customer_documents")
+                .select("*")
+                .ilike("customer_name", f"*{cust['name'].strip()}*")
+                .order("created_at", desc=True)
+                .limit(15)
+                .execute()
+                .data or []
+            )
+            for d in by_name:
+                if d.get("id") not in seen:
+                    seen.add(d.get("id"))
+                    rows.append(d)
+        except Exception:
+            pass
+    return [
+        {
+            "name": d.get("filename"),
+            "url": d.get("file_url") or d.get("drive_url"),
+            "category": d.get("category") or "doc",
+            "created": str(d.get("created_at") or "")[:10],
+        }
+        for d in rows
+    ]
+
+
+def _collect_drive_docs(cust: Dict) -> Optional[Dict]:
+    """Parallel Google Drive subfolder listing (runs inside a 3.5s timeout budget)."""
+    if store.MEMORY:
+        return None
+    from concurrent.futures import ThreadPoolExecutor
+    from app.services.google_service import is_connected
+    if not is_connected():
+        return None
+    from app.services.gdrive_service import create_customer_folder_structure, list_folder_files
+    ref_id = str(cust.get("project_id") or cust.get("lead_id") or "")[:8]
+    if not ref_id:
+        return None
+    struct = create_customer_folder_structure(cust.get("name") or "Customer", ref_id)
+    out: Dict = {"folder_url": struct.get("customer_folder_url"), "groups": [], "source": "drive"}
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        futs = [(label, pool.submit(list_folder_files, struct[key])) for label, key in _DOCS_SUBFOLDERS]
+        for label, fut in futs:
+            try:
+                out["groups"].append((label, fut.result(timeout=2.5)))
+            except Exception:
+                out["groups"].append((label, []))
     return out
 
 
 async def _send_docs_list(phone: str, cust: Dict) -> None:
     import asyncio
-    data = await asyncio.to_thread(_collect_docs, cust)
+    import threading
+
+    db_files = _collect_db_docs(cust)
+    data = None
+    try:
+        data = await asyncio.wait_for(asyncio.to_thread(_collect_drive_docs, cust), timeout=3.5)
+    except asyncio.TimeoutError:
+        logger.info(f"Drive listing exceeded 3.5s for {cust.get('name')}; falling back to instant DB docs & warming cache.")
+        threading.Thread(target=_collect_drive_docs, args=(cust,), daemon=True).start()
+    except Exception as e:
+        logger.warning(f"Drive listing fallback for {cust.get('name')}: {e}")
+
+    if not data:
+        data = {"folder_url": None, "groups": [("Saved documents", db_files)], "source": "db"}
+    else:
+        # Also include any DB-recorded files whose URLs aren't in the Drive subfolder list yet
+        drive_names = {f.get("name") for _, grp in data["groups"] for f in grp}
+        extra_db = [f for f in db_files if f.get("name") not in drive_names]
+        if extra_db:
+            data["groups"].append(("CRM Stored Docs", extra_db))
+
     lines = [f"📂 *Documents — {cust.get('name') or 'Customer'}*"]
     total = 0
     for label, files in data["groups"]:
         if not files:
             continue
         lines.append(f"\n*{label}*")
-        for f in files[:8]:
+        for f in files[:6]:
             total += 1
             lines.append(f"• {f['name']} ({f['created']})\n  {f['url'] or '(no link)'}")
     if total == 0:
-        lines.append("\nNo documents stored yet. Use `upload` to add one.")
-    if data["folder_url"]:
+        lines.append("\nNo documents stored yet. Use `upload` (or option `7`) to add one.")
+    if data.get("folder_url"):
         lines.append(f"\n📁 Folder: {data['folder_url']}")
     await send_message(phone, "\n".join(lines))
 
@@ -616,36 +678,42 @@ async def _cmd_today(phone: str, arg: str = "") -> None:
         f"✅ Qualified: {len(qual)} • ⏳ Needs Info: {len(unqual)} • 🤝 B2B/Invoices: {len(b2b_inv)} • 🚫 Flagged Spam hidden: {flagged_count}",
     ]
 
+    def _clean_sender(r: Dict) -> str:
+        raw = (r.get("sender_name") or r.get("sender_email") or "Client").strip()
+        if "-mo-mo" in raw or "kontakt.mobile.de" in (r.get("sender_email") or ""):
+            veh = (r.get("extracted_params") or {}).get("manufacturer_model") or "Vehicle"
+            return f"mobile.de Buyer ({veh[:22]})"
+        return raw[:28]
+
     def _fmt_item(r: Dict) -> str:
         sid = tstore.short_id(r)
         params = r.get("extracted_params") or {}
-        p_str = ", ".join(f"{k}: {v}" for k, v in list(params.items())[:4]) or "—"
+        p_str = ", ".join(f"{k}: {v}" for k, v in list(params.items())[:3]) or "—"
         miss = r.get("missing_fields") or []
-        m_str = ", ".join(miss[:3]) or "Complete"
-        q_str = (r.get("body_preview") or r.get("subject") or "").replace("\n", " ")[:70]
+        m_str = ", ".join(miss[:2]) or "Complete"
+        q_str = " ".join((r.get("body_preview") or r.get("subject") or "").split())[:55]
         return (
-            f"• `#{sid}` *{r.get('sender_name') or r.get('sender_email')}* [{r.get('category')}]\n"
-            f"  🔍 Params: {p_str}\n"
-            f"  ❓ Missing: {m_str}\n"
-            f"  💬 Query: _{q_str}_\n"
-            f"  👉 `mail send {sid}` | `mail ok {sid}` | `mail no {sid}`"
+            f"• `#{sid}` *{_clean_sender(r)}* [{r.get('category')}]\n"
+            f"  🔍 {p_str} | ❓ {m_str}\n"
+            f"  💬 _{q_str}_"
         )
 
     if qual:
         lines.append("\n*✅ Qualified Inquiries:*")
-        for r in qual[:5]:
+        for r in qual[:3]:
             lines.append(_fmt_item(r))
     if unqual:
         lines.append("\n*⏳ Inquiries Missing Info (Non-Qualified):*")
-        for r in unqual[:5]:
+        for r in unqual[:3]:
             lines.append(_fmt_item(r))
     if b2b_inv:
         lines.append("\n*🤝 B2B & Invoices:*")
-        for r in b2b_inv[:4]:
+        for r in b2b_inv[:3]:
             sid = tstore.short_id(r)
             dl = f" (Due: {r['payment_deadline']})" if r.get("payment_deadline") else ""
-            lines.append(f"• `#{sid}` [{r.get('category')}] {r.get('sender_email')} — _{(r.get('subject') or '')[:42]}_{dl}")
+            lines.append(f"• `#{sid}` [{r.get('category')}] {r.get('sender_email')[:28]} — _{(r.get('subject') or '')[:34]}_{dl}")
 
+    lines.append("\n👉 _Approve/edit: `mail send <id>` | `mail ok <id>` | `mail type <id> seller` | `mail no <id>`_")
     await send_message(phone, "\n".join(lines))
 
 
@@ -733,25 +801,32 @@ async def _cmd_mail(phone: str, arg: str) -> None:
         await send_message(phone, f"🚫 Ignored `#{tstore.short_id(row)}` and blocked `{row.get('sender_email')}`.")
         return
 
-    pending = tstore.list_pending(10)
+    pending = tstore.list_pending(8)
     st = tstore.stats(30)
     d = st.get("decisions", {})
     lines = [
         f"📩 *Email Triage (last 30d)*",
-        f"Scanned: {st.get('total', 0)} • Qualified: {st.get('qualified', 0)} • Drafts ready: {st.get('pending_drafts', 0)} • Leads: {d.get('lead', 0)} • Review: {d.get('review', 0)} • Flagged: {d.get('drop', 0)}",
+        f"Scanned: {st.get('total', 0)} • Qualified: {st.get('qualified', 0)} • Drafts: {st.get('pending_drafts', 0)} • Leads: {d.get('lead', 0)} • Review: {d.get('review', 0)} • Flagged: {d.get('drop', 0)}",
     ]
     if not pending:
         lines.append("\nNo emails waiting for review.")
     else:
-        lines.append(f"\n*Waiting for action ({len(pending)}) — use #id or item number (1-{len(pending)}):*")
+        lines.append(f"\n*Waiting for action ({len(pending)}) — use 1-{len(pending)} or #id:*")
         for i, r in enumerate(pending, 1):
             sid = tstore.short_id(r)
             qual_tag = "✅" if r.get("is_qualified") else "⏳"
+            sender_disp = "mobile.de Buyer" if "kontakt.mobile.de" in (r.get("sender_email") or "") else (r.get("sender_email") or "")[:28]
             lines.append(
-                f"*{i}.* {qual_tag} `#{sid}` [{r.get('category')}] {r.get('sender_email')[:32]} — _{(r.get('subject') or '')[:38]}_\n"
-                f"   👉 `mail send {sid}` | `mail ok {sid}` | `mail type {sid} seller` | `mail no {sid}`\n"
-                f"   _(or use number: `mail ok {i}`, `mail type {i} seller`)_"
+                f"*{i}.* {qual_tag} `#{sid}` [{r.get('category')}] {sender_disp}\n"
+                f"   _{(r.get('subject') or '')[:44]}_"
             )
+        lines.append(
+            "\n👉 *Commands (use item `1` or `#id`):*\n"
+            "• `mail send 1` — approve & send draft\n"
+            "• `mail ok 1` — approve lead (no email)\n"
+            "• `mail type 1 seller` — change type\n"
+            "• `mail no 1` — flag as spam"
+        )
     await send_message(phone, "\n".join(lines))
 
 

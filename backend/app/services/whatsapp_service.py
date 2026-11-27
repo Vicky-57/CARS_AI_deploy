@@ -63,7 +63,35 @@ def collect_twilio_replies(target_phone: Optional[str] = None):
         _twilio_collector.reset(token)
 
 
-async def run_within_twiml_budget(target_phone: Optional[str], coro_factory, budget: float = 9.0) -> List[str]:
+TWILIO_MAX_CHARS = 1450  # Twilio hard limit is 1600 chars per <Message>; split safely below 1450
+
+
+def _split_twilio_chunks(text: str, max_len: int = TWILIO_MAX_CHARS) -> List[str]:
+    """Split a long message on newline boundaries so Twilio never rejects with Error 21617 (>1600 chars)."""
+    if not text:
+        return []
+    if len(text) <= max_len:
+        return [text]
+    chunks: List[str] = []
+    cur: List[str] = []
+    cur_len = 0
+    for line in text.splitlines():
+        if len(line) > max_len:
+            line = line[: max_len - 3] + "..."
+        add_len = len(line) + (1 if cur else 0)
+        if cur and cur_len + add_len > max_len:
+            chunks.append("\n".join(cur))
+            cur = [line]
+            cur_len = len(line)
+        else:
+            cur.append(line)
+            cur_len += add_len
+    if cur:
+        chunks.append("\n".join(cur))
+    return chunks
+
+
+async def run_within_twiml_budget(target_phone: Optional[str], coro_factory, budget: float = 12.5) -> List[str]:
     """
     Run a handler but never let Twilio's 15s webhook timeout swallow the reply.
     Fast turns return their replies as TwiML. If the handler is still running after `budget`
@@ -86,8 +114,14 @@ async def run_within_twiml_budget(target_phone: Optional[str], coro_factory, bud
 
 
 def build_twiml(messages: List[str]) -> str:
-    """Build a valid TwiML <Response> containing zero or more <Message> blocks."""
-    inner = "".join(f"<Message>{xml_escape(m)}</Message>" for m in messages if m)
+    """Build a valid TwiML <Response> containing zero or more <Message> blocks (each <= 1450 chars)."""
+    blocks: List[str] = []
+    for m in messages:
+        if not m:
+            continue
+        for chunk in _split_twilio_chunks(m):
+            blocks.append(f"<Message>{xml_escape(chunk)}</Message>")
+    inner = "".join(blocks)
     return f'<?xml version="1.0" encoding="UTF-8"?><Response>{inner}</Response>'
 
 
