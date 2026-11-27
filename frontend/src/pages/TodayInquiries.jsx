@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import {
   Sparkles, CheckCircle2, Clock, FileText, ShieldAlert, Briefcase,
   Send, RefreshCw, Search, Mail, AlertCircle, Tag, Check, X, ArrowRight,
-  Car, Calendar, ShieldCheck, Zap, ChevronLeft, MessageSquare, Phone
+  Car, Calendar, ShieldCheck, Zap, ChevronLeft, MessageSquare, Phone,
+  Bell, Settings, Link2, Plus
 } from 'lucide-react';
 import { api } from '../api/api';
 import { format } from 'date-fns';
@@ -106,6 +107,11 @@ export default function TodayInquiries() {
   const [submitting, setSubmitting] = useState(false);
   const [autoReply, setAutoReply] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [reminders, setReminders] = useState([]);
+  const [workingHours, setWorkingHours] = useState({ work_days: [0, 1, 2, 3, 4, 5], start_hour: 9, end_hour: 18, state_holidays: 'BY' });
+  const [showHoursModal, setShowHoursModal] = useState(false);
+  const [newReminderTitle, setNewReminderTitle] = useState('');
+  const [newReminderHours, setNewReminderHours] = useState(4);
 
   const tabsBarRef = useRef(null);
   const tabBtnRefs = useRef({});
@@ -128,8 +134,14 @@ export default function TodayInquiries() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const rows = await api.getInquiries(200);
+      const [rows, remRows, whCfg] = await Promise.all([
+        api.getInquiries(200),
+        api.getReminders('OPEN').catch(() => []),
+        api.getWorkingHours().catch(() => ({ work_days: [0, 1, 2, 3, 4, 5], start_hour: 9, end_hour: 18, state_holidays: 'BY' })),
+      ]);
       setInquiries(rows);
+      setReminders(remRows);
+      if (whCfg) setWorkingHours(whCfg);
       if (rows.length && !selected) {
         const firstLead = rows.find(r => !isFlaggedCategory(r.category, r.decision)) || rows[0];
         selectRow(firstLead);
@@ -255,6 +267,62 @@ export default function TodayInquiries() {
       navigate('/b2b');
     } catch (err) {
       toast.error('Could not create B2B deal: ' + err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCompleteReminder = async (remId) => {
+    try {
+      await api.completeReminder(remId);
+      setReminders(prev => prev.filter(r => r.id !== remId));
+      toast.success('Reminder marked as completed (synced with WhatsApp).');
+    } catch (err) {
+      toast.error('Failed to complete reminder: ' + err.message);
+    }
+  };
+
+  const handleAddQuickReminder = async (e) => {
+    e.preventDefault();
+    if (!newReminderTitle.trim()) return;
+    try {
+      const created = await api.createReminder({
+        title: newReminderTitle.trim(),
+        hours_from_now: Number(newReminderHours) || 4,
+        triage_id: selected?.id || null,
+        customer_name: selected?.sender_name || null,
+        customer_contact: selected?.reply_to || selected?.sender_email || null,
+        category: selected?.category || 'custom',
+      });
+      setReminders(prev => [...prev, created]);
+      setNewReminderTitle('');
+      toast.success('Reminder scheduled (Bavarian working hours applied).');
+    } catch (err) {
+      toast.error('Could not create reminder: ' + err.message);
+    }
+  };
+
+  const handleSaveWorkingHours = async (e) => {
+    e.preventDefault();
+    try {
+      const saved = await api.updateWorkingHours(workingHours);
+      setWorkingHours(saved);
+      setShowHoursModal(false);
+      toast.success('Working hours updated! Applies to all newly created reminders (§10).');
+    } catch (err) {
+      toast.error('Failed to update working hours: ' + err.message);
+    }
+  };
+
+  const handleSplitSellAndSource = async () => {
+    if (!selected) return;
+    setSubmitting(true);
+    try {
+      await api.splitCombinedSellAndSource(selected.id);
+      toast.success('§6 Combined Inquiry linked into two separate inquiries (Sale + Sourcing) under one customer contact.');
+      await loadData();
+    } catch (err) {
+      toast.error('Could not create linked inquiry: ' + err.message);
     } finally {
       setSubmitting(false);
     }
@@ -427,6 +495,16 @@ export default function TodayInquiries() {
             </span>
           </button>
 
+          <button
+            type="button"
+            className="today-mode-btn"
+            onClick={() => setShowHoursModal(true)}
+            title="Configure Working Days, Hours & Bavarian Holidays (§10)"
+          >
+            <Settings size={13} />
+            <span>{String(workingHours.start_hour || 9).padStart(2, '0')}:00–{String(workingHours.end_hour || 18).padStart(2, '0')}:00 · BY</span>
+          </button>
+
           <div className="today-action-group">
             <button className="today-sync-btn" onClick={handleSync} disabled={syncing}>
               <Mail size={13} />
@@ -463,6 +541,7 @@ export default function TodayInquiries() {
           { id: 'NEEDS_INFO', label: 'Needs Info', count: needsInfoLeads.length, icon: <Clock size={13} /> },
           { id: 'B2B', label: 'B2B Offers', count: b2bList.length, icon: <Briefcase size={13} /> },
           { id: 'INVOICES', label: 'Invoices', count: invoiceList.length, icon: <FileText size={13} /> },
+          { id: 'REMINDERS', label: 'Reminders', count: reminders.length, icon: <Bell size={13} /> },
           { id: 'FLAGGED', label: 'Spam', count: flaggedList.length, icon: <ShieldAlert size={13} /> },
         ].map(t => (
           <button
@@ -480,7 +559,88 @@ export default function TodayInquiries() {
         ))}
       </div>
 
-      {/* Split Workspace */}
+      {/* Split Workspace or Reminders Panel */}
+      {activeTab === 'REMINDERS' ? (
+        <div className="today-card" style={{ padding: 18, flex: 1, overflowY: 'auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1rem' }}>⏰ Phase 1 Reminders &amp; Follow-Up Queue (§10)</h3>
+              <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                Calculated with configured working hours ({workingHours.start_hour}:00–{workingHours.end_hour}:00) &amp; Bavaria (Bayern) public holidays. Synced with WhatsApp (`reminders` / `done &lt;id&gt;`).
+              </p>
+            </div>
+            <form onSubmit={handleAddQuickReminder} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+              <input
+                className="input"
+                placeholder="New reminder title…"
+                value={newReminderTitle}
+                onChange={e => setNewReminderTitle(e.target.value)}
+                style={{ fontSize: '0.78rem', width: 220 }}
+              />
+              <select
+                className="input"
+                value={newReminderHours}
+                onChange={e => setNewReminderHours(e.target.value)}
+                style={{ fontSize: '0.78rem', padding: '5px 8px' }}
+              >
+                <option value={2}>+2 Working Hours (§4 Advertised)</option>
+                <option value={4}>Same Working Day (+4h)</option>
+                <option value={9}>Next Working Day (+1d)</option>
+                <option value={18}>+2 Working Days (No Reply)</option>
+              </select>
+              <button type="submit" className="btn btn-primary btn-sm">
+                <Plus size={13} /> Add Reminder
+              </button>
+            </form>
+          </div>
+
+          {reminders.length === 0 ? (
+            <div style={{ fontSize: '0.84rem', color: 'var(--text-muted)', padding: '20px 0' }}>
+              No open reminders. Automatic reminders are created when new inquiries arrive or when awaiting customer replies.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {reminders.map(rem => {
+                const isOverdue = new Date(rem.due_at) <= new Date();
+                const dueStr = (() => {
+                  try { return format(new Date(rem.due_at), 'dd.MM.yyyy · HH:mm'); } catch { return rem.due_at; }
+                })();
+                return (
+                  <div
+                    key={rem.id}
+                    style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: 12, borderRadius: 8, border: '1px solid var(--border)',
+                      background: isOverdue ? 'rgba(239,68,68,0.06)' : 'var(--surface)', gap: 12, flexWrap: 'wrap',
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span className="badge" style={{
+                          fontSize: '0.65rem',
+                          background: isOverdue ? 'rgba(239,68,68,0.16)' : 'rgba(245,158,11,0.16)',
+                          color: isOverdue ? '#dc2626' : '#d97706',
+                        }}>
+                          {isOverdue ? '🔴 OVERDUE' : '🟡 DUE'}
+                        </span>
+                        <strong style={{ fontSize: '0.88rem' }}>{rem.title}</strong>
+                        <code style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>#{String(rem.id).slice(0, 6)}</code>
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 3 }}>
+                        Customer: <strong>{rem.customer_name || rem.customer_contact || '—'}</strong> · Due: <strong>{dueStr}</strong>
+                        {rem.notes ? ` · ${rem.notes}` : ''}
+                      </div>
+                    </div>
+                    <button className="btn btn-primary btn-sm" onClick={() => handleCompleteReminder(rem.id)}>
+                      <Check size={13} /> Mark Completed
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
       <div className={`today-workspace${mobileShowDetail && selected ? ' has-selection' : ''}`}>
         {/* Left Queue */}
         <div className="today-queue">
@@ -725,6 +885,67 @@ export default function TodayInquiries() {
                       <span>Payment Deadline (§7): {cleanText(selected.payment_deadline)}</span>
                     </div>
                   )}
+
+                  {/* §6 Combined Sell + Source Linked Inquiry Banner */}
+                  {(selected.category === 'sell_and_source' || selected.linked_inquiry_id || selected.dependency_notes) && (
+                    <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 6, background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                      <div style={{ fontSize: '0.8rem' }}>
+                        <strong style={{ color: '#2563eb', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <Link2 size={14} /> §6 Combined Vehicle Sale &amp; Sourcing Inquiry
+                        </strong>
+                        <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>
+                          {selected.dependency_notes || 'Timing & financial dependency between current vehicle sale and replacement vehicle sourcing. Changes are not auto-transferred.'}
+                        </div>
+                      </div>
+                      {selected.linked_inquiry_id ? (
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => {
+                            const linked = inquiries.find(i => i.id === selected.linked_inquiry_id);
+                            if (linked) selectRow(linked);
+                            else toast('Linked inquiry ID: #' + String(selected.linked_inquiry_id).slice(0, 6));
+                          }}
+                        >
+                          <Link2 size={13} /> Open Linked Inquiry (#{String(selected.linked_inquiry_id).slice(0, 6)})
+                        </button>
+                      ) : (
+                        <button className="btn btn-primary btn-sm" onClick={handleSplitSellAndSource} disabled={submitting}>
+                          <Link2 size={13} /> Create Linked Companion Inquiry (§6)
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* §4 Advertised Vehicle Buyer Card (Listing Match, Price Offer vs Advertised Price, Viewing & Reservation) */}
+                  {(['advertised_buyer', 'marketplace'].includes(editCategory) || selected.matched_vehicle_title || selected.buyer_offer_price || selected.reservation_requested) && (
+                    <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 6, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', fontSize: '0.8rem' }}>
+                      <strong style={{ color: '#059669', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                        <Car size={14} /> §4 Advertised Vehicle Buyer Evaluation
+                      </strong>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 8 }}>
+                        <div>
+                          <span style={{ color: 'var(--text-muted)' }}>Advertised Listing:</span>{' '}
+                          <strong>{selected.matched_vehicle_title || (selected.extracted_params || {}).manufacturer_model || 'Confirm in CRM'}</strong>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--text-muted)' }}>Advertised Price:</span>{' '}
+                          <strong>{selected.advertised_price || 'See CRM Deal'}</strong>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--text-muted)' }}>Buyer Price Offer (§4):</span>{' '}
+                          <strong style={{ color: selected.buyer_offer_price ? '#d97706' : 'inherit' }}>
+                            {selected.buyer_offer_price || 'None submitted'}
+                          </strong>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--text-muted)' }}>Viewing / Reservation:</span>{' '}
+                          <strong>
+                            {selected.reservation_requested ? '⚠️ Reservation Requested (Confirm personally)' : selected.viewing_requested_time ? `Viewing: ${selected.viewing_requested_time}` : 'Standard Availability'}
+                          </strong>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -952,6 +1173,76 @@ export default function TodayInquiries() {
           )}
         </div>
       </div>
+      )}
+
+      {/* §10 Working Hours & Bavarian Holidays Configuration Modal */}
+      {showHoursModal && (
+        <div className="modal-overlay" onClick={() => setShowHoursModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 460, padding: 24 }}>
+            <h3 style={{ marginTop: 0, marginBottom: 6 }}>⚙️ Working Days, Hours &amp; Holidays (§10)</h3>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 0, marginBottom: 14 }}>
+              Public holidays in <strong>Bavaria (Freistaat Bayern)</strong> are automatically excluded when calculating reminder deadlines. Changes apply to newly created reminders.
+            </p>
+            <form onSubmit={handleSaveWorkingHours} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ fontSize: '0.76rem', fontWeight: 600, display: 'block', marginBottom: 6 }}>Working Days</label>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {[
+                    { idx: 0, label: 'Mon' }, { idx: 1, label: 'Tue' }, { idx: 2, label: 'Wed' },
+                    { idx: 3, label: 'Thu' }, { idx: 4, label: 'Fri' }, { idx: 5, label: 'Sat' }, { idx: 6, label: 'Sun' },
+                  ].map(d => {
+                    const active = (workingHours.work_days || []).includes(d.idx);
+                    return (
+                      <button
+                        type="button"
+                        key={d.idx}
+                        className={`btn btn-sm ${active ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => {
+                          const cur = workingHours.work_days || [];
+                          const next = active ? cur.filter(x => x !== d.idx) : [...cur, d.idx].sort();
+                          setWorkingHours({ ...workingHours, work_days: next });
+                        }}
+                      >
+                        {d.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={{ fontSize: '0.76rem', fontWeight: 600 }}>Start Hour (0–22)</label>
+                  <input
+                    className="input"
+                    type="number"
+                    min={0}
+                    max={22}
+                    value={workingHours.start_hour}
+                    onChange={e => setWorkingHours({ ...workingHours, start_hour: Number(e.target.value) })}
+                    style={{ width: '100%', marginTop: 4 }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.76rem', fontWeight: 600 }}>End Hour (1–23)</label>
+                  <input
+                    className="input"
+                    type="number"
+                    min={1}
+                    max={23}
+                    value={workingHours.end_hour}
+                    onChange={e => setWorkingHours({ ...workingHours, end_hour: Number(e.target.value) })}
+                    style={{ width: '100%', marginTop: 4 }}
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowHoursModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary btn-sm">Save Working Hours</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
