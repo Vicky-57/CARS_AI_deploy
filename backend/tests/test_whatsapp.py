@@ -477,6 +477,10 @@ def test_mail_review_queue_approve_and_deny():
     run(handler.handle_message(text_msg(OWNER, "mail", "m_list")))
     assert sid in body_of(sent_to(OWNER)[-1])
 
+    # Reclassify using 1-based index (`mail type 1 seller`) without needing hex ID lookup
+    run(handler.handle_message(text_msg(OWNER, "mail type 1 seller", "m_type")))
+    assert "Reclassified" in body_of(sent_to(OWNER)[-1]) and "seller" in body_of(sent_to(OWNER)[-1])
+
     run(handler.handle_message(text_msg(OWNER, f"mail no {sid}", "m_no")))
     assert "Ignored" in body_of(sent_to(OWNER)[-1])
     assert tstore.get_rule("unsure.buyer@gmail.com") == "deny"
@@ -499,7 +503,8 @@ def test_whatsapp_reminders_and_done_sync():
     run(handler.handle_message(text_msg(OWNER, "reminders", "rem_1")))
     assert sid in body_of(sent_to(OWNER)[-1]) and "Herr Weber" in body_of(sent_to(OWNER)[-1])
 
-    run(handler.handle_message(text_msg(OWNER, f"done {sid}", "rem_2")))
+    # Mark done using 1-based index `done 1`
+    run(handler.handle_message(text_msg(OWNER, "done 1", "rem_2")))
     assert "marked as completed" in body_of(sent_to(OWNER)[-1])
     assert rs.find_reminder(rem["id"])["status"] == "COMPLETED"
 

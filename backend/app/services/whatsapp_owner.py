@@ -33,19 +33,26 @@ HELP_MENU_BUTTONS = [
     ("schedule", "📅 Schedule meeting", "Book free slot with client"),
     ("meetings", "🗓️ My meetings", "Today & upcoming meetings"),
     ("upload", "📎 Upload document", "Save file to customer folder"),
-    ("scan", "🔎 Scan doc (OCR)", "Extract fields into templates"),
+    ("scan", "🔎 Scan doc (OCR)", "Extract fields & contract PDF"),
     ("reset", "🔄 Reset session", "Restart qualification test"),
+    ("today", "📋 Today's inquiries", "All leads, params, missing info & drafts"),
+    ("mail", "📩 Email review (mail)", "Approve drafts, reclassify or flag spam"),
+    ("b2b", "🤝 B2B & Partners", "B2B deals & cooperation offers"),
+    ("reminders", "⏰ Reminders", "Follow-up deadlines & mark done"),
+    ("docs", "📂 Customer docs", "List files in customer Drive folder"),
 ]
 
 HELP_TEXT = (
     "🚗 *CAR-AGENTS Assistant — Help*\n"
-    "Tap an option or type a command:\n"
+    "Tap an option (1-14) or type a command:\n"
     "• `customer <name | phone | email>`\n"
-    "  _(e.g. `customer +49170...` or `customer max@mail.de`)_\n"
     "• `docs <name | phone | email>` — list customer documents\n"
     "• `today` — today's inquiries (qualified & unqualified, params & drafts)\n"
-    "• `reminders` / `done <id>` — follow-up reminders & completion sync\n"
-    "• `mail` / `mail send <id>` / `mail ok <id>` / `mail no <id>`\n"
+    "• `mail` — list pending email IDs (`#id` or `1, 2, 3...`)\n"
+    "  `mail send <id>` • `mail ok <id>` • `mail no <id>`\n"
+    "  `mail type <id> <seller|sourcing|b2b_offer|invoice|spam>`\n"
+    "• `b2b` — B2B deals & offers\n"
+    "• `reminders` • `done <id>` — follow-up reminders & completion sync\n"
     "• `convert <lead>` • `stage <client> <stage>`\n"
     "• `cancel meeting` • `reschedule`"
 )
@@ -298,6 +305,12 @@ async def handle_owner(phone: str, inp: Dict, text: str) -> None:
 
 
 async def _dispatch_command(phone: str, cmd: str, arg: str, raw_text: str) -> None:
+    # Allow bare menu number 1..14 anytime the owner is not inside a wizard or qualification flow
+    if cmd.isdigit() and not arg:
+        idx = int(cmd) - 1
+        if 0 <= idx < len(HELP_MENU_BUTTONS):
+            cmd = HELP_MENU_BUTTONS[idx][0]
+
     if cmd == "reset":
         store.delete_session(phone)
         await send_message(phone, "🔄 Session reset. Send a customer message (e.g. 'Hallo, ich möchte ein Auto kaufen') to test qualification, or `help` for commands.")
@@ -548,15 +561,15 @@ async def _cmd_reminders(phone: str, arg: str = "") -> None:
     if not rows:
         lines.append("\nNo open reminders.")
     else:
-        for r in rows[:12]:
+        for i, r in enumerate(rows[:12], 1):
             sid = rs.short_id(r)
             is_od = (r.get("due_at") or "") <= now_iso
             tag = "🔴 OVERDUE" if is_od else "🟡 DUE"
             due_txt = str(r.get("due_at") or "")[:16].replace("T", " ")
             lines.append(
-                f"\n• `#{sid}` [{tag}] *{r.get('title')}*\n"
+                f"\n*{i}.* `#{sid}` [{tag}] *{r.get('title')}*\n"
                 f"  👤 {r.get('customer_name') or r.get('customer_contact') or '—'} • {due_txt}\n"
-                f"  👉 `done {sid}`"
+                f"  👉 `done {i}` _(or `done {sid}`)_"
             )
     await send_message(phone, "\n".join(lines))
 
@@ -582,17 +595,21 @@ async def _cmd_today(phone: str, arg: str = "") -> None:
     """
     from app.services import email_triage_store as tstore
 
-    rows = tstore.list_inquiries(limit=30)
-    visible = [r for r in rows if r.get("decision") != "drop" and r.get("category") not in ("spam", "automated")]
+    rows = tstore.list_inquiries(limit=100)
+    visible = [r for r in rows if r.get("decision") != "drop" and r.get("category") not in ("spam", "automated", "marketing", "b2b_advertising")]
     flagged_count = len(rows) - len(visible)
 
     if not visible:
         await send_message(phone, f"📋 *Inquiries Overview*\nNo non-spam inquiries found ({flagged_count} flagged spam hidden).")
         return
 
-    qual = [r for r in visible if r.get("is_qualified")]
-    unqual = [r for r in visible if not r.get("is_qualified") and r.get("decision") not in ("b2b", "invoice")]
-    b2b_inv = [r for r in visible if r.get("decision") in ("b2b", "invoice")]
+    def _is_b2b_or_inv(r: Dict) -> bool:
+        cat = str(r.get("category") or "").lower()
+        return r.get("decision") in ("b2b", "invoice") or cat == "invoice" or cat.startswith("b2b")
+
+    qual = [r for r in visible if r.get("is_qualified") and not _is_b2b_or_inv(r)]
+    unqual = [r for r in visible if not r.get("is_qualified") and not _is_b2b_or_inv(r)]
+    b2b_inv = [r for r in visible if _is_b2b_or_inv(r)]
 
     lines = [
         f"📋 *Phase 1 Inquiries Overview*",
@@ -726,13 +743,14 @@ async def _cmd_mail(phone: str, arg: str) -> None:
     if not pending:
         lines.append("\nNo emails waiting for review.")
     else:
-        lines.append(f"\n*Waiting for action ({len(pending)}):*")
-        for r in pending:
+        lines.append(f"\n*Waiting for action ({len(pending)}) — use #id or item number (1-{len(pending)}):*")
+        for i, r in enumerate(pending, 1):
             sid = tstore.short_id(r)
             qual_tag = "✅" if r.get("is_qualified") else "⏳"
             lines.append(
-                f"• {qual_tag} `#{sid}` [{r.get('category')}] {r.get('sender_email')} — _{(r.get('subject') or '')[:42]}_\n"
-                f"  Reply `mail send {sid}` | `mail ok {sid}` | `mail no {sid}`"
+                f"*{i}.* {qual_tag} `#{sid}` [{r.get('category')}] {r.get('sender_email')[:32]} — _{(r.get('subject') or '')[:38]}_\n"
+                f"   👉 `mail send {sid}` | `mail ok {sid}` | `mail type {sid} seller` | `mail no {sid}`\n"
+                f"   _(or use number: `mail ok {i}`, `mail type {i} seller`)_"
             )
     await send_message(phone, "\n".join(lines))
 

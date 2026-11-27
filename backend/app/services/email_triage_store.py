@@ -209,21 +209,37 @@ def list_pending(limit: int = 15) -> List[Dict]:
             .is_("resolution", "null")
             .in_("decision", ["review", "lead", "b2b", "invoice"])
             .order("created_at", desc=True)
-            .limit(limit)
+            .limit(max(limit, 30))
             .execute()
             .data or []
         )
-        return rows
+        # Prioritize customer leads/inquiries at the top so items 1, 2, 3 are customer leads first
+        def _prio_key(r: Dict) -> int:
+            cat = (r.get("category") or "").lower()
+            if cat in ("seller", "sourcing", "sell_and_source", "advertised_buyer", "marketplace", "lead_buy", "lead_sell", "other"):
+                return 0
+            if cat.startswith("b2b"):
+                return 1
+            return 2
+
+        rows.sort(key=_prio_key)
+        return rows[:limit]
     except Exception as e:
         _warn_once(e)
         return [r for r in _mem_triage if r.get("decision") == "review" and not r.get("resolution")][-limit:]
 
 
 def find_pending(short_id_str: str) -> Optional[Dict]:
-    sid = (short_id_str or "").strip().lower()
+    sid = (short_id_str or "").strip().lower().lstrip("#")
     if not sid:
         return None
-    for r in list_pending(80):
+    pending = list_pending(50)
+    # Allow 1-based index (e.g. `mail ok 1`, `mail type 1 seller`) directly from the `mail` list
+    if sid.isdigit() and len(sid) <= 2:
+        idx = int(sid) - 1
+        if 0 <= idx < len(pending):
+            return pending[idx]
+    for r in pending:
         if str(r.get("id", "")).lower().startswith(sid):
             return r
     return find_inquiry(sid)

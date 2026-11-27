@@ -370,9 +370,15 @@ def list_reminders(status: Optional[str] = "OPEN", limit: int = 100) -> List[Dic
 
 
 def find_reminder(short_or_full_id: str) -> Optional[Dict]:
-    sid = (short_or_full_id or "").strip().lower()
+    sid = (short_or_full_id or "").strip().lower().lstrip("#")
     if not sid:
         return None
+    open_rows = list_reminders(status="OPEN", limit=50)
+    # Allow 1-based index (e.g. `done 1`) from the `reminders` list
+    if sid.isdigit() and len(sid) <= 2:
+        idx = int(sid) - 1
+        if 0 <= idx < len(open_rows):
+            return open_rows[idx]
     for r in list_reminders(status="ALL", limit=200):
         if str(r.get("id", "")).lower().startswith(sid):
             return r

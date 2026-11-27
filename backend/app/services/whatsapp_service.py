@@ -222,7 +222,8 @@ async def send_message(to_phone: str, text: str, buttons: Optional[List] = None)
     if not buttons:
         return await send_whatsapp_message(to, text)
 
-    norm_btns = [normalize_button(b) for b in buttons[:10]]
+    all_norm_btns = [normalize_button(b) for b in buttons]
+    norm_btns = all_norm_btns[:10]
 
     if _twilio_collector.get() is not None or use_twilio():
         if use_twilio() and getattr(settings, "TWILIO_CONTENT_ENABLED", False):
@@ -232,10 +233,10 @@ async def send_message(to_phone: str, text: str, buttons: Optional[List] = None)
                 return sent
 
         lines = []
-        for i, (_, title, desc) in enumerate(norm_btns, 1):
+        for i, (_, title, desc) in enumerate(all_norm_btns, 1):
             lines.append(f"*{i}.* {title}" + (f" — _{desc}_" if desc else ""))
         options_txt = "\n".join(lines)
-        full_text = f"{text}\n\n{options_txt}\n\n_(Reply with 1-{len(norm_btns)})_"
+        full_text = f"{text}\n\n{options_txt}\n\n_(Reply with 1-{len(all_norm_btns)})_"
         return await _send_via_twilio(to, full_text)
 
     if len(norm_btns) <= 3:
