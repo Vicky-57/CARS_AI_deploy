@@ -641,538 +641,538 @@ export default function TodayInquiries() {
           )}
         </div>
       ) : (
-      <div className={`today-workspace${mobileShowDetail && selected ? ' has-selection' : ''}`}>
-        {/* Left Queue */}
-        <div className="today-queue">
-          <div className="today-queue-top">
-            <div className="today-search-box">
-              <Search size={14} />
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search customer, vehicle, parameter…"
-              />
-              {search && (
-                <button
-                  type="button"
-                  className="today-search-clear"
-                  onClick={() => setSearch('')}
-                  aria-label="Clear search"
-                >
-                  <X size={12} />
-                </button>
-              )}
-            </div>
-            <div className="today-queue-meta">
-              <span>{activeList.length} {activeList.length === 1 ? 'inquiry' : 'inquiries'} shown</span>
-              <span>{dateScope === 'TODAY' ? 'Today' : 'All time'}</span>
-            </div>
-          </div>
-
-          {loading ? (
-            <div className="loading-spinner">
-              <div className="spinner spinner-dark" />
-            </div>
-          ) : activeList.length === 0 ? (
-            <div className="empty-state" style={{ flex: 1, justifyContent: 'center' }}>
-              <Sparkles size={26} style={{ opacity: 0.35 }} />
-              <div className="empty-state-title">No inquiries in this view</div>
-              <div className="empty-state-sub">
-                {dateScope === 'TODAY'
-                  ? 'Switch to "All Inquiries" to review earlier messages.'
-                  : 'Click Sync Strato to fetch new incoming messages.'}
-              </div>
-            </div>
-          ) : (
-            <div className="today-queue-list" key={`${activeTab}-${dateScope}`}>
-              {activeList.map((r, idx) => {
-                const isSelected = selected?.id === r.id;
-                const params = r.extracted_params || {};
-                const veh = cleanText(params.manufacturer_model || '');
-                const flagged = isFlaggedCategory(r.category, r.decision);
-                const b2b = isB2BCategory(r.category, r.decision);
-                const displayName = formatContactName(r.sender_name || r.sender_email, r.sender_email, veh);
-                const initials = getCleanInitials(r.sender_name || r.sender_email, r.sender_email);
-                const dtStr = (() => {
-                  try { return format(new Date(r.email_date || r.created_at), 'dd.MM · HH:mm'); } catch { return ''; }
-                })();
-                const avatarTone = flagged ? 'flagged' : b2b ? 'b2b' : r.is_qualified ? 'qualified' : 'needs-info';
-                const isLeadItem = !flagged && !b2b && r.category !== 'invoice';
-
-                return (
-                  <div
-                    key={r.id}
-                    className={`today-item${isSelected ? ' active' : ''}`}
-                    style={{ '--i': Math.min(idx, 10) }}
-                    onClick={() => selectRow(r, true)}
+        <div className={`today-workspace${mobileShowDetail && selected ? ' has-selection' : ''}`}>
+          {/* Left Queue */}
+          <div className="today-queue">
+            <div className="today-queue-top">
+              <div className="today-search-box">
+                <Search size={14} />
+                <input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search customer, vehicle, parameter…"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    className="today-search-clear"
+                    onClick={() => setSearch('')}
+                    aria-label="Clear search"
                   >
-                    <div className={`today-item-avatar ${avatarTone}`}>
-                      {initials}
-                    </div>
-
-                    <div className="today-item-body">
-                      <div className="today-item-top">
-                        <span className="today-item-sender">{displayName}</span>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                          {r.priority === 'HIGH' && (
-                            <span className="today-pill today-pill-high">HIGH</span>
-                          )}
-                          <span className="today-item-time">{dtStr}</span>
-                        </div>
-                      </div>
-
-                      <div className="today-item-subject">
-                        {cleanText(r.subject) || '(No Subject)'}
-                      </div>
-
-                      <div className="today-item-footer">
-                        {veh ? (
-                          <span className="today-pill today-pill-car" title={veh}>
-                            <Car size={11} strokeWidth={2} style={{ flexShrink: 0 }} />
-                            <span>{veh}</span>
-                          </span>
-                        ) : (
-                          <span className="today-pill today-pill-cat">
-                            {CATEGORY_SHORT_LABELS[r.category] || r.category}
-                          </span>
-                        )}
-
-                        {isLeadItem && (
-                          <span className={`today-pill ${r.is_qualified ? 'today-pill-qualified' : 'today-pill-needs'}`}>
-                            {r.is_qualified ? <CheckCircle2 size={10} /> : <Clock size={10} />}
-                            {r.is_qualified ? 'Qualified' : 'Needs Info'}
-                          </span>
-                        )}
-
-                        {r.resolution === 'ok' && (
-                          <span className="today-pill today-pill-approved">
-                            <Check size={10} />
-                            Sent
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Right Detail & Approval Studio */}
-        <div className="today-detail">
-          {!selected ? (
-            <div className="empty-state" style={{ height: '100%', justifyContent: 'center' }}>
-              <Sparkles size={30} style={{ opacity: 0.25 }} />
-              <div className="empty-state-title">Select an inquiry</div>
-              <div className="empty-state-sub">
-                Inspect extracted vehicle parameters, missing requirements, customer message, and approve the AI draft reply.
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+              <div className="today-queue-meta">
+                <span>{activeList.length} {activeList.length === 1 ? 'inquiry' : 'inquiries'} shown</span>
+                <span>{dateScope === 'TODAY' ? 'Today' : 'All time'}</span>
               </div>
             </div>
-          ) : (
-            <div className="today-detail-stack" key={selected.id}>
-              <button
-                type="button"
-                className="today-mobile-back"
-                onClick={() => setMobileShowDetail(false)}
-              >
-                <ChevronLeft size={14} />
-                Back to inquiries
-              </button>
 
-              {/* 1. Focus Summary Card */}
-              <div className="today-card">
-                <div className="today-card-body">
-                  <div className="today-detail-top">
-                    <div className="today-detail-head-info">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-                        {!isFlaggedCategory(selected.category, selected.decision) && !isB2BCategory(selected.category, selected.decision) && selected.category !== 'invoice' && (
-                          <span className={`today-pill ${selected.is_qualified ? 'today-pill-qualified' : 'today-pill-needs'}`}>
-                            {selected.is_qualified ? <CheckCircle2 size={11} /> : <Clock size={11} />}
-                            {selected.is_qualified ? 'Qualified' : 'Needs Info'}
-                          </span>
-                        )}
-
-                        {selected.priority === 'HIGH' && (
-                          <span className="today-pill today-pill-high">HIGH</span>
-                        )}
-
-                        {selected.resolution === 'ok' && (
-                          <span className="today-pill today-pill-approved">
-                            <Check size={11} />
-                            Approved
-                          </span>
-                        )}
-
-                        <span className="today-id-chip">#{String(selected.id).slice(0, 6)}</span>
-                      </div>
-
-                      <h2 className="today-detail-subject">
-                        {cleanText(selected.subject) || '(No Subject)'}
-                      </h2>
-
-                      <div className="today-detail-sender">
-                        <strong>{formatContactName(selected.sender_name || selected.sender_email, selected.sender_email, selectedVehicle)}</strong>
-                        <span style={{ color: 'var(--text-muted)' }}>
-                          {selected.reply_to || selected.sender_email}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Owner Classification Override (§2) */}
-                    <div className="today-override-box">
-                      <Tag size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                      <select
-                        className="today-override-select"
-                        value={editCategory}
-                        onChange={e => handleCategoryChange(e.target.value)}
-                        aria-label="Classification Override"
-                      >
-                        {CATEGORY_OPTIONS.map(opt => (
-                          <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Key Facts Glance Strip */}
-                  {(() => {
-                    const p = selected.extracted_params || {};
-                    const facts = [
-                      selectedVehicle && { icon: <Car size={14} strokeWidth={2} />, label: 'Vehicle', value: selectedVehicle },
-                      p.price_or_budget && { icon: <Tag size={13} />, label: 'Budget / Price', value: cleanText(String(p.price_or_budget)) },
-                      (p.first_registration || p.mileage) && {
-                        icon: <Clock size={13} />,
-                        label: p.first_registration && p.mileage ? 'Year · Mileage' : p.first_registration ? 'First Reg.' : 'Mileage',
-                        value: [p.first_registration, p.mileage].filter(Boolean).map(v => cleanText(String(v))).join(' · '),
-                      },
-                      (p.phone || p.location) && {
-                        icon: <Phone size={13} />,
-                        label: p.phone ? 'Phone' : 'Location',
-                        value: cleanText(String(p.phone || p.location)),
-                      },
-                    ].filter(Boolean);
-
-                    if (facts.length === 0) return null;
-                    return (
-                      <div className="today-facts-grid">
-                        {facts.map(f => (
-                          <div key={f.label} className="today-fact-tile">
-                            <span className="today-fact-icon">{f.icon}</span>
-                            <div style={{ minWidth: 0 }}>
-                              <div className="today-fact-label">{f.label}</div>
-                              <div className="today-fact-value" title={f.value}>{f.value}</div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })()}
-
-                  {selected.reason && (
-                    <div className="today-ai-line">
-                      <Sparkles size={13} style={{ flexShrink: 0, color: 'var(--text-primary)' }} />
-                      <span>
-                        {cleanText(selected.reason)}
-                        {selected.priority_reason ? ` · ${cleanText(selected.priority_reason)}` : ''}
-                      </span>
-                    </div>
-                  )}
-
-                  {selected.payment_deadline && (
-                    <div className="today-deadline-banner">
-                      <Calendar size={14} style={{ flexShrink: 0 }} />
-                      <span>Payment Deadline (§7): {cleanText(selected.payment_deadline)}</span>
-                    </div>
-                  )}
-
-                  {/* §6 Combined Sell + Source Linked Inquiry Banner */}
-                  {(selected.category === 'sell_and_source' || selected.linked_inquiry_id || selected.dependency_notes) && (
-                    <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 6, background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                      <div style={{ fontSize: '0.8rem' }}>
-                        <strong style={{ color: '#2563eb', display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <Link2 size={14} /> §6 Combined Vehicle Sale &amp; Sourcing Inquiry
-                        </strong>
-                        <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>
-                          {selected.dependency_notes || 'Timing & financial dependency between current vehicle sale and replacement vehicle sourcing. Changes are not auto-transferred.'}
-                        </div>
-                      </div>
-                      {selected.linked_inquiry_id ? (
-                        <button
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => {
-                            const linked = inquiries.find(i => i.id === selected.linked_inquiry_id);
-                            if (linked) selectRow(linked);
-                            else toast('Linked inquiry ID: #' + String(selected.linked_inquiry_id).slice(0, 6));
-                          }}
-                        >
-                          <Link2 size={13} /> Open Linked Inquiry (#{String(selected.linked_inquiry_id).slice(0, 6)})
-                        </button>
-                      ) : (
-                        <button className="btn btn-primary btn-sm" onClick={handleSplitSellAndSource} disabled={submitting}>
-                          <Link2 size={13} /> Create Linked Companion Inquiry (§6)
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {/* §4 Advertised Vehicle Buyer Card (Listing Match, Price Offer vs Advertised Price, Viewing & Reservation) */}
-                  {(['advertised_buyer', 'marketplace'].includes(editCategory) || selected.matched_vehicle_title || selected.buyer_offer_price || selected.reservation_requested) && (
-                    <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 6, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', fontSize: '0.8rem' }}>
-                      <strong style={{ color: '#059669', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                        <Car size={14} /> §4 Advertised Vehicle Buyer Evaluation
-                      </strong>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 8 }}>
-                        <div>
-                          <span style={{ color: 'var(--text-muted)' }}>Advertised Listing:</span>{' '}
-                          <strong>{selected.matched_vehicle_title || (selected.extracted_params || {}).manufacturer_model || 'Confirm in CRM'}</strong>
-                        </div>
-                        <div>
-                          <span style={{ color: 'var(--text-muted)' }}>Advertised Price:</span>{' '}
-                          <strong>{selected.advertised_price || 'See CRM Deal'}</strong>
-                        </div>
-                        <div>
-                          <span style={{ color: 'var(--text-muted)' }}>Buyer Price Offer (§4):</span>{' '}
-                          <strong style={{ color: selected.buyer_offer_price ? '#d97706' : 'inherit' }}>
-                            {selected.buyer_offer_price || 'None submitted'}
-                          </strong>
-                        </div>
-                        <div>
-                          <span style={{ color: 'var(--text-muted)' }}>Viewing / Reservation:</span>{' '}
-                          <strong>
-                            {selected.reservation_requested ? '⚠️ Reservation Requested (Confirm personally)' : selected.viewing_requested_time ? `Viewing: ${selected.viewing_requested_time}` : 'Standard Availability'}
-                          </strong>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+            {loading ? (
+              <div className="loading-spinner">
+                <div className="spinner spinner-dark" />
+              </div>
+            ) : activeList.length === 0 ? (
+              <div className="empty-state" style={{ flex: 1, justifyContent: 'center' }}>
+                <Sparkles size={26} style={{ opacity: 0.35 }} />
+                <div className="empty-state-title">No inquiries in this view</div>
+                <div className="empty-state-sub">
+                  {dateScope === 'TODAY'
+                    ? 'Switch to "All Inquiries" to review earlier messages.'
+                    : 'Click Sync Strato to fetch new incoming messages.'}
                 </div>
               </div>
+            ) : (
+              <div className="today-queue-list" key={`${activeTab}-${dateScope}`}>
+                {activeList.map((r, idx) => {
+                  const isSelected = selected?.id === r.id;
+                  const params = r.extracted_params || {};
+                  const veh = cleanText(params.manufacturer_model || '');
+                  const flagged = isFlaggedCategory(r.category, r.decision);
+                  const b2b = isB2BCategory(r.category, r.decision);
+                  const displayName = formatContactName(r.sender_name || r.sender_email, r.sender_email, veh);
+                  const initials = getCleanInitials(r.sender_name || r.sender_email, r.sender_email);
+                  const dtStr = (() => {
+                    try { return format(new Date(r.email_date || r.created_at), 'dd.MM · HH:mm'); } catch { return ''; }
+                  })();
+                  const avatarTone = flagged ? 'flagged' : b2b ? 'b2b' : r.is_qualified ? 'qualified' : 'needs-info';
+                  const isLeadItem = !flagged && !b2b && r.category !== 'invoice';
 
-              {/* 2. Tabbed Inspector Card: Specs & Missing Info | Original Message */}
-              {(() => {
-                const paramEntries = Object.entries(selected.extracted_params || {}).filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== '');
-                const missingFields = selected.missing_fields || [];
-                const missingCount = missingFields.length;
-                return (
-                  <div className="today-card today-inspector-card">
-                    <div className="today-inspector-bar">
-                      <div className="today-inspector-tabs" role="tablist">
-                        <button
-                          type="button"
-                          role="tab"
-                          aria-selected={detailTab === 'SPECS'}
-                          className={`today-inspector-tab${detailTab === 'SPECS' ? ' active' : ''}`}
-                          onClick={() => setDetailTab('SPECS')}
-                        >
-                          <CheckCircle2 size={13} />
-                          <span>Specs &amp; Checklist</span>
-                          {missingCount > 0 && (
-                            <span className="today-inspector-badge warn">
-                              {missingCount} missing
-                            </span>
-                          )}
-                        </button>
-
-                        <button
-                          type="button"
-                          role="tab"
-                          aria-selected={detailTab === 'MESSAGE'}
-                          className={`today-inspector-tab${detailTab === 'MESSAGE' ? ' active' : ''}`}
-                          onClick={() => setDetailTab('MESSAGE')}
-                        >
-                          <MessageSquare size={13} />
-                          <span>Original Message</span>
-                        </button>
+                  return (
+                    <div
+                      key={r.id}
+                      className={`today-item${isSelected ? ' active' : ''}`}
+                      style={{ '--i': Math.min(idx, 10) }}
+                      onClick={() => selectRow(r, true)}
+                    >
+                      <div className={`today-item-avatar ${avatarTone}`}>
+                        {initials}
                       </div>
 
-                      <span className={`today-inspector-status ${missingCount === 0 ? 'ok' : 'warn'}`}>
-                        {missingCount === 0 ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
-                        <span>{missingCount === 0 ? 'Ready to reply' : `${missingCount} field${missingCount === 1 ? '' : 's'} missing`}</span>
-                      </span>
+                      <div className="today-item-body">
+                        <div className="today-item-top">
+                          <span className="today-item-sender">{displayName}</span>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                            {r.priority === 'HIGH' && (
+                              <span className="today-pill today-pill-high">HIGH</span>
+                            )}
+                            <span className="today-item-time">{dtStr}</span>
+                          </div>
+                        </div>
+
+                        <div className="today-item-subject">
+                          {cleanText(r.subject) || '(No Subject)'}
+                        </div>
+
+                        <div className="today-item-footer">
+                          {veh ? (
+                            <span className="today-pill today-pill-car" title={veh}>
+                              <Car size={11} strokeWidth={2} style={{ flexShrink: 0 }} />
+                              <span>{veh}</span>
+                            </span>
+                          ) : (
+                            <span className="today-pill today-pill-cat">
+                              {CATEGORY_SHORT_LABELS[r.category] || r.category}
+                            </span>
+                          )}
+
+                          {isLeadItem && (
+                            <span className={`today-pill ${r.is_qualified ? 'today-pill-qualified' : 'today-pill-needs'}`}>
+                              {r.is_qualified ? <CheckCircle2 size={10} /> : <Clock size={10} />}
+                              {r.is_qualified ? 'Qualified' : 'Needs Info'}
+                            </span>
+                          )}
+
+                          {r.resolution === 'ok' && (
+                            <span className="today-pill today-pill-approved">
+                              <Check size={10} />
+                              Sent
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Right Detail & Approval Studio */}
+          <div className="today-detail">
+            {!selected ? (
+              <div className="empty-state" style={{ height: '100%', justifyContent: 'center' }}>
+                <Sparkles size={30} style={{ opacity: 0.25 }} />
+                <div className="empty-state-title">Select an inquiry</div>
+                <div className="empty-state-sub">
+                  Inspect extracted vehicle parameters, missing requirements, customer message, and approve the AI draft reply.
+                </div>
+              </div>
+            ) : (
+              <div className="today-detail-stack" key={selected.id}>
+                <button
+                  type="button"
+                  className="today-mobile-back"
+                  onClick={() => setMobileShowDetail(false)}
+                >
+                  <ChevronLeft size={14} />
+                  Back to inquiries
+                </button>
+
+                {/* 1. Focus Summary Card */}
+                <div className="today-card">
+                  <div className="today-card-body">
+                    <div className="today-detail-top">
+                      <div className="today-detail-head-info">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                          {!isFlaggedCategory(selected.category, selected.decision) && !isB2BCategory(selected.category, selected.decision) && selected.category !== 'invoice' && (
+                            <span className={`today-pill ${selected.is_qualified ? 'today-pill-qualified' : 'today-pill-needs'}`}>
+                              {selected.is_qualified ? <CheckCircle2 size={11} /> : <Clock size={11} />}
+                              {selected.is_qualified ? 'Qualified' : 'Needs Info'}
+                            </span>
+                          )}
+
+                          {selected.priority === 'HIGH' && (
+                            <span className="today-pill today-pill-high">HIGH</span>
+                          )}
+
+                          {selected.resolution === 'ok' && (
+                            <span className="today-pill today-pill-approved">
+                              <Check size={11} />
+                              Approved
+                            </span>
+                          )}
+
+                          <span className="today-id-chip">#{String(selected.id).slice(0, 6)}</span>
+                        </div>
+
+                        <h2 className="today-detail-subject">
+                          {cleanText(selected.subject) || '(No Subject)'}
+                        </h2>
+
+                        <div className="today-detail-sender">
+                          <strong>{formatContactName(selected.sender_name || selected.sender_email, selected.sender_email, selectedVehicle)}</strong>
+                          <span style={{ color: 'var(--text-muted)' }}>
+                            {selected.reply_to || selected.sender_email}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Owner Classification Override (§2) */}
+                      <div className="today-override-box">
+                        <Tag size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                        <select
+                          className="today-override-select"
+                          value={editCategory}
+                          onChange={e => handleCategoryChange(e.target.value)}
+                          aria-label="Classification Override"
+                        >
+                          {CATEGORY_OPTIONS.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
 
-                    {detailTab === 'SPECS' ? (
-                      <div className="today-inspector-split" key={`specs-${selected.id}`}>
-                        {/* Extracted Parameters */}
-                        <div className="today-inspector-pane">
-                          <div className="today-pane-header">
-                            <span className="today-section-kicker">Extracted Details</span>
-                            <span className="today-kicker-count">{paramEntries.length}</span>
-                          </div>
-                          {paramEntries.length === 0 ? (
-                            <div className="today-pane-empty">
-                              No structured parameters detected yet.
-                            </div>
-                          ) : (
-                            <div className="today-param-grid">
-                              {paramEntries.map(([k, v]) => {
-                                const valText = cleanText(String(v));
-                                return (
-                                  <div key={k} className="today-param-tile" title={valText}>
-                                    <span className="today-param-icon">{getParamIcon(k)}</span>
-                                    <div className="today-param-content">
-                                      <span className="today-param-label">{PARAM_LABELS[k] || k}</span>
-                                      <span className="today-param-val">{valText}</span>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
+                    {/* Key Facts Glance Strip */}
+                    {(() => {
+                      const p = selected.extracted_params || {};
+                      const facts = [
+                        selectedVehicle && { icon: <Car size={14} strokeWidth={2} />, label: 'Vehicle', value: selectedVehicle },
+                        p.price_or_budget && { icon: <Tag size={13} />, label: 'Budget / Price', value: cleanText(String(p.price_or_budget)) },
+                        (p.first_registration || p.mileage) && {
+                          icon: <Clock size={13} />,
+                          label: p.first_registration && p.mileage ? 'Year · Mileage' : p.first_registration ? 'First Reg.' : 'Mileage',
+                          value: [p.first_registration, p.mileage].filter(Boolean).map(v => cleanText(String(v))).join(' · '),
+                        },
+                        (p.phone || p.location) && {
+                          icon: <Phone size={13} />,
+                          label: p.phone ? 'Phone' : 'Location',
+                          value: cleanText(String(p.phone || p.location)),
+                        },
+                      ].filter(Boolean);
 
-                        {/* Missing Info */}
-                        <div className="today-inspector-pane">
-                          <div className="today-pane-header">
-                            <span className="today-section-kicker">Missing Info</span>
-                            <span className={`today-kicker-count ${missingCount === 0 ? 'ok' : 'warn'}`}>
-                              {missingCount}
-                            </span>
-                          </div>
-                          {missingCount === 0 ? (
-                            <div className="today-complete-note">
-                              <span className="today-complete-icon">
-                                <CheckCircle2 size={14} />
-                              </span>
-                              <div>
-                                <div className="today-complete-title">All key fields present</div>
-                                <div className="today-complete-sub">Ready to call or reply.</div>
+                      if (facts.length === 0) return null;
+                      return (
+                        <div className="today-facts-grid">
+                          {facts.map(f => (
+                            <div key={f.label} className="today-fact-tile">
+                              <span className="today-fact-icon">{f.icon}</span>
+                              <div style={{ minWidth: 0 }}>
+                                <div className="today-fact-label">{f.label}</div>
+                                <div className="today-fact-value" title={f.value}>{f.value}</div>
                               </div>
                             </div>
-                          ) : (
-                            <div className="today-missing-chips">
-                              {missingFields.map((m, idx) => (
-                                <span key={idx} className="today-missing-chip">
-                                  <AlertCircle size={11} style={{ flexShrink: 0 }} />
-                                  <span>{cleanText(m)}</span>
-                                </span>
-                              ))}
-                            </div>
-                          )}
+                          ))}
                         </div>
+                      );
+                    })()}
+
+                    {selected.reason && (
+                      <div className="today-ai-line">
+                        <Sparkles size={13} style={{ flexShrink: 0, color: 'var(--text-primary)' }} />
+                        <span>
+                          {cleanText(selected.reason)}
+                          {selected.priority_reason ? ` · ${cleanText(selected.priority_reason)}` : ''}
+                        </span>
                       </div>
-                    ) : (
-                      <div className="today-message-wrap">
-                        <div className="today-message-box" key={`msg-${selected.id}`}>
-                          {cleanMultilineText(selected.body_preview) || '(Empty message body)'}
+                    )}
+
+                    {selected.payment_deadline && (
+                      <div className="today-deadline-banner">
+                        <Calendar size={14} style={{ flexShrink: 0 }} />
+                        <span>Payment Deadline (§7): {cleanText(selected.payment_deadline)}</span>
+                      </div>
+                    )}
+
+                    {/* §6 Combined Sell + Source Linked Inquiry Banner */}
+                    {(selected.category === 'sell_and_source' || selected.linked_inquiry_id || selected.dependency_notes) && (
+                      <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 6, background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                        <div style={{ fontSize: '0.8rem' }}>
+                          <strong style={{ color: '#2563eb', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <Link2 size={14} /> §6 Combined Vehicle Sale &amp; Sourcing Inquiry
+                          </strong>
+                          <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>
+                            {selected.dependency_notes || 'Timing & financial dependency between current vehicle sale and replacement vehicle sourcing. Changes are not auto-transferred.'}
+                          </div>
+                        </div>
+                        {selected.linked_inquiry_id ? (
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => {
+                              const linked = inquiries.find(i => i.id === selected.linked_inquiry_id);
+                              if (linked) selectRow(linked);
+                              else toast('Linked inquiry ID: #' + String(selected.linked_inquiry_id).slice(0, 6));
+                            }}
+                          >
+                            <Link2 size={13} /> Open Linked Inquiry (#{String(selected.linked_inquiry_id).slice(0, 6)})
+                          </button>
+                        ) : (
+                          <button className="btn btn-primary btn-sm" onClick={handleSplitSellAndSource} disabled={submitting}>
+                            <Link2 size={13} /> Create Linked Companion Inquiry (§6)
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* §4 Advertised Vehicle Buyer Card (Listing Match, Price Offer vs Advertised Price, Viewing & Reservation) */}
+                    {(['advertised_buyer', 'marketplace'].includes(editCategory) || selected.matched_vehicle_title || selected.buyer_offer_price || selected.reservation_requested) && (
+                      <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 6, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', fontSize: '0.8rem' }}>
+                        <strong style={{ color: '#059669', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                          <Car size={14} /> §4 Advertised Vehicle Buyer Evaluation
+                        </strong>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 8 }}>
+                          <div>
+                            <span style={{ color: 'var(--text-muted)' }}>Advertised Listing:</span>{' '}
+                            <strong>{selected.matched_vehicle_title || (selected.extracted_params || {}).manufacturer_model || 'Confirm in CRM'}</strong>
+                          </div>
+                          <div>
+                            <span style={{ color: 'var(--text-muted)' }}>Advertised Price:</span>{' '}
+                            <strong>{selected.advertised_price || 'See CRM Deal'}</strong>
+                          </div>
+                          <div>
+                            <span style={{ color: 'var(--text-muted)' }}>Buyer Price Offer (§4):</span>{' '}
+                            <strong style={{ color: selected.buyer_offer_price ? '#d97706' : 'inherit' }}>
+                              {selected.buyer_offer_price || 'None submitted'}
+                            </strong>
+                          </div>
+                          <div>
+                            <span style={{ color: 'var(--text-muted)' }}>Viewing / Reservation:</span>{' '}
+                            <strong>
+                              {selected.reservation_requested ? '⚠️ Reservation Requested (Confirm personally)' : selected.viewing_requested_time ? `Viewing: ${selected.viewing_requested_time}` : 'Standard Availability'}
+                            </strong>
+                          </div>
                         </div>
                       </div>
                     )}
                   </div>
-                );
-              })()}
-
-              {/* Action Bar for B2B Inquiries */}
-              {isB2BCategory(editCategory, selected.decision) && (
-                <div className="today-card today-b2b-card">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 'var(--radius)',
-                        background: '#EFF6FF',
-                        color: '#2563EB',
-                        border: '1px solid #BFDBFE',
-                        display: 'grid',
-                        placeItems: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <Briefcase size={16} />
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-primary)' }}>
-                        B2B Cooperation / Service Offer (§7)
-                      </div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                        Convert this message into a B2B Deal in B2B &amp; Partners.
-                      </div>
-                    </div>
-                  </div>
-                  <button className="btn btn-primary btn-sm" onClick={handleCreateB2BFromInquiry} disabled={submitting}>
-                    <Briefcase size={13} />
-                    <span>Create B2B Deal</span>
-                    <ArrowRight size={13} />
-                  </button>
                 </div>
-              )}
 
-              {/* 3. Owner-Approved Draft Response Editor (§1, §3, §4, §5) */}
-              {isCustomerCategory(editCategory) && (
-                <div className="today-card">
-                  <div className="today-card-head">
-                    <div className="today-card-title">
-                      <Sparkles size={14} style={{ color: 'var(--text-primary)' }} />
-                      <span>AI Draft Reply</span>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 400, color: 'var(--text-muted)' }}>
-                        &middot; {autoReply ? 'Auto-reply enabled' : 'Sent only after your approval'}
+                {/* 2. Tabbed Inspector Card: Specs & Missing Info | Original Message */}
+                {(() => {
+                  const paramEntries = Object.entries(selected.extracted_params || {}).filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== '');
+                  const missingFields = selected.missing_fields || [];
+                  const missingCount = missingFields.length;
+                  return (
+                    <div className="today-card today-inspector-card">
+                      <div className="today-inspector-bar">
+                        <div className="today-inspector-tabs" role="tablist">
+                          <button
+                            type="button"
+                            role="tab"
+                            aria-selected={detailTab === 'SPECS'}
+                            className={`today-inspector-tab${detailTab === 'SPECS' ? ' active' : ''}`}
+                            onClick={() => setDetailTab('SPECS')}
+                          >
+                            <CheckCircle2 size={13} />
+                            <span>Specs &amp; Checklist</span>
+                            {missingCount > 0 && (
+                              <span className="today-inspector-badge warn">
+                                {missingCount} missing
+                              </span>
+                            )}
+                          </button>
+
+                          <button
+                            type="button"
+                            role="tab"
+                            aria-selected={detailTab === 'MESSAGE'}
+                            className={`today-inspector-tab${detailTab === 'MESSAGE' ? ' active' : ''}`}
+                            onClick={() => setDetailTab('MESSAGE')}
+                          >
+                            <MessageSquare size={13} />
+                            <span>Original Message</span>
+                          </button>
+                        </div>
+
+                        <span className={`today-inspector-status ${missingCount === 0 ? 'ok' : 'warn'}`}>
+                          {missingCount === 0 ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
+                          <span>{missingCount === 0 ? 'Ready to reply' : `${missingCount} field${missingCount === 1 ? '' : 's'} missing`}</span>
+                        </span>
+                      </div>
+
+                      {detailTab === 'SPECS' ? (
+                        <div className="today-inspector-split" key={`specs-${selected.id}`}>
+                          {/* Extracted Parameters */}
+                          <div className="today-inspector-pane">
+                            <div className="today-pane-header">
+                              <span className="today-section-kicker">Extracted Details</span>
+                              <span className="today-kicker-count">{paramEntries.length}</span>
+                            </div>
+                            {paramEntries.length === 0 ? (
+                              <div className="today-pane-empty">
+                                No structured parameters detected yet.
+                              </div>
+                            ) : (
+                              <div className="today-param-grid">
+                                {paramEntries.map(([k, v]) => {
+                                  const valText = cleanText(String(v));
+                                  return (
+                                    <div key={k} className="today-param-tile" title={valText}>
+                                      <span className="today-param-icon">{getParamIcon(k)}</span>
+                                      <div className="today-param-content">
+                                        <span className="today-param-label">{PARAM_LABELS[k] || k}</span>
+                                        <span className="today-param-val">{valText}</span>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Missing Info */}
+                          <div className="today-inspector-pane">
+                            <div className="today-pane-header">
+                              <span className="today-section-kicker">Missing Info</span>
+                              <span className={`today-kicker-count ${missingCount === 0 ? 'ok' : 'warn'}`}>
+                                {missingCount}
+                              </span>
+                            </div>
+                            {missingCount === 0 ? (
+                              <div className="today-complete-note">
+                                <span className="today-complete-icon">
+                                  <CheckCircle2 size={14} />
+                                </span>
+                                <div>
+                                  <div className="today-complete-title">All key fields present</div>
+                                  <div className="today-complete-sub">Ready to call or reply.</div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="today-missing-chips">
+                                {missingFields.map((m, idx) => (
+                                  <span key={idx} className="today-missing-chip">
+                                    <AlertCircle size={11} style={{ flexShrink: 0 }} />
+                                    <span>{cleanText(m)}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="today-message-wrap">
+                          <div className="today-message-box" key={`msg-${selected.id}`}>
+                            {cleanMultilineText(selected.body_preview) || '(Empty message body)'}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Action Bar for B2B Inquiries */}
+                {isB2BCategory(editCategory, selected.decision) && (
+                  <div className="today-card today-b2b-card">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 'var(--radius)',
+                          background: '#EFF6FF',
+                          color: '#2563EB',
+                          border: '1px solid #BFDBFE',
+                          display: 'grid',
+                          placeItems: 'center',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <Briefcase size={16} />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-primary)' }}>
+                          B2B Cooperation / Service Offer (§7)
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                          Convert this message into a B2B Deal in B2B &amp; Partners.
+                        </div>
+                      </div>
+                    </div>
+                    <button className="btn btn-primary btn-sm" onClick={handleCreateB2BFromInquiry} disabled={submitting}>
+                      <Briefcase size={13} />
+                      <span>Create B2B Deal</span>
+                      <ArrowRight size={13} />
+                    </button>
+                  </div>
+                )}
+
+                {/* 3. Owner-Approved Draft Response Editor (§1, §3, §4, §5) */}
+                {isCustomerCategory(editCategory) && (
+                  <div className="today-card">
+                    <div className="today-card-head">
+                      <div className="today-card-title">
+                        <Sparkles size={14} style={{ color: 'var(--text-primary)' }} />
+                        <span>AI Draft Reply</span>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 400, color: 'var(--text-muted)' }}>
+                          &middot; {autoReply ? 'Auto-reply enabled' : 'Sent only after your approval'}
+                        </span>
+                      </div>
+                      <span className="today-pill today-pill-approved" style={{ textTransform: 'capitalize' }}>
+                        {selected.draft_status || 'pending'}
                       </span>
                     </div>
-                    <span className="today-pill today-pill-approved" style={{ textTransform: 'capitalize' }}>
-                      {selected.draft_status || 'pending'}
-                    </span>
-                  </div>
 
-                  <div className="today-card-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <div>
-                      <label className="form-label" style={{ display: 'block', marginBottom: 4 }}>Subject</label>
-                      <input
-                        className="input"
-                        value={draftSubject}
-                        onChange={e => setDraftSubject(e.target.value)}
-                      />
-                    </div>
+                    <div className="today-card-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div>
+                        <label className="form-label" style={{ display: 'block', marginBottom: 4 }}>Subject</label>
+                        <input
+                          className="input"
+                          value={draftSubject}
+                          onChange={e => setDraftSubject(e.target.value)}
+                        />
+                      </div>
 
-                    <div>
-                      <label className="form-label" style={{ display: 'block', marginBottom: 4 }}>
-                        Message
-                      </label>
-                      <textarea
-                        className="textarea"
-                        rows={6}
-                        value={draftBody}
-                        onChange={e => setDraftBody(e.target.value)}
-                        style={{ lineHeight: 1.55 }}
-                      />
-                    </div>
+                      <div>
+                        <label className="form-label" style={{ display: 'block', marginBottom: 4 }}>
+                          Message
+                        </label>
+                        <textarea
+                          className="textarea"
+                          rows={6}
+                          value={draftBody}
+                          onChange={e => setDraftBody(e.target.value)}
+                          style={{ lineHeight: 1.55 }}
+                        />
+                      </div>
 
-                    <div className="today-draft-actions">
-                      <button
-                        className="btn btn-primary"
-                        onClick={() => handleApproveAndSend(true)}
-                        disabled={submitting}
-                      >
-                        <Send size={13} />
-                        <span>Approve &amp; Send Reply</span>
-                      </button>
+                      <div className="today-draft-actions">
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => handleApproveAndSend(true)}
+                          disabled={submitting}
+                        >
+                          <Send size={13} />
+                          <span>Approve &amp; Send Reply</span>
+                        </button>
 
-                      <button
-                        className="btn btn-secondary"
-                        onClick={() => handleApproveAndSend(false)}
-                        disabled={submitting}
-                      >
-                        <Check size={13} />
-                        <span>Approve Only (No Email)</span>
-                      </button>
+                        <button
+                          className="btn btn-secondary"
+                          onClick={() => handleApproveAndSend(false)}
+                          disabled={submitting}
+                        >
+                          <Check size={13} />
+                          <span>Approve Only (No Email)</span>
+                        </button>
 
-                      <button
-                        className="btn btn-danger today-spam-btn"
-                        onClick={handleFlagAsSpam}
-                        disabled={submitting}
-                      >
-                        <X size={13} />
-                        <span>Mark as Spam</span>
-                      </button>
+                        <button
+                          className="btn btn-danger today-spam-btn"
+                          onClick={handleFlagAsSpam}
+                          disabled={submitting}
+                        >
+                          <X size={13} />
+                          <span>Mark as Spam</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
-          )}
+                )}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
       )}
 
       {/* §10 Working Hours & Bavarian Holidays Configuration Modal */}
